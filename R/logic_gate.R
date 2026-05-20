@@ -302,3 +302,18 @@ IdentifyLogicGateConsensus <- function(reo_mat,
     stringsAsFactors = FALSE
   )
 }
+
+#' Print method for LogicGateResult
+#' @param x LogicGateResult object.
+#' @param ... ignored.
+#' @export
+print.LogicGateResult <- function(x, ...) {
+  n_total <- nrow(x)
+  n_scored <- sum(is.finite(x$regulated_lcs), na.rm = TRUE)
+  n_blocked <- sum(is.finite(x$block_rate) & x$block_rate > 0, na.rm = TRUE)
+  cat(sprintf("LogicGateResult: %d pairs | scored: %d | modulator-blocked: %d\n",
+              n_total, n_scored, n_blocked))
+  show_cols <- intersect(c("lr_pair", "base_lcs", "regulated_lcs", "delta_lcs", "block_rate"), names(x))
+  if (length(show_cols) > 0) print(utils::head(as.data.frame(x)[, show_cols, drop = FALSE], 5), row.names = FALSE)
+  invisible(x)
+}

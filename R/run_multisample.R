@@ -13,7 +13,7 @@
 #' set \code{mc_cores = 1} (fork-based parallelism is unsupported on Windows).
 #'
 #' Memory tip: for very large datasets (> 100k cells per sample), pass
-#' BPCells \code{IterableMatrix} objects in \code{sample_list} — LogicComm
+#' BPCells \code{IterableMatrix} objects in \code{sample_list}; LogicComm
 #' will stream them chunk by chunk.
 #'
 #' @param sample_list Named list of expression inputs per sample. Each element
@@ -23,7 +23,7 @@
 #'     \item A \code{Seurat} object
 #'     \item A \code{BPCells} \code{IterableMatrix}
 #'   }
-#' @param group_info Named character vector: sample name → group label
+#' @param group_info Named character vector: sample name -> group label
 #'   (e.g. \code{c(s1="Case", s2="Ctrl")}). Must cover all names in
 #'   \code{sample_list}. Alternatively, an unnamed vector in the same order.
 #' @param lr_db LR database. Default: \code{lr_pairs_human}.
@@ -96,7 +96,7 @@ run_multisample <- function(sample_list,
   graph_symmetrize <- match.arg(graph_symmetrize)
   edge_weight_mode <- match.arg(edge_weight_mode)
 
-  # ── 1. Validate ───────────────────────────────────────────────────────────
+  # 1. Validate
   if (is.null(names(sample_list))) {
     names(sample_list) <- paste0("Sample", seq_along(sample_list))
   }
@@ -119,7 +119,7 @@ run_multisample <- function(sample_list,
       nrow(lr_db), mc_cores))
   }
 
-  # ── 2. Per-sample REO + LCS ───────────────────────────────────────────────
+  # 2. Per-sample REO + LCS
   sample_names <- names(sample_list)
 
   run_one <- function(sname) {
@@ -177,7 +177,7 @@ run_multisample <- function(sample_list,
   }
   if (length(lcs_list) == 0) stop("All samples failed. Check input data.")
 
-  # ── 3. Group comparison ───────────────────────────────────────────────────
+  # 3. Group comparison
   if (verbose) message("[MultiSample] Running group comparison...")
   comparison <- CompareLogicGroups(
     lcs_list, group_info = group_info,
@@ -186,7 +186,7 @@ run_multisample <- function(sample_list,
     min_samples_per_group = min_samples_per_group,
     verbose = verbose)
 
-  # ── 4. Assemble output ────────────────────────────────────────────────────
+  # 4. Assemble output
   result <- structure(
     list(
       lcs_list   = lcs_list,
@@ -230,7 +230,7 @@ print.LogicCommMulti <- function(x, ...) {
               p$n_samples, p$n_lr_pairs))
   cat(sprintf("Groups: %s vs %s | rank_threshold=%.2f | lcs_threshold=%.3f\n",
               p$case_label, p$ctrl_label, p$rank_threshold, p$lcs_threshold))
-  cat("─── Top enriched pairs ──────────────────────────\n")
+  cat("--- Top enriched pairs --------------------------\n")
   print.LogicCommResult(x$comparison, n = 5)
   invisible(x)
 }

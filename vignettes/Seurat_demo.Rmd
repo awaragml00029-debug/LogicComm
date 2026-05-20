@@ -1,5 +1,5 @@
 ---
-title: "Seurat_demo: PBMC3K LogicComm Tutorial"
+title: "Seurat_demo: PBMC3K LogicComm Tutorial / PBMC3K 中英文教程"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Seurat_demo: PBMC3K LogicComm Tutorial}
@@ -23,6 +23,9 @@ knitr::opts_chunk$set(
 This tutorial shows how to run **LogicComm** on the classic **PBMC3K** dataset
 with a Seurat workflow.
 
+**中文说明。** 本教程演示如何在经典 **PBMC3K** 数据集上结合 Seurat 使用
+**LogicComm**。英文段落保留方法学细节，中文段落提供对应解释，方便中英文对照阅读。
+
 The goal is to demonstrate a practical single-sample workflow:
 
 1. Load PBMC3K as a `Seurat` object.
@@ -35,8 +38,23 @@ The goal is to demonstrate a practical single-sample workflow:
 8. Summarize celltypeA -> celltypeB communication counts, strengths, pathways,
    and signaling roles.
 
+中文流程对应为：
+
+1. 读取 PBMC3K，并构建 Seurat 对象。
+2. 运行标准 Seurat 预处理，建立 KNN 邻居图。
+3. 将表达矩阵转换成 LogicComm 的 REO 二值逻辑矩阵。
+4. 基于 Seurat KNN 计算配体-受体 LCS 分数。
+5. 评估每个细胞作为发送者或接收者的通讯活性。
+6. 在 UMAP 上展示通讯活性。
+7. 汇总高活性的配体-受体对和 cluster 层面的信号。
+8. 汇总 celltypeA -> celltypeB 的通讯强度、通路和信号角色。
+
 PBMC3K is a single sample, so this tutorial focuses on **within-sample discovery**.
 For Case vs Control or cohort-level analysis, see `LogicComm-intro.Rmd`.
+
+**中文说明。** PBMC3K 只有一个样本，因此这里重点展示“单样本内发现”：哪些细胞类型
+可能发送信号、接收信号、处于通讯枢纽位置，以及哪些 L-R 轴值得进一步验证。病例-对照
+或队列水平比较应使用多个独立生物样本，而不是把所有细胞混在一起当重复。
 
 A publication-style biological question for this vignette is:
 
@@ -48,9 +66,29 @@ The later sections translate raw LogicComm scores into figure-ready summaries,
 role confidence, edge-support QC, optional receiver-response evidence, spatial
 neighborhood analysis, pseudotime dynamics, and sample-level differential models.
 
+**中文说明。** 后续章节会把原始 LCS 分数转成更适合发表图表和生物学解释的结果，包括
+细胞类型通讯网络、角色分析、边支持度质控、受体下游响应证据、空间邻域扩展、拟时序动态
+以及多样本差异模型。
+
+### Key terms / 关键术语
+
+| English term | 中文解释 |
+|---|---|
+| REO matrix | 相对表达排序得到的二值逻辑矩阵，表示每个细胞内基因是否相对活跃。 |
+| LCS | Logic Consensus Score，表示配体-受体逻辑在细胞或邻域边中被满足的比例。 |
+| neighborhood mode | 使用 Seurat KNN/SNN 或空间图，只把邻近细胞之间的 L-R 逻辑作为局部证据。 |
+| global potential | 不依赖局部邻居图的细胞类型层面通讯潜力，可补充远距离或图中漏掉的信号。 |
+| self-loop | 单个细胞自己连自己，例如 `CellA -> CellA`，默认去掉。 |
+| same-cell-type signaling | 同一细胞类型内部通讯，例如 `T cell -> T cell`，默认保留。 |
+| autocrine-like / homotypic | 自分泌样或同类细胞通讯潜力，不能直接证明同一个单细胞自己分泌并自己接收。 |
+
 ---
 
 ## Installation
+
+**中文说明。** 安装分为三部分：R 包基础依赖、Seurat 工作流依赖，以及可选可视化依赖。
+如果只是检查 LogicComm 包本身，可以先不安装 Seurat；如果要完整运行本教程，需要安装
+Seurat 和 PBMC3K 数据。
 
 ```{r install, eval=FALSE}
 # Core dependencies
@@ -84,6 +122,9 @@ end of this tutorial.
 
 ## Load Packages
 
+**中文说明。** 这里加载 LogicComm、Seurat、PBMC3K 数据包、稀疏矩阵和 ggplot2。
+如果某些可选包没有安装，只会影响对应扩展图或教程块，不影响核心 LCS 计算。
+
 ```{r load_packages, eval=FALSE}
 library(LogicComm)
 library(Seurat)
@@ -95,6 +136,9 @@ library(ggplot2)
 ---
 
 ## Step 1: Load PBMC3K
+
+**中文说明。** 第一步读取 PBMC3K。它是一个经典外周血单细胞数据集，适合演示
+免疫细胞之间的通讯发现流程。
 
 ```{r load_pbmc3k, eval=FALSE}
 # Load the SeuratData PBMC3K object
@@ -113,6 +157,10 @@ Because this is not a disease-vs-control dataset, the main biological question i
 not differential signaling, but which immune communication programs are active
 inside this one resting PBMC sample.
 
+**中文说明。** 因为 PBMC3K 不是疾病组和对照组的比较数据，所以不要把结果解读成
+“疾病差异通讯”。更合适的问题是：在这个健康 PBMC 样本中，哪些免疫细胞群体可能在
+发送、接收或协调配体-受体信号。
+
 If your object uses Seurat v5, LogicComm can read a named assay layer such as
 `"counts"`. In Seurat v4, this corresponds to the counts slot.
 
@@ -123,6 +171,10 @@ If your object uses Seurat v5, LogicComm can read a named assay layer such as
 LogicComm itself does not require Seurat normalization, but KNN mode needs a
 cell-cell graph. We therefore run a normal Seurat preprocessing workflow to build
 neighbors and UMAP.
+
+**中文说明。** LogicComm 的 REO 逻辑本身不依赖 Seurat 标准化，但如果要使用
+KNN 邻域模式，就需要 Seurat 的细胞-细胞邻居图。因此这里先运行标准 Seurat 流程，
+得到 `RNA_nn` / `RNA_snn` 图和 UMAP。
 
 ```{r seurat_preprocess, eval=FALSE}
 pbmc <- NormalizeData(pbmc, verbose = FALSE)
@@ -157,12 +209,20 @@ with high neighborhood LCS means the ligand-active and receptor-active cells are
 close in the PBMC transcriptional manifold, not merely present somewhere in the
 sample.
 
+**中文说明。** `RNA_nn` 在这里代表转录组空间里的局部邻近关系。高 neighborhood
+LCS 的含义不是“这个样本里有 ligand 也有 receptor”这么简单，而是 ligand 活跃细胞
+和 receptor 活跃细胞经常出现在邻近关系中。
+
 ---
 
 ## Step 3: Build the LogicComm REO Matrix
 
 REO converts each cell into binary gene logic states. A gene is active if its
 expression is above a within-cell quantile anchor.
+
+**中文说明。** REO 不是普通归一化表达矩阵，而是把每个细胞内的基因表达转换成
+“活跃/不活跃”的逻辑状态。这样可以减少测序深度等绝对表达量差异的影响，更关注
+每个细胞内部的相对表达排序。
 
 For PBMC3K, we usually only need genes that appear in the built-in
 ligand-receptor database. `lr_pairs_human` is a compact 109-interaction human
@@ -222,6 +282,10 @@ head(gate_pbmc_cellchat[order(gate_pbmc_cellchat$regulated_lcs, decreasing = TRU
 ```
 
 Practical cautions when using the full CellChatDB:
+
+**中文说明。** 可以把 CellChatDB 转成 LogicComm 的 LR 数据库格式直接使用，但需要注意：
+数据库越大，搜索空间越大，计算和解释都更复杂；不要把每一个正分数都当成已经验证的
+生物学事件。
 
 - It is much larger than `lr_pairs_human`, so REO and LCS scoring can take longer.
 - More tested interactions also means a larger multiple-testing/search space; rank
@@ -288,6 +352,10 @@ Now calculate ligand-receptor activity using the Seurat KNN graph. In
 neighborhood mode, a pair is counted when a sender cell has the ligand active and
 its neighboring receiver cell has the receptor active.
 
+**中文说明。** 这一步计算 LCS。直观理解：如果一个细胞的 ligand 是活跃的，而它邻近的
+另一个细胞 receptor 也是活跃的，这条邻域边就支持该 L-R 通讯。LCS 越高，说明这种
+邻域层面的 ligand -> receptor 逻辑越常见。
+
 ```{r lcs_seurat_knn, eval=FALSE}
 lcs_pbmc <- IdentifyLogicConsensus(
   reo_pbmc,
@@ -351,6 +419,29 @@ instead of silently calculating mismatched cell-cell communication. Diagonal
 self-loops are removed by default; set `remove_self_edges = FALSE` only for a
 specific sensitivity analysis.
 
+**中文说明：self-loop 与同类通讯不是一回事。** 默认去掉的是细胞级别的自环，
+也就是 `CellA -> CellA`。这样可以避免把同一个细胞内 ligand/receptor 共表达直接当成
+“细胞间通讯证据”。但这并不会删除同一细胞类型内部通讯，例如 `Tumor -> Tumor`、
+`Macrophage -> Macrophage` 或 `T cell -> T cell`。这些 same-cell-type 结果仍然保留，
+可以解释为 autocrine-like / homotypic / within-cell-type signaling potential，
+也就是类似 CellChat 中常见的同类细胞通讯或自分泌样通讯潜力。
+
+### 4.1 Same-cell-type signaling and autocrine-like interpretation
+
+LogicComm follows the same practical interpretation used by many cell-cell
+communication tools: a same-cell-type edge such as `Tumor -> Tumor` or
+`Macrophage -> Macrophage` is kept by default and interpreted as same-population,
+homotypic, or autocrine-like signaling potential. This result does not prove that
+the exact same single cell secreted and received the ligand. It means the sender
+and receiver populations are the same annotated cell type.
+
+**中文说明。** LogicComm 默认保留同一细胞类型内部通讯，这和 CellChat 中常见的
+`celltype -> same celltype` 解释方式一致。也就是说，`Tumor -> Tumor` 可以作为
+自分泌样或同类细胞通讯潜力来解释，但不要过度声称它证明了“同一个单细胞自己分泌、
+自己接收”。默认去掉 `CellA -> CellA` 自环，是为了避免把单细胞内 L/R 共表达直接当成
+邻域通讯主证据；默认保留 `celltypeA -> celltypeA`，是为了保留同类细胞群体内部的
+通讯信息。
+
 **Biological interpretation.** `RNA_nn` and `RNA_snn` answer slightly different
 questions. `RNA_nn` is closer to "which cells are immediate transcriptional
 neighbors?" and is therefore the preferred graph for local L-R logic. `RNA_snn`
@@ -362,6 +453,9 @@ cautiously and inspect whether they are driven by cluster boundaries.
 ---
 
 ## Step 5: Convert LCS Vector to a Table
+
+**中文说明。** `IdentifyLogicConsensus()` 返回的是一个命名向量。为了查看、排序、保存
+或和其他结果合并，通常先把它转成普通表格。
 
 ```{r lcs_table, eval=FALSE}
 lcs_tbl <- data.frame(
@@ -398,6 +492,9 @@ write.csv(lcs_tbl, "PBMC3K_LogicComm_LCS.csv", row.names = FALSE)
 `score_lr_activity()` estimates how strongly each cell participates in active
 ligand-receptor logic as sender and/or receiver.
 
+**中文说明。** 这里不是在判断某个具体 L-R 对，而是在问每个细胞总体上更像“发送者”、
+“接收者”，还是两者都强。它适合在 UMAP 上快速定位通讯活跃的细胞区域。
+
 ```{r score_cells, eval=FALSE}
 cell_scores <- score_lr_activity(
   reo_pbmc,
@@ -431,6 +528,9 @@ threshold.
 ---
 
 ## Step 7: Add Scores Back to Seurat Metadata
+
+**中文说明。** 把 LogicComm 分数写回 Seurat metadata 后，就可以直接用 Seurat 的
+`FeaturePlot()`、`VlnPlot()` 等函数展示通讯活性。
 
 ```{r add_metadata, eval=FALSE}
 # score_lr_activity() returns a list, not a data.frame.
@@ -480,6 +580,9 @@ program.
 
 If you have cluster labels, LogicComm can help identify which clusters show the
 logic state for selected L-R pairs.
+
+**中文说明。** 这一步把排名靠前的 L-R 对映射回 cluster 或 cell type，帮助判断可能的
+发送细胞群和接收细胞群。它是从“分数列表”走向“生物学解释”的关键步骤。
 
 ```{r cluster_labels, eval=FALSE}
 # Choose an annotation column if present; otherwise use Seurat clusters.
@@ -534,6 +637,11 @@ A critical biological question is: **how** do these cells talk?
 
 LogicComm now automatically classifies communication events into these ranges by comparing neighborhood-based scores with global potential.
 
+**中文说明。** 这一节是发表级解释的重点：不只看某个 L-R 对有没有分数，还要看它是
+局部邻域支持的信号、同类细胞内部信号，还是可能被 KNN 图漏掉的远距离候选信号。
+LogicComm 会同时报告 local neighborhood evidence 和 global candidate potential，
+避免把远距离通讯简单丢掉。
+
 ```{r summarize_celltype_comm, eval=FALSE}
 # Use a biological annotation column
 label_col <- if ("seurat_annotations" %in% colnames(pbmc@meta.data)) {
@@ -545,16 +653,18 @@ label_col <- if ("seurat_annotations" %in% colnames(pbmc@meta.data)) {
 celltype_labels <- setNames(as.character(pbmc[[label_col]][, 1]), colnames(pbmc))
 
 ct_comm <- summarize_celltype_communication(
-  reo_mat          = reo_pbmc,
-  seurat_obj       = pbmc,
-  cell_labels      = celltype_labels,
-  graph_name       = "RNA_nn",       # Using direct nearest neighbors
-  graph_symmetrize = "max",
-  edge_weight_mode = "binary",
-  lr_db            = lr_pairs_human,
-  lcs_threshold    = 0.01,
-  min_edges        = 20,
-  verbose          = TRUE
+  reo_mat           = reo_pbmc,
+  seurat_obj        = pbmc,
+  cell_labels       = celltype_labels,
+  graph_name        = "RNA_nn",       # Using direct nearest neighbors
+  graph_symmetrize  = "max",
+  edge_weight_mode  = "binary",
+  remove_self_edges = TRUE,           # Remove CellA -> CellA self-loops
+  include_self      = TRUE,           # Keep same-cell-type pairs, e.g. T cell -> T cell
+  lr_db             = lr_pairs_human,
+  lcs_threshold     = 0.01,
+  min_edges         = 20,
+  verbose           = TRUE
 )
 ```
 
@@ -567,6 +677,10 @@ plot_communication_range_summary(ct_comm)
 ```
 
 **Biological interpretation.** If a pathway is dominated by `distal/endocrine` signals, it suggests systemic communication that might be missed by purely spatial or neighborhood-based tools. `juxtacrine` dominance suggests strict local regulation.
+
+**中文说明。** 如果某个通路主要是 `distal/endocrine`，说明它可能不是局部邻居图最容易
+捕捉的信号，而是更偏远距离或全局候选通讯。相反，如果主要是 `juxtacrine`，则更像依赖
+近距离接触或局部邻域结构的调控。
 
 ### 9.2 Publication-Ready Network Visualization
 Visualize the communication network, highlighting the range of interaction.
@@ -583,6 +697,10 @@ plot_celltype_network(
 
 ### 9.3 Signaling Roles & Hubs
 Identify which cell types drive the communication network.
+
+**中文说明。** 角色分析回答的是：哪些细胞类型更像发送者，哪些更像接收者，哪些可能是
+网络中的 hub、mediator 或 influencer。角色标签需要结合 evidence 和 confidence 一起看，
+不要只看一个最高分。
 
 ```{r signaling_roles, eval=FALSE, fig.width=10, fig.height=5}
 # Outgoing vs Incoming strength landscape
@@ -605,7 +723,13 @@ plot_lr_bubble_advanced(
 
 **Interpretation.** This plot allows you to see the "Logic Hotspots" across the entire immune landscape. Faceting by pathway helps separate functional modules (e.g., Cytokines vs. ECM), while bubble color confirms if the interaction is local or distal.
 
----
+**中文说明。** bubble 图适合快速找出细胞类型之间最突出的 L-R 热点。分面可以区分不同
+功能模块，颜色可以提示该信号主要来自局部邻域证据还是远距离/全局候选证据。
+
+### 9.5 Pathway-Level Dominance
+Summarize pathway-level communication strength and network structure.
+
+```{r pathway_dominance_network, eval=FALSE, fig.width=10, fig.height=7}
 plot_pathway_heatmap(
   ct_comm,
   metric = "sum_lcs",
@@ -620,6 +744,9 @@ In PBMC data, MHC-I, MHC-II, and MIF can dominate the total communication
 landscape. That is biologically meaningful, but not always a pair-specific
 mechanism. The next step is to separate stable but broad immune-recognition axes
 from more specific sender -> receiver candidates.
+
+**中文说明。** 在 PBMC 中，MHC 和 MIF 等通路可能非常强，但强并不等于一定是最特异的
+机制。发表时最好区分“广泛免疫识别背景信号”和“特定 sender -> receiver 的机制候选”。
 
 ```{r communication_specificity, eval=FALSE}
 ct_comm <- score_communication_specificity(ct_comm)
@@ -658,6 +785,9 @@ whether the receiver also shows downstream response-state logic. You can provide
 a lightweight response database with `lr_pair` and `response_genes` (semicolon,
 comma, pipe, or plus separated):
 
+**中文说明。** L-R 共活跃只能说明“有通讯潜力”。如果接收细胞同时出现下游响应基因的
+逻辑活性，生物学证据会更强。这个模块就是把 receiver response 作为额外证据整合进去。
+
 ```{r receiver_response_score, eval=FALSE}
 response_db <- data.frame(
   lr_pair = c("IFNG_IFNGR1_IFNGR2", "TGFB1_TGFBR1_TGFBR2"),
@@ -680,6 +810,10 @@ head(ct_comm$lr_table[order(ct_comm$lr_table$response_integrated_score, decreasi
 For publication-level interpretation, inspect uncertainty and null expectations.
 The bootstrap is fast and approximate; the permutation null is slower but asks
 whether the observed sender-receiver structure exceeds random cell-type labels.
+
+**中文说明。** 发表级分析不能只展示最高分，还需要回答三个问题：这个信号是否稳定？
+是否高于随机标签背景？是否对 REO 阈值敏感？bootstrap、permutation null 和阈值敏感性
+分别对应这三个检查。
 
 ```{r celltype_bootstrap, eval=FALSE}
 boot_pair <- bootstrap_celltype_communication(
@@ -748,6 +882,10 @@ symmetrized, both directions may exist as graph opportunities, but the L-R
 interpretation remains directional. Very small cell types may have too few edges;
 always inspect `n_edges`, adjust `min_edges`, and examine bootstrap/permutation
 stability.
+
+**中文说明。** sender -> receiver 的方向来自 ligand 在 sender 侧、receptor 在 receiver
+侧。即使 KNN 图被无向化，L-R 的解释仍然是有方向的。小细胞群可能边数不足，所以要同时
+检查 `n_edges`、`min_edges`、bootstrap 和 permutation 结果。
 
 ---
 
@@ -826,6 +964,9 @@ PBMC3K is not spatial, but the same LogicComm logic can be used with Visium,
 MERFISH, Xenium, CosMx, or any coordinate-resolved assay. In spatial mode, the
 neighborhood graph is built from physical coordinates rather than Seurat KNN/SNN.
 
+**中文说明。** PBMC3K 没有真实空间坐标，但 LogicComm 的思想可以迁移到空间转录组。
+空间模式下，邻居图来自物理坐标，因此 local evidence 更接近真实组织空间邻近关系。
+
 ```{r spatial_extension, eval=FALSE}
 # coords must have rownames matching cells/spots and two coordinate columns.
 # Common coordinate names such as x/y, imagecol/imagerow, or
@@ -881,6 +1022,9 @@ For differentiation or activation trajectories, communication may rewire along a
 continuous process. LogicComm can summarize each pseudotime bin separately and
 plot dynamic cell-type-pair or role trajectories.
 
+**中文说明。** 如果研究对象有分化、激活或时间序列过程，可以把细胞按 pseudotime 或时间
+分箱，观察通讯轴和细胞角色是否随状态变化而重排。
+
 ```{r pseudotime_dynamics, eval=FALSE}
 # pseudotime_vector must be named by cell barcode. It can be numeric or a
 # categorical time/stage label.
@@ -914,6 +1058,10 @@ knowledge.
 For multi-sample studies, compute cell-type-resolved communication inside each
 biological sample, then compare those sample-level vectors. Do not pool all cells
 across samples as the statistical unit.
+
+**中文说明。** 多样本研究要把“样本”作为统计单位。正确做法是每个样本单独计算
+cell-type-resolved communication，再比较样本级向量；不要把所有细胞合并后直接做
+Case vs Control，否则会产生伪重复。
 
 ```{r multisample_celltype_comm, eval=FALSE}
 ct_lcs_list <- lapply(names(pbmc_list), function(sname) {
@@ -973,6 +1121,9 @@ useful first pass, but a sample-level model is preferable when covariates or
 unequal edge opportunities matter. `fit_celltype_comm_glm()` models active edge
 counts using available edge opportunities as trials.
 
+**中文说明。** 如果样本量足够并且有批次、年龄、性别等协变量，GLM 比简单频率比较更适合
+发表级队列分析。它把 active edge count 作为事件数，把可用 edge opportunities 作为试验数。
+
 ```{r multisample_glm, eval=FALSE}
 # sample_ct_list should contain the full LogicCommCellTypeComm object per sample,
 # not only the vector returned by celltype_comm_to_lcs().
@@ -1006,6 +1157,9 @@ Case after adjusting for the supplied covariates.
 
 PBMC3K is often annotated using canonical markers. The following is only a
 minimal example; adjust labels after inspecting marker genes.
+
+**中文说明。** 细胞类型注释会直接影响 sender/receiver 的解释。这里给的是最小示例，
+真实分析中应结合 marker gene、已有注释和生物学背景认真校正。
 
 ```{r marker_plot, eval=FALSE, fig.width=9, fig.height=6}
 FeaturePlot(
@@ -1060,6 +1214,9 @@ install.packages("plyr")
 
 If `SeuratData` is unavailable, download PBMC3K directly from 10X Genomics:
 
+**中文说明。** 如果 `SeuratData` 安装失败，可以直接下载 10X 官方 PBMC3K 数据，手动创建
+Seurat 对象，然后从 Step 2 继续。
+
 ```{r manual_download, eval=FALSE}
 dir.create("data", showWarnings = FALSE)
 
@@ -1079,6 +1236,9 @@ Then continue from **Step 2: Standard Seurat Preprocessing**.
 ## Step 13: Multiple PBMC Samples
 
 In real projects you usually have multiple independent PBMC samples, for example:
+
+**中文说明。** 真实项目通常有多个 PBMC 样本。LogicComm 推荐每个样本独立预处理、独立计算
+REO/LCS，然后在样本层面比较，而不是把细胞混成一个“大样本”。
 
 ```text
 pbmcsample001, pbmcsample002, pbmcsample003, ...
@@ -1327,6 +1487,9 @@ result <- run_multisample(
 
 ### 13.6 Practical recommendations for multiple PBMC samples
 
+**中文说明。** 多样本分析的核心原则是：样本是统计重复，细胞不是独立病人。所有样本应使用
+相同 LR 数据库、相同 REO 阈值、相同 assay/layer，并保持样本名与分组信息严格对齐。
+
 - Use one object per biological sample.
 - Keep sample names unique and stable: `pbmcsample001`, `pbmcsample002`, etc.
 - Keep `group_info` named and aligned to `pbmc_list`.
@@ -1339,6 +1502,9 @@ result <- run_multisample(
 ---
 
 ## Complete Minimal Script
+
+**中文说明。** 如果你只想快速跑通流程，可以先运行下面这个最小脚本；前面章节提供的是
+每一步的解释和扩展分析。
 
 ```{r minimal_script, eval=FALSE}
 library(LogicComm)
@@ -1391,6 +1557,9 @@ FeaturePlot(pbmc, features = "LogicComm_score", reduction = "umap")
 ---
 
 ## Troubleshooting
+
+**中文说明。** 这一节列出常见问题：PBMC3K 下载失败、KNN 图找不到、细胞名不匹配、内存过高、
+以及应该使用哪个 assay layer。
 
 ### `SeuratData::InstallData("pbmc3k")` fails
 

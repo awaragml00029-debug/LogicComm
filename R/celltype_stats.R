@@ -2,14 +2,11 @@
 
 #' Bootstrap LogicComm Cell-Type Communication Scores
 #'
-#' Performs a lightweight binomial edge bootstrap from the observed LCS and edge
-#' counts. This estimates score uncertainty without rerunning REO scanning.
-#'
 #' @param ct_comm Output from \code{summarize_celltype_communication()}.
 #' @param n_boot Number of bootstrap replicates.
 #' @param level \code{"celltype_lr"} or \code{"celltype_pair"}.
 #' @param seed Optional random seed.
-#' @return Data frame with observed score, bootstrap mean/sd/95 percent interval.
+#' @return Data frame with observed score and bootstrap interval.
 #' @export
 bootstrap_celltype_communication <- function(ct_comm,
                                              n_boot = 100,
@@ -22,10 +19,9 @@ bootstrap_celltype_communication <- function(ct_comm,
   df <- df[!is.na(df$lcs) & df$n_edges > 0, , drop = FALSE]
   if (nrow(df) == 0) stop("No scored L-R rows with positive edge counts.")
   probs <- pmin(pmax(df$lcs, 0), 1)
+  trials <- pmax(1, as.integer(round(df$n_edges)))
   boot_mat <- matrix(NA_real_, nrow = nrow(df), ncol = n_boot)
-  for (b in seq_len(n_boot)) {
-    boot_mat[, b] <- stats::rbinom(nrow(df), size = pmax(0, as.integer(round(df$n_edges))), prob = probs) / df$n_edges
-  }
+  for (b in seq_len(n_boot)) boot_mat[, b] <- stats::rbinom(nrow(df), size = trials, prob = probs) / trials
   if (level == "celltype_lr") {
     out <- data.frame(
       sender_type = df$sender_type,
@@ -57,10 +53,6 @@ bootstrap_celltype_communication <- function(ct_comm,
 
 #' Cell-Label Permutation Null for Cell-Type Communication
 #'
-#' Recomputes cell-type communication after shuffling cell labels within a sample.
-#' This tests whether observed sender-receiver structure exceeds what is expected
-#' from the same graph and REO states but random cell-type assignments.
-#'
 #' @param ct_comm Optional observed object. If NULL, it is computed from inputs.
 #' @param reo_mat Binary REO matrix or LogicCommREOResult.
 #' @param cell_labels Named cell-type labels.
@@ -69,10 +61,10 @@ bootstrap_celltype_communication <- function(ct_comm,
 #' @param n_perm Number of permutations.
 #' @param metric Pair-level metric to test.
 #' @param seed Optional random seed.
-#' @param adaptive If TRUE, refine the top preliminary candidates with additional permutations.
-#' @param adaptive_top_n Number of preliminary candidates to refine when adaptive is TRUE.
-#' @param adaptive_n_perm Target number of permutations for adaptive candidates.
-#' @param min_n_perm_publication Recommended minimum permutation count for publication-level p-value resolution.
+#' @param adaptive If TRUE, refine top preliminary candidates.
+#' @param adaptive_top_n Number of preliminary candidates to refine.
+#' @param adaptive_n_perm Target permutations for adaptive candidates.
+#' @param min_n_perm_publication Recommended minimum permutation count.
 #' @param verbose Print progress.
 #' @param ... Passed to \code{summarize_celltype_communication()}.
 #' @return Pair-level null summary with empirical p-values.
@@ -106,7 +98,7 @@ permute_celltype_communication <- function(ct_comm = NULL,
   feature <- paste(observed$sender_type, observed$receiver_type, sep = "|")
   null_mat <- matrix(NA_real_, nrow = nrow(observed), ncol = n_perm,
                      dimnames = list(feature, paste0("perm", seq_len(n_perm))))
-  for (b in seq_len(n_perm)) {
+  run_perm <- function() {
     perm_labels <- sample(as.character(cell_labels))
     names(perm_labels) <- names(cell_labels)
     perm <- summarize_celltype_communication(reo_mat, cell_labels = perm_labels,
@@ -114,10 +106,11 @@ permute_celltype_communication <- function(ct_comm = NULL,
                                              verbose = FALSE, ...)
     key_perm <- paste(perm$pair_summary$sender_type, perm$pair_summary$receiver_type, sep = "|")
     vals <- stats::setNames(perm$pair_summary[[metric]], key_perm)
-    null_mat[, b] <- vals[feature]
-    if (isTRUE(verbose) && (b %% max(1, floor(n_perm / 10)) == 0)) {
-      message(sprintf("[CellTypeComm null] %d/%d permutations", b, n_perm))
-    }
+    vals[feature]
+  }
+  for (b in seq_len(n_perm)) {
+    null_mat[, b] <- run_perm()
+    if (isTRUE(verbose) && (b %% max(1, floor(n_perm / 10)) == 0)) message(sprintf("[CellTypeComm null] %d/%d permutations", b, n_perm))
   }
   obs <- observed[[metric]]
   if (isTRUE(adaptive) && is.finite(adaptive_n_perm) && adaptive_n_perm > n_perm) {
@@ -132,14 +125,8 @@ permute_celltype_communication <- function(ct_comm = NULL,
       extra_mat <- matrix(NA_real_, nrow = nrow(observed), ncol = extra_n,
                           dimnames = list(feature, paste0("adaptive", seq_len(extra_n))))
       for (b in seq_len(extra_n)) {
-        perm_labels <- sample(as.character(cell_labels))
-        names(perm_labels) <- names(cell_labels)
-        perm <- summarize_celltype_communication(reo_mat, cell_labels = perm_labels,
-                                                 knn_mat = knn_mat, lr_db = lr_db,
-                                                 verbose = FALSE, ...)
-        key_perm <- paste(perm$pair_summary$sender_type, perm$pair_summary$receiver_type, sep = "|")
-        vals <- stats::setNames(perm$pair_summary[[metric]], key_perm)
-        extra_mat[top_idx, b] <- vals[feature[top_idx]]
+        vals <- run_perm()
+        extra_mat[top_idx, b] <- vals[top_idx]
         if (isTRUE(verbose) && (b %% max(1, floor(extra_n / 10)) == 0)) {
           message(sprintf("[CellTypeComm null adaptive] %d/%d additional permutations for top %d candidates", b, extra_n, length(top_idx)))
         }
@@ -162,16 +149,124 @@ permute_celltype_communication <- function(ct_comm = NULL,
   degenerate_positive_null <- degenerate_null & obs > null_mean
   degenerate_negative_null <- degenerate_null & obs < null_mean
   fdr <- stats::p.adjust(empirical_p, method = "BH")
-  
-  out <- data.frame(sender_type = observed$sender_type,
-                    receiver_type = observed$receiver_type,
-                    observed = obs,
-                    null_mean = null_mean,
-                    null_sd = null_sd,
-                    z_score = z_score,
-                    empirical_p = empirical_p,
-                    fdr = fdr,
-                    n_perm = as.integer(n_null_nonmissing),
-                    stringsAsFactors = FALSE)
+  min_possible_bh_fdr <- stats::p.adjust(min_possible_p, method = "BH")
+  null_interpretation_flag <- ifelse(degenerate_positive_null, "degenerate_positive_null",
+                                     ifelse(n_null_nonmissing < min_n_perm_publication, "low_resolution_null", "resolved_null"))
+  null_biological_interpretation <- ifelse(
+    degenerate_positive_null,
+    "Permutation null has zero variance below the observation; treat as structural-null evidence requiring biological validation.",
+    ifelse(n_null_nonmissing < min_n_perm_publication,
+           "Permutation count limits p-value resolution; increase n_perm for publication claims.",
+           "Permutation resolution is adequate for screening-level interpretation.")
+  )
+
+  data.frame(sender_type = observed$sender_type,
+             receiver_type = observed$receiver_type,
+             observed = obs,
+             null_mean = null_mean,
+             null_sd = null_sd,
+             z_score = z_score,
+             empirical_p = empirical_p,
+             fdr = fdr,
+             n_perm = as.integer(n_null_nonmissing),
+             n_null_nonmissing = as.integer(n_null_nonmissing),
+             min_possible_p = min_possible_p,
+             min_possible_bh_fdr = min_possible_bh_fdr,
+             degenerate_null = degenerate_null,
+             degenerate_positive_null = degenerate_positive_null,
+             degenerate_negative_null = degenerate_negative_null,
+             null_interpretation_flag = null_interpretation_flag,
+             null_biological_interpretation = null_biological_interpretation,
+             metric = metric,
+             stringsAsFactors = FALSE)
+}
+
+#' Diagnose Permutation Null Resolution
+#'
+#' @param null_pair Output from \code{permute_celltype_communication()}.
+#' @return A \code{LogicCommPermutationDiagnostic} list.
+#' @export
+diagnose_permutation_resolution <- function(null_pair) {
+  stopifnot(is.data.frame(null_pair))
+  out <- list(
+    n_tests = nrow(null_pair),
+    n_low_resolution = sum(null_pair$null_interpretation_flag == "low_resolution_null", na.rm = TRUE),
+    n_degenerate_null = sum(null_pair$degenerate_null %in% TRUE, na.rm = TRUE),
+    n_degenerate_positive_null = sum(null_pair$degenerate_positive_null %in% TRUE, na.rm = TRUE),
+    min_n_perm = if ("n_null_nonmissing" %in% names(null_pair)) min(null_pair$n_null_nonmissing, na.rm = TRUE) else NA_integer_,
+    recommendations = c(
+      "Use permutation p-values as structural evidence, not proof of causality.",
+      "Increase n_perm for low-resolution nulls before publication-level claims.",
+      "Inspect edge support and specificity for degenerate positive nulls."
+    ),
+    input = null_pair
+  )
+  class(out) <- "LogicCommPermutationDiagnostic"
+  out
+}
+
+#' @export
+print.LogicCommPermutationDiagnostic <- function(x, ...) {
+  cat(sprintf("LogicCommPermutationDiagnostic | %d tests | %d degenerate positive nulls\n",
+              x$n_tests, x$n_degenerate_positive_null))
+  if (length(x$recommendations)) {
+    cat("Recommendations:\n")
+    cat(paste0("- ", x$recommendations, collapse = "\n"), "\n")
+  }
+  invisible(x)
+}
+
+#' Sensitivity Analysis Across REO Rank Thresholds
+#'
+#' @param expr_mat Seurat object or matrix-like input accepted by \code{calc_REO_matrix()}.
+#' @param rank_threshold_grid Numeric thresholds to evaluate.
+#' @param lr_db LR database.
+#' @param cell_labels Cell-type labels.
+#' @param knn_mat Optional graph.
+#' @param layer Expression layer/slot.
+#' @param level Feature level passed to \code{celltype_comm_to_lcs()}.
+#' @param metric Metric passed to \code{celltype_comm_to_lcs()}.
+#' @param verbose Print progress.
+#' @param ... Passed to \code{summarize_celltype_communication()}.
+#' @return A list with threshold-specific results and a stability table.
+#' @export
+sensitivity_REO_threshold <- function(expr_mat,
+                                      rank_threshold_grid = c(0.4, 0.5, 0.6),
+                                      lr_db = lr_pairs_human,
+                                      cell_labels,
+                                      knn_mat = NULL,
+                                      layer = "counts",
+                                      level = "celltype_lr",
+                                      metric = "lcs",
+                                      verbose = TRUE,
+                                      ...) {
+  lr_genes <- all_lr_genes(lr_db)
+  results <- vector("list", length(rank_threshold_grid))
+  names(results) <- paste0("thr_", rank_threshold_grid)
+  vecs <- vector("list", length(rank_threshold_grid))
+  names(vecs) <- names(results)
+  for (i in seq_along(rank_threshold_grid)) {
+    thr <- rank_threshold_grid[i]
+    if (isTRUE(verbose)) message(sprintf("[Sensitivity] rank_threshold=%.3f", thr))
+    reo <- calc_REO_matrix(expr_mat, lr_genes = lr_genes, rank_threshold = thr, layer = layer, verbose = FALSE)
+    ct <- summarize_celltype_communication(reo, cell_labels = cell_labels, knn_mat = knn_mat,
+                                           lr_db = lr_db, verbose = FALSE, ...)
+    results[[i]] <- ct
+    vecs[[i]] <- celltype_comm_to_lcs(ct, level = level, metric = metric, active_only = FALSE)
+  }
+  features <- sort(unique(unlist(lapply(vecs, names), use.names = FALSE)))
+  mat <- matrix(0, nrow = length(features), ncol = length(vecs), dimnames = list(features, names(vecs)))
+  for (i in seq_along(vecs)) mat[names(vecs[[i]]), i] <- vecs[[i]]
+  stability <- data.frame(
+    feature = rownames(mat),
+    active_fraction = rowMeans(mat > 0, na.rm = TRUE),
+    mean_lcs = rowMeans(mat, na.rm = TRUE),
+    sd_lcs = apply(mat, 1, stats::sd, na.rm = TRUE),
+    n_thresholds = ncol(mat),
+    stringsAsFactors = FALSE
+  )
+  stability <- stability[order(stability$active_fraction, stability$mean_lcs, decreasing = TRUE), , drop = FALSE]
+  out <- list(stability = stability, thresholds = rank_threshold_grid, results = results, matrix = mat)
+  class(out) <- "LogicCommSensitivity"
   out
 }

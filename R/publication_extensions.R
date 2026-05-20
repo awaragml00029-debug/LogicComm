@@ -150,8 +150,17 @@ build_spatial_graph <- function(coords,
 #' @param coords Spatial coordinates or Seurat object.
 #' @param cell_labels Named cell-type labels.
 #' @param lr_db LR database.
-#' @param ... Additional arguments passed to build_spatial_graph() and
-#'   summarize_celltype_communication().
+#' @param coord_cols Optional coordinate columns.
+#' @param spatial_mode \code{"knn"} or \code{"radius"} spatial graph construction.
+#' @param k Number of neighbors in kNN mode.
+#' @param radius Radius threshold in radius mode.
+#' @param directed Whether to keep directed spatial edges.
+#' @param distance_weight \code{"binary"}, \code{"inverse"}, or \code{"gaussian"}.
+#' @param sigma Gaussian distance kernel bandwidth.
+#' @param graph_symmetrize How to symmetrize the spatial graph before scoring.
+#' @param edge_weight_mode Optional edge weighting mode passed to communication scoring.
+#' @param verbose Print progress messages.
+#' @param ... Additional arguments passed to summarize_celltype_communication().
 #' @return LogicCommCellTypeComm object with spatial_graph and spatial_coords.
 #' @export
 summarize_spatial_communication <- function(reo_mat,
@@ -274,6 +283,7 @@ plot_spatial_logic <- function(reo_mat,
 #' @param n_bins Number of bins for numeric pseudotime.
 #' @param bin_method "quantile", "equal_width", or "categorical".
 #' @param min_cells_per_bin Minimum cells required in a bin.
+#' @param verbose Print progress messages.
 #' @param ... Passed to summarize_celltype_communication().
 #' @return LogicCommDynamics object.
 #' @export
@@ -343,6 +353,7 @@ summarize_communication_dynamics <- function(reo_mat,
 #' @param lr_pair Optional LR-pair filter for level = "lr".
 #' @param cell_type Optional cell-type filter for level = "role".
 #' @param top_n If no specific feature is selected, show top_n features by total metric.
+#' @param title Optional plot title.
 #' @return ggplot2 object.
 #' @export
 plot_communication_dynamics <- function(dynamics,
@@ -413,6 +424,7 @@ plot_communication_dynamics <- function(dynamics,
 #' @param min_samples Minimum samples with usable counts for a feature.
 #' @param min_total_trials Minimum total trials across usable samples.
 #' @param fdr_method Multiple-testing method.
+#' @param verbose Print progress messages.
 #' @return Data frame of model statistics.
 #' @export
 fit_celltype_comm_glm <- function(sample_ct_list,
@@ -518,6 +530,7 @@ fit_celltype_comm_glm <- function(sample_ct_list,
 #'
 #' @param glm_result Output from fit_celltype_comm_glm().
 #' @param top_n_label Number of top features to label.
+#' @param title Optional plot title.
 #' @return ggplot2 object.
 #' @export
 plot_celltype_glm_volcano <- function(glm_result,

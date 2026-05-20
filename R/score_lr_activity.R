@@ -151,3 +151,83 @@ rank_comm_cells <- function(activity_scores, n = 50, cell_labels = NULL) {
 
   utils::head(df, n)
 }
+
+#' Score Receiver Downstream Response Evidence
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @param reo_mat Binary REO matrix or LogicCommREOResult.
+#' @param response_db Data frame with \code{lr_pair} and \code{response_genes}.
+#' @param response_mode How to combine response genes: \code{"any"} or \code{"all"}.
+#' @return A data frame with receiver-response evidence per L-R row.
+#' @export
+score_receiver_response <- function(ct_comm,
+                                    reo_mat,
+                                    response_db,
+                                    response_mode = c("any", "all")) {
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
+  response_mode <- match.arg(response_mode)
+  if (is.list(reo_mat) && !is.null(reo_mat$logic)) reo_mat <- reo_mat$logic
+  if (!all(c("lr_pair", "response_genes") %in% names(response_db))) {
+    stop("response_db must contain lr_pair and response_genes columns.")
+  }
+  labels <- ct_comm$cell_labels[colnames(reo_mat)]
+  response_map <- stats::setNames(lapply(as.character(response_db$response_genes), .parse_response_genes), as.character(response_db$lr_pair))
+  df <- ct_comm$lr_table
+  response_score <- numeric(nrow(df))
+  response_gene_count <- integer(nrow(df))
+  response_active_frac <- numeric(nrow(df))
+
+  for (i in seq_len(nrow(df))) {
+    genes <- response_map[[df$lr_pair[i]]]
+    genes <- intersect(genes %||% character(0), rownames(reo_mat))
+    response_gene_count[i] <- length(genes)
+    receiver_cells <- names(labels)[labels == df$receiver_type[i]]
+    if (length(genes) == 0 || length(receiver_cells) == 0) {
+      response_score[i] <- NA_real_
+      response_active_frac[i] <- NA_real_
+      next
+    }
+    mat <- reo_mat[genes, receiver_cells, drop = FALSE]
+    if (inherits(mat, "sparseMatrix")) {
+      sums <- Matrix::colSums(mat)
+    } else {
+      sums <- colSums(as.matrix(mat), na.rm = TRUE)
+    }
+    active <- if (response_mode == "all") sums == length(genes) else sums > 0
+    response_active_frac[i] <- mean(active, na.rm = TRUE)
+    response_score[i] <- response_active_frac[i]
+  }
+
+  out <- df
+  out$response_gene_count <- response_gene_count
+  out$response_active_frac <- response_active_frac
+  out$receiver_response_score <- response_score
+  out$response_integrated_score <- out$lcs * ifelse(is.na(response_score), 0, response_score)
+  out
+}
+
+#' Add Receiver Response Scores to a Cell-Type Communication Object
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @param reo_mat Binary REO matrix or LogicCommREOResult.
+#' @param response_db Data frame with \code{lr_pair} and \code{response_genes}.
+#' @param response_mode How to combine response genes: \code{"any"} or \code{"all"}.
+#' @return Updated \code{LogicCommCellTypeComm} object.
+#' @export
+add_receiver_response_score <- function(ct_comm,
+                                        reo_mat,
+                                        response_db,
+                                        response_mode = c("any", "all")) {
+  response_mode <- match.arg(response_mode)
+  scored <- score_receiver_response(ct_comm, reo_mat, response_db, response_mode = response_mode)
+  cols <- c("response_gene_count", "response_active_frac", "receiver_response_score", "response_integrated_score")
+  ct_comm$lr_table[, cols] <- scored[, cols]
+  ct_comm
+}
+
+.parse_response_genes <- function(x) {
+  x <- as.character(x %||% "")
+  x <- gsub("\\s+", "", x)
+  out <- unlist(strsplit(x, "[;,|+]", perl = TRUE), use.names = FALSE)
+  unique(out[nzchar(out) & !is.na(out)])
+}

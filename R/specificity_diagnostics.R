@@ -35,6 +35,17 @@
   stats::weighted.mean(x[ok], w[ok], na.rm = TRUE)
 }
 
+.parse_celltype_feature_names <- function(feature) {
+  parts <- strsplit(as.character(feature), "\\|", fixed = FALSE)
+  out <- lapply(parts, function(x) {
+    x <- c(x, rep(NA_character_, max(0, 3 - length(x))))
+    data.frame(sender_type = x[1], receiver_type = x[2], feature = x[3], stringsAsFactors = FALSE)
+  })
+  out <- do.call(rbind, out)
+  rownames(out) <- NULL
+  out
+}
+
 #' Score Communication Specificity and Ubiquity
 #'
 #' Adds specificity annotations to a cell-type communication object. This is
@@ -168,6 +179,49 @@ rank_communication_axes <- function(ct_comm,
   df
 }
 
+#' Interpret Cell-Type Communication Roles
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @return Data frame with role interpretation and caution labels.
+#' @export
+interpret_celltype_roles <- function(ct_comm) {
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
+  roles <- ct_comm$role_summary
+  if (is.null(roles) || !nrow(roles)) return(data.frame())
+
+  reliability <- roles$role_reliability_label
+  if (is.null(reliability)) reliability <- roles$role_confidence_label
+  if (is.null(reliability)) reliability <- rep(NA_character_, nrow(roles))
+
+  separation <- roles$role_separation_label
+  if (is.null(separation)) separation <- rep(NA_character_, nrow(roles))
+
+  low_communication <- if ("low_communication" %in% names(roles)) roles$low_communication %in% TRUE else rep(FALSE, nrow(roles))
+  evidence <- if ("communication_evidence_label" %in% names(roles)) roles$communication_evidence_label else rep(NA_character_, nrow(roles))
+  dominant_role <- if ("dominant_role" %in% names(roles)) roles$dominant_role else roles$dominant_role_strict
+  strict_role <- if ("dominant_role_strict" %in% names(roles)) roles$dominant_role_strict else dominant_role
+  biological <- if ("role_biological_interpretation" %in% names(roles)) roles$role_biological_interpretation else rep(NA_character_, nrow(roles))
+
+  caution <- ifelse(low_communication | reliability %in% c("Low", "Low-communication"),
+                    "Low communication evidence; interpret role assignment cautiously.",
+                    ifelse(separation %in% c("Ambiguous", "Mixed"),
+                           "Role scores are not well separated; consider secondary roles.",
+                           "Role assignment is supported for hypothesis generation."))
+
+  data.frame(
+    cell_type = roles$cell_type,
+    dominant_role = dominant_role,
+    dominant_role_strict = strict_role,
+    secondary_role = if ("secondary_role" %in% names(roles)) roles$secondary_role else NA_character_,
+    communication_evidence_label = evidence,
+    role_reliability_label = reliability,
+    role_separation_label = separation,
+    role_interpretation = biological,
+    role_interpretation_caution = caution,
+    stringsAsFactors = FALSE
+  )
+}
+
 #' Diagnose Cell-Type Communication Results
 #'
 #' @param ct_comm Cell-type communication object.
@@ -179,9 +233,34 @@ diagnose_celltype_communication <- function(ct_comm,
                                             null_pair = NULL,
                                             sens = NULL) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
-  # Simplified diagnostic summary
-  list(
+  lr <- ct_comm$lr_table
+  pair <- ct_comm$pair_summary
+  roles <- ct_comm$role_summary
+  out <- list(
     n_cells = length(ct_comm$cell_labels),
-    n_active_events = sum(ct_comm$lr_table$active, na.rm = TRUE)
+    n_cell_types = length(unique(as.character(ct_comm$cell_labels))),
+    n_lr_rows = nrow(lr),
+    n_celltype_pairs = nrow(pair),
+    n_active_events = sum(lr$active %in% TRUE, na.rm = TRUE),
+    n_distal_candidates = if ("distal_candidate" %in% names(lr)) sum(lr$distal_candidate %in% TRUE, na.rm = TRUE) else NA_integer_,
+    n_low_reliability_roles = if (!is.null(roles) && "role_reliability_label" %in% names(roles)) sum(roles$role_reliability_label %in% c("Low", "Low-communication"), na.rm = TRUE) else NA_integer_,
+    role_interpretation = interpret_celltype_roles(ct_comm),
+    null_diagnostic = if (!is.null(null_pair)) diagnose_permutation_resolution(null_pair) else NULL,
+    sensitivity = sens
   )
+  class(out) <- "LogicCommDiagnostic"
+  out
+}
+
+#' @export
+print.LogicCommDiagnostic <- function(x, ...) {
+  cat(sprintf("LogicCommDiagnostic | %d cells | %d active LR events\n",
+              x$n_cells, x$n_active_events))
+  if (!is.null(x$n_distal_candidates) && is.finite(x$n_distal_candidates)) {
+    cat(sprintf("Distal/global candidates: %d\n", x$n_distal_candidates))
+  }
+  if (!is.null(x$n_low_reliability_roles) && is.finite(x$n_low_reliability_roles)) {
+    cat(sprintf("Low-reliability roles: %d\n", x$n_low_reliability_roles))
+  }
+  invisible(x)
 }

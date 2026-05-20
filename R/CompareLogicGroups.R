@@ -257,6 +257,8 @@ filter_lcs <- function(result,
   idx[is.na(idx)] <- FALSE
 
   out <- result[idx, , drop = FALSE]
+  keep_attrs <- attributes(out)[c("names", "row.names")]
+  attributes(out) <- keep_attrs
   class(out) <- c("LogicCommResult", "data.frame")
   for (nm in c("case_label", "ctrl_label", "lcs_threshold",
                "min_samples_per_group", "lcs_mat")) {

@@ -3,12 +3,12 @@
 #' Plot Cell-Type-Level Communication Network
 #'
 #' @param ct_comm Output from \code{summarize_celltype_communication()}.
-#' @param metric Metric for edge weights (\code{"sum_lcs"} or \code{"n_active_lr"}).
-#' @param layout Network layout (e.g., \code{"circle"}, \code{"nicely"}).
+#' @param metric Metric for edge weights.
+#' @param layout Network layout. Currently \code{"circle"} and \code{"nicely"} use a circular layout.
 #' @param min_weight Filter edges below this threshold.
 #' @param arrow_size Size of edge arrows.
 #' @param show_labels Show cell-type names.
-#' @param color_edges_by How to color edges: \code{"range"} or \code{"top_pathway"}.
+#' @param color_edges_by How to color edges: \code{"top_pathway"} or \code{"range"}.
 #' @return A ggplot2 object.
 #' @export
 plot_celltype_network <- function(ct_comm,
@@ -18,124 +18,353 @@ plot_celltype_network <- function(ct_comm,
                                   arrow_size = 0.2,
                                   show_labels = TRUE,
                                   color_edges_by = c("top_pathway", "range")) {
-  if (!requireNamespace("igraph", quietly = TRUE)) stop("igraph required.")
-  if (!requireNamespace("ggnetwork", quietly = TRUE)) stop("ggnetwork required.")
-  
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   metric <- match.arg(metric)
   color_edges_by <- match.arg(color_edges_by)
   pair_sum <- ct_comm$pair_summary
-  pair_sum <- pair_sum[pair_sum[[metric]] >= min_weight, , drop = FALSE]
-  
+  if (!metric %in% names(pair_sum)) stop("metric not found in pair_summary: ", metric)
+  pair_sum <- pair_sum[is.finite(pair_sum[[metric]]) & pair_sum[[metric]] >= min_weight, , drop = FALSE]
   if (nrow(pair_sum) == 0) stop("No edges above min_weight.")
-  
-  g <- igraph::graph_from_data_frame(pair_sum, directed = TRUE)
-  net <- ggnetwork::ggnetwork(g, layout = layout)
-  
-  # Map role summary stats to nodes
-  nodes <- ct_comm$role_summary
-  net$hub_score <- nodes$hub_score[match(net$vertex.names, nodes$cell_type)]
-  net$balance <- nodes$sender_receiver_balance[match(net$vertex.names, nodes$cell_type)]
-  
-  # For edge coloring, if range is selected, we need to decide which range to show.
-  # Since pair_summary aggregates across L-R pairs, we show the dominant range.
-  if (color_edges_by == "range") {
-    # Get dominant range per CT pair from lr_table
-    df_active <- ct_comm$lr_table[ct_comm$lr_table$active, ]
-    range_map <- tapply(df_active$communication_range, paste(df_active$sender_type, df_active$receiver_type, sep = "->"), function(x) names(sort(table(x), decreasing = TRUE))[1])
-    net$range <- range_map[paste(net$sender_type, net$receiver_type, sep = "->")]
-  }
 
-  p <- ggplot2::ggplot(net, ggplot2::aes(x = x, y = y, xend = xend, yend = yend)) +
-    ggnetwork::geom_edges(
-      ggplot2::aes(size = !!as.name(metric), 
-                   color = if(color_edges_by == "range") range else top_pathway,
-                   linetype = if(color_edges_by == "range" && "range" %in% names(net)) range else NULL),
-      alpha = 0.6, curvature = 0.15,
-      arrow = ggplot2::arrow(length = ggplot2::unit(arrow_size, "cm"), type = "closed")
-    ) +
-    ggnetwork::geom_nodes(ggplot2::aes(fill = balance, size = hub_score), shape = 21, color = "black") +
-    ggplot2::scale_fill_gradient2(low = "#2166ac", mid = "#f7f7f7", high = "#b2182b",
-                                   midpoint = 0, name = "S-R Balance") +
-    ggplot2::scale_size_continuous(range = c(3, 12), name = "Strength") +
-    theme_logiccomm()
-    
+  nodes <- ct_comm$role_summary
+  n <- nrow(nodes)
+  theta <- seq(0, 2 * pi, length.out = n + 1L)[seq_len(n)]
+  nodes$x <- cos(theta)
+  nodes$y <- sin(theta)
+  edges <- merge(pair_sum, nodes[, c("cell_type", "x", "y", "hub_score", "sender_receiver_balance")],
+                 by.x = "sender_type", by.y = "cell_type", all.x = TRUE)
+  edges <- merge(edges, nodes[, c("cell_type", "x", "y")],
+                 by.x = "receiver_type", by.y = "cell_type", all.x = TRUE, suffixes = c("", "end"))
+  edges$edge_color <- if (color_edges_by == "range") edges$dominant_communication_range else edges$top_pathway
+  edges$edge_linetype <- ifelse(edges$dominant_communication_range == "distal/endocrine", "distal/endocrine", "local/mixed")
+  edges$value <- edges[[metric]]
+
+  p <- ggplot2::ggplot() +
+    ggplot2::geom_curve(data = edges,
+                        ggplot2::aes(x = x, y = y, xend = xend, yend = yend,
+                                     linewidth = value, color = edge_color, linetype = edge_linetype),
+                        curvature = 0.18, alpha = 0.7,
+                        arrow = grid::arrow(length = grid::unit(arrow_size, "cm"), type = "closed"),
+                        lineend = "round") +
+    ggplot2::geom_point(data = nodes,
+                        ggplot2::aes(x = x, y = y, fill = sender_receiver_balance, size = hub_score),
+                        shape = 21, color = "black", stroke = 0.5) +
+    ggplot2::scale_linewidth_continuous(range = c(0.3, 2.5), name = metric) +
+    ggplot2::scale_fill_gradient2(low = "#2166ac", mid = "#f7f7f7", high = "#b2182b", midpoint = 0, name = "S-R Balance") +
+    ggplot2::scale_size_continuous(range = c(3, 12), name = "Hub score") +
+    ggplot2::scale_linetype_manual(values = c("local/mixed" = "solid", "distal/endocrine" = "dashed"), name = "Range style") +
+    ggplot2::coord_equal() +
+    ggplot2::labs(title = "Cell-type communication network", color = if (color_edges_by == "range") "Range" else "Top pathway") +
+    ggplot2::theme_void(base_size = 12) +
+    ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"), legend.position = "right")
+
   if (color_edges_by == "range") {
-    p <- p + ggplot2::scale_color_manual(values = .logiccomm_palettes$range, name = "Communication Range") +
-             ggplot2::scale_linetype_manual(values = c("juxtacrine" = "solid", "paracrine" = "solid", "distal/endocrine" = "dashed"), name = "Range Style")
+    p <- p + ggplot2::scale_color_manual(values = .logiccomm_palettes$range, na.value = "grey70")
   } else {
-    p <- p + ggplot2::scale_color_viridis_d(option = "turbo", name = "Top Pathway")
+    p <- p + ggplot2::scale_color_discrete(na.translate = FALSE)
   }
-    
   if (show_labels) {
-    p <- p + ggnetwork::geom_nodetext_repel(ggplot2::aes(label = vertex.names),
-                                            size = 3.5, fontface = "bold", box.padding = 0.5)
+    p <- p + ggrepel::geom_text_repel(data = nodes, ggplot2::aes(x = x, y = y, label = cell_type),
+                                      size = 3.5, fontface = "bold", max.overlaps = Inf)
   }
   p
 }
 
-#' Plot Communication Role Landscape
+#' Plot a Cell-Type Pair Heatmap
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @param metric Pair-summary metric to display.
+#' @param title Optional title.
+#' @param rotate_x Rotation angle for x-axis labels.
+#' @return A ggplot2 object.
 #' @export
-plot_celltype_roles <- function(ct_comm) {
-  df <- ct_comm$role_summary
-  ggplot2::ggplot(df, ggplot2::aes(x = outgoing_strength, y = incoming_strength)) +
-    ggplot2::geom_point(ggplot2::aes(size = hub_score, color = sender_receiver_balance)) +
-    ggrepel::geom_text_repel(ggplot2::aes(label = cell_type), size = 3) +
-    ggplot2::scale_color_gradient2(low = "#2166ac", mid = "#f7f7f7", high = "#b2182b", midpoint = 0) +
-    ggplot2::scale_size_continuous(range = c(2, 10)) +
-    ggplot2::geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey50") +
+plot_celltype_heatmap <- function(ct_comm,
+                                  metric = c("n_active_lr", "active_lr_event_count", "sum_lcs",
+                                             "mean_lcs_active", "sum_lcs_all", "n_edges", "edge_weight_sum",
+                                             "sum_active_edges", "sum_active_edge_weight"),
+                                  title = NULL,
+                                  rotate_x = 45) {
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
+  metric <- match.arg(metric)
+  df <- ct_comm$pair_summary
+  if (!metric %in% names(df)) stop("metric not found in pair_summary: ", metric)
+  if (is.null(title)) title <- paste("Cell-type communication:", metric)
+  ggplot2::ggplot(df, ggplot2::aes(x = sender_type, y = receiver_type, fill = .data[[metric]])) +
+    ggplot2::geom_tile(color = "white", linewidth = 0.25) +
+    ggplot2::scale_fill_gradient(low = "grey95", high = "#7B3294", na.value = "grey90", name = metric) +
+    ggplot2::labs(title = title, x = "Sender type", y = "Receiver type") +
     theme_logiccomm() +
-    ggplot2::labs(title = "Signaling Role Landscape", 
-                  subtitle = "Outgoing vs Incoming Communication Strength",
-                  x = "Outgoing Strength (Source)", y = "Incoming Strength (Target)")
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = rotate_x, hjust = 1))
 }
 
-#' Plot Logic Communication Range Summary
+#' Plot Communication Range Summary
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @return A ggplot2 object.
 #' @export
 plot_communication_range_summary <- function(ct_comm) {
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   df <- ct_comm$lr_table
-  df <- df[df$active, , drop = FALSE]
+  df <- df[df$active %in% TRUE, , drop = FALSE]
   if (nrow(df) == 0) stop("No active events to plot.")
-  
-  # Summary by Pathway
-  pw_df <- as.data.frame(table(df$pathway, df$communication_range))
+  pw_df <- as.data.frame(table(df$pathway, df$communication_range), stringsAsFactors = FALSE)
   colnames(pw_df) <- c("Pathway", "Range", "Count")
-  
-  # Sort pathways by total count
   pw_totals <- tapply(pw_df$Count, pw_df$Pathway, sum)
   pw_df$Pathway <- factor(pw_df$Pathway, levels = names(sort(pw_totals)))
-  
   ggplot2::ggplot(pw_df, ggplot2::aes(x = Pathway, y = Count, fill = Range)) +
-    ggplot2::geom_bar(stat = "identity", position = "stack") +
-    ggplot2::scale_fill_manual(values = .logiccomm_palettes$range) +
+    ggplot2::geom_col() +
+    ggplot2::scale_fill_manual(values = .logiccomm_palettes$range, na.value = "grey80") +
     ggplot2::coord_flip() +
     theme_logiccomm() +
-    ggplot2::labs(title = "Signaling Range by Pathway", 
-                  subtitle = "Count of active L-R pairs per range category",
-                  y = "Number of active L-R pairs")
+    ggplot2::labs(title = "Signaling range by pathway", y = "Number of active L-R pairs", x = "Pathway")
 }
 
 #' Advanced Bubble Plot of L-R Logic Events
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @param senders Optional sender filter.
+#' @param receivers Optional receiver filter.
+#' @param top_n_per_pair Number of rows per sender-receiver pair.
+#' @return A ggplot2 object.
 #' @export
 plot_lr_bubble_advanced <- function(ct_comm, senders = NULL, receivers = NULL, top_n_per_pair = 5) {
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   df <- ct_comm$lr_table
-  if (!is.null(senders)) df <- df[df$sender_type %in% senders, ]
-  if (!is.null(receivers)) df <- df[df$receiver_type %in% receivers, ]
-  df <- df[df$active, ]
-  
-  # Rank per CT pair
-  df <- df |> 
-    dplyr::group_by(sender_type, receiver_type) |> 
-    dplyr::slice_max(order_by = lcs, n = top_n_per_pair, with_ties = FALSE) |> 
-    dplyr::ungroup()
-    
+  if (!is.null(senders)) df <- df[df$sender_type %in% senders, , drop = FALSE]
+  if (!is.null(receivers)) df <- df[df$receiver_type %in% receivers, , drop = FALSE]
+  df <- df[df$active %in% TRUE & is.finite(df$lcs), , drop = FALSE]
+  if (nrow(df) == 0) stop("No active events to plot.")
+  keys <- paste(df$sender_type, df$receiver_type, sep = "|||")
+  keep <- unlist(lapply(split(seq_len(nrow(df)), keys), function(ii) ii[order(df$lcs[ii], decreasing = TRUE)][seq_len(min(top_n_per_pair, length(ii)))]), use.names = FALSE)
+  df <- df[keep, , drop = FALSE]
   ggplot2::ggplot(df, ggplot2::aes(x = sender_type, y = receiver_type, size = lcs, color = communication_range)) +
-    ggplot2::geom_point(alpha = 0.7) +
+    ggplot2::geom_point(alpha = 0.75) +
     ggplot2::facet_wrap(~pathway, scales = "free") +
-    ggplot2::scale_color_manual(values = .logiccomm_palettes$range) +
+    ggplot2::scale_color_manual(values = .logiccomm_palettes$range, na.value = "grey70") +
     ggplot2::scale_size_continuous(range = c(2, 8)) +
     theme_logiccomm() +
-    ggplot2::labs(title = "Cell-Type Logic Communication Hotspots", 
-                  subtitle = "Top active L-R pairs facetted by Pathway",
-                  x = "Sender Type", y = "Receiver Type") +
+    ggplot2::labs(title = "Cell-type LogicComm hotspots", x = "Sender type", y = "Receiver type") +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+}
+
+#' Plot L-R Bubbles by Cell Type
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @param sender Optional sender filter.
+#' @param receiver Optional receiver filter.
+#' @param top_n Number of rows to show.
+#' @param active_only Whether to show active candidate rows only.
+#' @param color_by Field used for color.
+#' @param title Optional title.
+#' @return A ggplot2 object.
+#' @export
+plot_lr_bubble_by_celltype <- function(ct_comm,
+                                       sender = NULL,
+                                       receiver = NULL,
+                                       top_n = 30,
+                                       active_only = TRUE,
+                                       color_by = c("pathway", "lcs", "n_active_edges", "ligand_active_frac_sender", "receptor_active_frac_receiver", "communication_range"),
+                                       title = NULL) {
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
+  color_by <- match.arg(color_by)
+  df <- ct_comm$lr_table
+  if (!is.null(sender)) df <- df[df$sender_type %in% sender, , drop = FALSE]
+  if (!is.null(receiver)) df <- df[df$receiver_type %in% receiver, , drop = FALSE]
+  if (isTRUE(active_only)) df <- df[df$active %in% TRUE, , drop = FALSE]
+  df <- df[is.finite(df$lcs), , drop = FALSE]
+  if (nrow(df) == 0) stop("No L-R rows to plot.")
+  df <- df[order(df$lcs, decreasing = TRUE), , drop = FALSE]
+  df <- utils::head(df, top_n)
+  df$axis_label <- paste(df$sender_type, df$receiver_type, sep = " -> ")
+  df$lr_pair <- factor(df$lr_pair, levels = rev(unique(df$lr_pair)))
+  if (is.null(title)) title <- "Top cell-type L-R communication events"
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = axis_label, y = lr_pair, size = lcs, color = .data[[color_by]])) +
+    ggplot2::geom_point(alpha = 0.8) +
+    ggplot2::scale_size_continuous(range = c(2, 8), name = "LCS") +
+    ggplot2::labs(title = title, x = "Cell-type pair", y = "L-R pair", color = color_by) +
+    theme_logiccomm() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+  if (is.numeric(df[[color_by]])) p + ggplot2::scale_color_gradient(low = "#4393C3", high = "#D6604D") else p
+}
+
+#' Plot Pathway Heatmap
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @param metric Pathway-summary metric.
+#' @param sender Optional sender filter.
+#' @param receiver Optional receiver filter.
+#' @param top_n_pathways Number of pathways to display.
+#' @param title Optional title.
+#' @return A ggplot2 object.
+#' @export
+plot_pathway_heatmap <- function(ct_comm,
+                                 metric = c("sum_lcs", "n_active_lr", "mean_lcs_active"),
+                                 sender = NULL,
+                                 receiver = NULL,
+                                 top_n_pathways = 30,
+                                 title = NULL) {
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
+  metric <- match.arg(metric)
+  df <- ct_comm$pathway_summary
+  if (!metric %in% names(df)) stop("metric not found in pathway_summary: ", metric)
+  if (!is.null(sender)) df <- df[df$sender_type %in% sender, , drop = FALSE]
+  if (!is.null(receiver)) df <- df[df$receiver_type %in% receiver, , drop = FALSE]
+  if (nrow(df) == 0) stop("No pathway rows to plot.")
+  totals <- tapply(df[[metric]], df$pathway, sum, na.rm = TRUE)
+  keep <- names(sort(totals, decreasing = TRUE))[seq_len(min(top_n_pathways, length(totals)))]
+  df <- df[df$pathway %in% keep, , drop = FALSE]
+  df$celltype_pair <- paste(df$sender_type, df$receiver_type, sep = " -> ")
+  if (is.null(title)) title <- paste("Pathway communication:", metric)
+  ggplot2::ggplot(df, ggplot2::aes(x = celltype_pair, y = pathway, fill = .data[[metric]])) +
+    ggplot2::geom_tile(color = "white", linewidth = 0.2) +
+    ggplot2::scale_fill_gradient(low = "grey95", high = "#B2182B", na.value = "grey90", name = metric) +
+    ggplot2::labs(title = title, x = "Cell-type pair", y = "Pathway") +
+    theme_logiccomm() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+}
+
+#' Explain a Cell-Type L-R Interaction
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @param sender Sender cell type.
+#' @param receiver Receiver cell type.
+#' @param lr_pair L-R pair.
+#' @param reo_mat Optional REO matrix.
+#' @param seurat_obj Optional Seurat object.
+#' @param lr_db Optional LR database.
+#' @param cell_labels Optional cell labels.
+#' @param pt_size Point size for optional plots.
+#' @return A list with query, evidence, interpretation, and plot.
+#' @export
+explain_celltype_interaction <- function(ct_comm, sender, receiver, lr_pair,
+                                         reo_mat = NULL, seurat_obj = NULL,
+                                         lr_db = NULL, cell_labels = NULL, pt_size = 0.7) {
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
+  ev <- ct_comm$lr_table[ct_comm$lr_table$sender_type == sender &
+                           ct_comm$lr_table$receiver_type == receiver &
+                           ct_comm$lr_table$lr_pair == lr_pair, , drop = FALSE]
+  if (nrow(ev) == 0) stop("Selected sender/receiver/lr_pair not found.")
+  ev <- ev[1, , drop = FALSE]
+  interpretation <- paste0(
+    sender, " -> ", receiver, " ", lr_pair, " is classified as ", ev$communication_range,
+    " with local LCS=", signif(ev$lcs_neighborhood, 3),
+    " and global potential=", signif(ev$lcs_global, 3), "."
+  )
+  plt <- tryCatch(plot_lr_evidence(ct_comm, sender, receiver, lr_pair), error = function(e) NULL)
+  list(query = list(sender = sender, receiver = receiver, lr_pair = lr_pair), evidence = ev,
+       interpretation = interpretation, plot = plt)
+}
+
+#' Plot Ligand/Receptor Activity Balance
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @param sender Optional sender filter.
+#' @param receiver Optional receiver filter.
+#' @param active_only Whether to keep active rows.
+#' @param top_n Number of strongest rows to display.
+#' @param title Optional title.
+#' @return A ggplot2 object.
+#' @export
+plot_lr_activity_balance <- function(ct_comm, sender = NULL, receiver = NULL, active_only = TRUE, top_n = 100, title = NULL) {
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
+  df <- ct_comm$lr_table
+  if (!is.null(sender)) df <- df[df$sender_type %in% sender, , drop = FALSE]
+  if (!is.null(receiver)) df <- df[df$receiver_type %in% receiver, , drop = FALSE]
+  if (isTRUE(active_only)) df <- df[df$active %in% TRUE, , drop = FALSE]
+  df <- df[is.finite(df$lcs), , drop = FALSE]
+  if (nrow(df) == 0) stop("No L-R rows to plot.")
+  df <- utils::head(df[order(df$lcs, decreasing = TRUE), , drop = FALSE], top_n)
+  if (is.null(title)) title <- "Ligand and receptor logic activity balance"
+  ggplot2::ggplot(df, ggplot2::aes(x = ligand_active_frac_sender, y = receptor_active_frac_receiver)) +
+    ggplot2::geom_point(ggplot2::aes(size = lcs, color = communication_range), alpha = 0.75) +
+    ggrepel::geom_text_repel(ggplot2::aes(label = lr_pair), size = 3, max.overlaps = 15) +
+    ggplot2::scale_color_manual(values = .logiccomm_palettes$range, na.value = "grey70") +
+    ggplot2::scale_size_continuous(range = c(2, 8), name = "LCS") +
+    ggplot2::labs(title = title, x = "Ligand-active fraction in sender", y = "Receptor-active fraction in receiver") +
+    theme_logiccomm()
+}
+
+#' Plot Evidence for One Cell-Type L-R Event
+#'
+#' @param ct_comm Output from \code{summarize_celltype_communication()}.
+#' @param sender Sender cell type.
+#' @param receiver Receiver cell type.
+#' @param lr_pair L-R pair.
+#' @param title Optional title.
+#' @return A ggplot2 object.
+#' @export
+plot_lr_evidence <- function(ct_comm, sender, receiver, lr_pair, title = NULL) {
+  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
+  row <- ct_comm$lr_table[ct_comm$lr_table$sender_type == sender &
+                            ct_comm$lr_table$receiver_type == receiver &
+                            ct_comm$lr_table$lr_pair == lr_pair, , drop = FALSE]
+  if (nrow(row) == 0) stop("Selected sender/receiver/lr_pair not found.")
+  row <- row[1, , drop = FALSE]
+  support_fraction <- row$n_active_edges / pmax(row$n_edges, 1)
+  plot_df <- data.frame(
+    metric = c("Primary LCS", "Local LCS", "Global potential", "Ligand sender fraction", "Receptor receiver fraction", "Support fraction"),
+    value = c(row$lcs, row$lcs_neighborhood, row$lcs_global, row$ligand_active_frac_sender, row$receptor_active_frac_receiver, support_fraction),
+    stringsAsFactors = FALSE
+  )
+  plot_df$value[!is.finite(plot_df$value)] <- NA_real_
+  if (is.null(title)) title <- paste(sender, "->", receiver, lr_pair)
+  ggplot2::ggplot(plot_df, ggplot2::aes(x = metric, y = value, fill = metric)) +
+    ggplot2::geom_col(width = 0.7, show.legend = FALSE) +
+    ggplot2::coord_cartesian(ylim = c(0, 1)) +
+    ggplot2::labs(title = title, subtitle = paste("Range:", row$communication_range), x = NULL, y = "Score / fraction") +
+    theme_logiccomm() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
+}
+
+#' Plot Differential Cell-Type Communication Heatmap
+#'
+#' @param result Output from \code{CompareLogicGroups()}.
+#' @param metric Numeric metric.
+#' @param top_n Number of features.
+#' @param title Optional title.
+#' @return A ggplot2 object.
+#' @export
+plot_differential_celltype_heatmap <- function(result, metric = "asymmetry", top_n = 30, title = NULL) {
+  df <- as.data.frame(result)
+  if (!metric %in% names(df)) stop("metric not found: ", metric)
+  if (!"lr_pair" %in% names(df)) stop("result must contain lr_pair.")
+  df <- df[order(abs(df[[metric]]), decreasing = TRUE), , drop = FALSE]
+  df <- utils::head(df, top_n)
+  parts <- strsplit(as.character(df$lr_pair), "\\|", fixed = FALSE)
+  df$sender_type <- vapply(parts, function(x) if (length(x) >= 1) x[1] else "feature", character(1))
+  df$receiver_type <- vapply(parts, function(x) if (length(x) >= 2) x[2] else "feature", character(1))
+  df$feature <- df$lr_pair
+  if (is.null(title)) title <- paste("Differential cell-type communication:", metric)
+  ggplot2::ggplot(df, ggplot2::aes(x = sender_type, y = feature, fill = .data[[metric]])) +
+    ggplot2::geom_tile(color = "white", linewidth = 0.2) +
+    ggplot2::scale_fill_gradient2(low = "#2166ac", mid = "white", high = "#b2182b", midpoint = 0, name = metric) +
+    ggplot2::labs(title = title, x = "Sender", y = "Feature") +
+    theme_logiccomm()
+}
+
+#' Plot Differential Cell-Type Communication Volcano
+#'
+#' @param result Output from \code{CompareLogicGroups()}.
+#' @param x X-axis metric.
+#' @param fdr_col FDR column.
+#' @param top_n_label Number of labels.
+#' @param title Optional title.
+#' @return A ggplot2 object.
+#' @export
+plot_differential_celltype_volcano <- function(result, x = "log2fc_lcs", fdr_col = "fdr_fisher", top_n_label = 15, title = NULL) {
+  df <- as.data.frame(result)
+  if (!x %in% names(df)) x <- if ("asymmetry" %in% names(df)) "asymmetry" else stop("x metric not found: ", x)
+  if (!fdr_col %in% names(df)) fdr_col <- if ("fdr" %in% names(df)) "fdr" else stop("FDR column not found: ", fdr_col)
+  df$neglog10 <- -log10(pmax(df[[fdr_col]], .Machine$double.xmin))
+  df$label <- if ("lr_pair" %in% names(df)) df$lr_pair else rownames(df)
+  ord <- order(df[[fdr_col]], -abs(df[[x]]), na.last = NA)
+  df$to_label <- FALSE
+  if (length(ord) > 0) df$to_label[ord[seq_len(min(top_n_label, length(ord)))]] <- TRUE
+  if (is.null(title)) title <- "Differential cell-type communication volcano"
+  ggplot2::ggplot(df, ggplot2::aes(x = .data[[x]], y = neglog10)) +
+    ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
+    ggplot2::geom_point(alpha = 0.75) +
+    ggrepel::geom_text_repel(data = df[df$to_label, , drop = FALSE], ggplot2::aes(label = label), size = 3, max.overlaps = Inf) +
+    ggplot2::labs(title = title, x = x, y = paste0("-log10(", fdr_col, ")")) +
+    theme_logiccomm()
 }

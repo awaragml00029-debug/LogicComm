@@ -45,7 +45,9 @@
 #'   in KNN graphs are removed before scoring. Default: \code{TRUE}.
 #' @param graph_symmetrize How to symmetrize the graph before scoring: \code{"none"}
 #'   keeps the matrix as supplied; \code{"or"} uses binary union; \code{"max"}
-#'   keeps the maximum weight in either direction.
+#'   keeps the maximum weight in either direction. By default, binary KNN scoring
+#'   uses \code{"or"} when self-loops are removed; weighted scoring and explicit
+#'   self-loop scoring keep supplied directed weights.
 #' @param edge_weight_mode \code{"binary"} treats every non-zero graph entry
 #'   as one edge; \code{"weighted"} uses graph weights in the LCS denominator.
 #' @param verbose Print progress messages. Default: \code{TRUE}.
@@ -81,13 +83,17 @@ IdentifyLogicConsensus <- function(reo_mat,
                                     graph_name    = NULL,
                                     lcs_threshold = 0.01,
                                     remove_self_edges = TRUE,
-                                    graph_symmetrize = c("none", "or", "max"),
+                                    graph_symmetrize = c("or", "none", "max"),
                                     edge_weight_mode = c("binary", "weighted"),
                                     verbose       = TRUE) {
 
   stopifnot(inherits(reo_mat, c("dgCMatrix","REOMatrix","sparseMatrix","matrix")))
-  graph_symmetrize <- match.arg(graph_symmetrize)
   edge_weight_mode <- match.arg(edge_weight_mode)
+  if (missing(graph_symmetrize)) {
+    graph_symmetrize <- if (edge_weight_mode == "binary" && isTRUE(remove_self_edges)) "or" else "none"
+  } else {
+    graph_symmetrize <- match.arg(graph_symmetrize)
+  }
 
   # ── 1. Resolve KNN ─────────────────────────────────────────────────────────
   use_knn   <- FALSE

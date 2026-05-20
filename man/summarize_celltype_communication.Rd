@@ -34,12 +34,12 @@ celltype_comm_to_lcs(ct_comm,
 \item{min_edges}{Minimum number of sender-to-receiver cell edges required for active calls.}
 \item{min_active_edges}{Minimum active edges required for an active call.}
 \item{mode}{\code{"auto"}, \code{"neighborhood"}, or \code{"global"}.}
-\item{remove_self_edges}{Remove diagonal/self-loop KNN entries before scoring.}
+\item{remove_self_edges}{Remove diagonal cell-level self-loop KNN entries before neighborhood scoring. This avoids treating within-cell ligand/receptor co-expression as direct intercellular communication evidence and does not remove same-cell-type communication.}
 \item{graph_symmetrize}{How to symmetrize the graph before scoring: \code{"none"}, \code{"or"}, or \code{"max"}.}
 \item{edge_weight_mode}{\code{"binary"} treats each non-zero graph entry as one edge; \code{"weighted"} uses graph weights in LCS.}
 \item{min_role_hub_quantile}{Positive-hub quantile below which cell types are labeled \code{Low-communication}.}
 \item{min_role_event_count}{Minimum incoming plus outgoing active L-R events required for a non-low role label.}
-\item{include_self}{Include same-cell-type communication pairs.}
+\item{include_self}{Include same-cell-type sender/receiver pairs, interpreted as autocrine-like, homotypic, or within-cell-type signaling potential.}
 \item{verbose}{Whether to print progress messages.}
 \item{ct_comm}{A \code{LogicCommCellTypeComm} object returned by \code{summarize_celltype_communication()}.}
 \item{level}{Feature level to export as a named vector.}
@@ -53,6 +53,16 @@ by graph edge weights. The output reports both the graph-edge denominator
 (\code{n_edges} and \code{edge_weight_sum}) and the active evidence
 (\code{n_active_edges}, \code{active_edge_weight_sum}, \code{lcs}, and
 \code{lcs_unweighted}).
+
+Cell-level self-loops and same-cell-type communication are intentionally
+separated. With the default \code{remove_self_edges = TRUE}, diagonal graph
+entries such as cell A -> cell A are removed so within-cell ligand/receptor
+co-expression is not used as direct local communication evidence. With the
+default \code{include_self = TRUE}, sender and receiver cell types may still be
+identical, so rows such as Tumor -> Tumor or Macrophage -> Macrophage are retained
+and should be interpreted as autocrine-like, homotypic, or within-cell-type
+signaling potential. Global candidate scores provide complementary cell-type-level
+potential, including distal or graph-missed signals.
 
 The role table distinguishes three count concepts: active L-R event counts,
 unique L-R counts, and active edge support. Role labels include low-communication

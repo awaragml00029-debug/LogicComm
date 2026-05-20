@@ -23,8 +23,7 @@
 #'
 #' @return A ggplot2 object.
 #'
-#' @importFrom ggplot2 ggplot aes geom_point geom_vline geom_hline
-#'   scale_color_manual labs theme_bw theme element_text annotate
+#' @importFrom ggplot2 ggplot aes geom_point geom_vline geom_hline scale_color_manual labs theme_bw theme element_text annotate
 #' @importFrom ggrepel geom_text_repel
 #' @export
 plot_rank_shift <- function(rs_result,
@@ -121,7 +120,7 @@ plot_rank_shift <- function(rs_result,
     ggplot2::labs(
       title    = title,
       subtitle = sprintf("Rank shift > 0: gene became more dominant in %s cells", case_l),
-      x        = sprintf("Rank Shift Score\n(← dominant in %s   dominant in %s →)",
+      x        = sprintf("Rank Shift Score\n(<- dominant in %s   dominant in %s ->)",
                          ctrl_l, case_l),
       y        = "-log10(FDR)",
       caption  = sprintf("FDR cutoff = %.2f | |shift| threshold = %.2f",
@@ -204,7 +203,7 @@ plot_shift_lcs_combined <- function(rs_result,
       name = "") +
     ggplot2::labs(
       title = sprintf("Rank Shift + LCS: Top %d Pairs in %s", top_n, case_l),
-      x     = "Rank Shift Score (→ more dominant in Case)",
+      x     = "Rank Shift Score (-> more dominant in Case)",
       y     = NULL) +
     ggplot2::theme_bw(base_size = 11) +
     ggplot2::theme(

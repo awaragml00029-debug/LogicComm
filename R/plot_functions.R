@@ -17,8 +17,7 @@
 #' @param title Plot title. Default: auto-generated.
 #'
 #' @return A ggplot2 object.
-#' @importFrom ggplot2 ggplot aes geom_point geom_abline scale_color_gradient2
-#'   scale_size_continuous labs theme_bw theme element_text
+#' @importFrom ggplot2 ggplot aes geom_point geom_abline scale_color_gradient2 scale_size_continuous labs theme_bw theme element_text
 #' @importFrom ggrepel geom_text_repel
 #' @export
 plot_lcs_bubble <- function(result,

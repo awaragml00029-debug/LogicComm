@@ -4,7 +4,7 @@
 \description{Compute ligand-receptor Logic Consensus Scores (LCS) for one sample.}
 \usage{IdentifyLogicConsensus(reo_mat, seurat_obj = NULL, knn_mat = NULL,
   lr_db = lr_pairs_human, graph_name = NULL, lcs_threshold = 0.01,
-  remove_self_edges = TRUE, graph_symmetrize = c("none", "or", "max"),
+  remove_self_edges = TRUE, graph_symmetrize = c("or", "none", "max"),
   edge_weight_mode = c("binary", "weighted"), verbose = TRUE)}
 \arguments{
 \item{reo_mat}{Binary REO matrix returned by \code{calc_REO_matrix()}.}
@@ -14,7 +14,7 @@
 \item{graph_name}{Optional graph name for Seurat objects.}
 \item{lcs_threshold}{Threshold used for active-pair summaries.}
 \item{remove_self_edges}{Whether to remove diagonal self-loop graph entries.}
-\item{graph_symmetrize}{How to symmetrize graph entries before scoring: \code{"none"}, \code{"or"}, or \code{"max"}.}
+\item{graph_symmetrize}{How to symmetrize graph entries before scoring: \code{"none"}, \code{"or"}, or \code{"max"}. By default, binary KNN scoring uses \code{"or"} when self-loops are removed; weighted scoring and explicit self-loop scoring keep supplied directed weights.}
 \item{edge_weight_mode}{\code{"binary"} treats each non-zero graph entry as one edge; \code{"weighted"} uses graph weights.}
 \item{verbose}{Whether to print progress messages.}
 }

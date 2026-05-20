@@ -2,6 +2,23 @@
 useDynLib(LogicComm, .registration = TRUE)
 importFrom(Rcpp, evalCpp)
 
+# Main pipeline API
+export(logic_prepare)
+export(logic_get_lr_genes)
+export(logic_import_lrdb)
+export(logic_check_lrdb)
+export(logic_score_lr)
+export(logic_summarize_celltypes)
+export(logic_compare_groups)
+export(logic_run)
+
+# Validation adapter API
+export(logic_validate_receiver_response)
+export(logic_validate_targets)
+export(logic_validate_tf_switch)
+export(logic_add_external_evidence)
+export(logic_grade_evidence)
+
 # Main analysis functions
 export(calc_REO_matrix)
 export(IdentifyLogicConsensus)
@@ -67,6 +84,7 @@ S3method(print, LogicCommFindings)
 S3method(print, LogicCommGLMResult)
 S3method(print, LogicCommDiagnostic)
 S3method(print, LogicCommPermutationDiagnostic)
+S3method(print, LogicCommLRDBCheck)
 
 # Print methods
 S3method(print, LCSVector)
@@ -77,7 +95,7 @@ S3method(print, LogicCommCellTypeComm)
 
 # Imports
 importFrom(Matrix, Matrix, summary)
-importFrom(stats, fisher.test, wilcox.test, p.adjust, quantile)
+importFrom(stats, fisher.test, wilcox.test, p.adjust, quantile, setNames, aggregate)
 importFrom(utils, head)
 importFrom(methods, is)
 importFrom(dplyr, case_when)

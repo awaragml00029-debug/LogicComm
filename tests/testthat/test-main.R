@@ -417,6 +417,67 @@ test_that("cell-type communication summaries recover directed A to B LCS and rol
   expect_equal(unname(vec["A|B|L_R"]), 1)
 })
 
+test_that("hybrid cell-type scoring separates local, global, and denominator support", {
+  reo <- Matrix::Matrix(
+    matrix(c(1, 1, 0, 0,
+             0, 0, 1, 1), nrow = 2, byrow = TRUE,
+           dimnames = list(c("L", "R"), paste0("C", 1:4))),
+    sparse = TRUE
+  )
+  labels <- setNames(c("A", "A", "B", "B"), paste0("C", 1:4))
+  lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
+                      pathway = "p1", stringsAsFactors = FALSE)
+  lr_db$ligand_genes <- list("L")
+  lr_db$receptor_genes <- list("R")
+
+  knn <- Matrix::Matrix(0, nrow = 4, ncol = 4, sparse = TRUE)
+  rownames(knn) <- colnames(knn) <- paste0("C", 1:4)
+  knn["C1", "C2"] <- 1
+  knn["C3", "C4"] <- 1
+
+  ct_distal <- summarize_celltype_communication(
+    reo, cell_labels = labels, knn_mat = knn, lr_db = lr_db,
+    lcs_threshold = 0.5, min_edges = 1, min_active_edges = 1,
+    verbose = FALSE
+  )
+  row_ab <- ct_distal$lr_table[ct_distal$lr_table$sender_type == "A" &
+                                ct_distal$lr_table$receiver_type == "B" &
+                                ct_distal$lr_table$lr_pair == "L_R", ]
+  expect_equal(nrow(row_ab), 1)
+  expect_true(row_ab$distal_candidate)
+  expect_true(row_ab$active)
+  expect_equal(row_ab$communication_range, "distal/endocrine")
+  ps_ab <- ct_distal$pair_summary[ct_distal$pair_summary$sender_type == "A" &
+                                    ct_distal$pair_summary$receiver_type == "B", ]
+  expect_equal(ps_ab$n_distal, 1)
+
+  ct_global <- summarize_celltype_communication(
+    reo, cell_labels = labels, lr_db = lr_db, mode = "global",
+    lcs_threshold = 0.5, min_edges = 1, min_active_edges = 1,
+    verbose = FALSE
+  )
+  row_global <- ct_global$lr_table[ct_global$lr_table$sender_type == "A" &
+                                    ct_global$lr_table$receiver_type == "B", ]
+  expect_true(row_global$global_candidate_active)
+  expect_true(row_global$active)
+  expect_equal(ct_global$pair_summary$n_active_lr[ct_global$pair_summary$sender_type == "A" &
+                                                    ct_global$pair_summary$receiver_type == "B"], 1)
+
+  ct_min_edges <- summarize_celltype_communication(
+    reo, cell_labels = labels, lr_db = lr_db, mode = "global",
+    lcs_threshold = 0.5, min_edges = 5, min_active_edges = 1,
+    verbose = FALSE
+  )
+  row_min_edges <- ct_min_edges$lr_table[ct_min_edges$lr_table$sender_type == "A" &
+                                          ct_min_edges$lr_table$receiver_type == "B", ]
+  expect_false(row_min_edges$global_candidate_active)
+  expect_false(row_min_edges$active)
+  expect_true(all(c("celltype_sizes", "adjacency_strength", "adjacency_count",
+                    "adjacency_active_edge_support") %in% names(ct_min_edges)))
+  expect_true(all(c("lcs_neighborhood", "lcs_global", "local_active",
+                    "global_candidate_active", "distal_candidate", "candidate_active") %in% names(ct_min_edges$lr_table)))
+})
+
 test_that("cell-type plotting helpers return ggplot objects", {
   reo <- Matrix::Matrix(
     matrix(c(1, 1, 0, 0,

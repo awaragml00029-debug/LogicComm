@@ -5,6 +5,8 @@ Version: 0.6.1
 Date: 2026-05-15
 Authors@R: person("LogicComm", "Developer", role = c("aut", "cre"),
     email = "dev@logiccomm.io")
+Author: LogicComm Developer
+Maintainer: LogicComm Developer <dev@logiccomm.io>
 Description: Identifies cell-cell communication signals by converting single-cell
     gene expression into Relative Expression Ordering (REO) binary logic states,
     then detecting ligand-receptor Logic Consensus Scores (LCS) across cell
@@ -20,7 +22,6 @@ Description: Identifies cell-cell communication signals by converting single-cel
 License: MIT + file LICENSE
 LazyData: true
 Encoding: UTF-8
-RoxygenNote: 7.3.3
 Depends: R (>= 4.1.0)
 Imports: Matrix (>= 1.5.0), methods, stats, utils, grDevices, grid, parallel,
     dplyr (>= 1.0.0), ggplot2 (>= 3.4.0), ggrepel (>= 0.9.0),
@@ -31,3 +32,4 @@ LinkingTo: Rcpp
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 NeedsCompilation: yes
+Config/roxygen2/version: 8.0.0

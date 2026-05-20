@@ -8,6 +8,15 @@ if (getRversion() >= "2.15.1") {
     "cell_type", "outdegree_score", "indegree_score", "dominant_role",
     "lr_pair_f", "pathway_plot", "color_val", "pathway", "celltype_pair",
     "role", "ligand_active_frac_sender", "receptor_active_frac_receiver",
-    "component", "xval", "neglog10", "color_value", "label"
+    "component", "xval", "neglog10", "color_value", "label",
+    ".data", "communication_range", "dominant_communication_range",
+    "edge_color", "edge_linetype", "lcs", "axis_label", "Pathway",
+    "Count", "Range", "metric", "feature", "to_label", "active_fraction",
+    "pair_specificity", "total_lcs", "mean_lcs", "lr_pairs_human",
+    "estimate", "top_pathway", "xm", "ym", "edge_text", "raw_score",
+    "evidence", "sender_role_score", "receiver_role_score", "bin_order",
+    "n_edges", "sum_lcs", "n_active_lr", "mean_edge_support_fraction_active",
+    "size_val", "fraction", "neg_log10_fdr", "color_var", "role_confidence",
+    "specificity_class"
   ))
 }
