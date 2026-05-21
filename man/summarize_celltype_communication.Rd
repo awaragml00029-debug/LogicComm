@@ -24,7 +24,7 @@ celltype_comm_to_lcs(ct_comm,
 }
 \arguments{
 \item{reo_mat}{Binary REO matrix, genes x cells, or a \code{LogicCommREOResult} containing \code{$logic}.}
-\item{cell_labels}{Named vector/factor mapping cells to cell types, or a Seurat object.}
+\item{cell_labels}{Named vector/factor mapping cells to cell types, or a Seurat object. Cells with \code{NA} or empty labels are filtered automatically with a message when \code{verbose = TRUE}.}
 \item{seurat_obj}{Optional Seurat object used for KNN graph extraction and/or labels.}
 \item{label_col}{Optional Seurat metadata column used as cell type labels.}
 \item{knn_mat}{Optional cells x cells KNN/SNN adjacency matrix.}

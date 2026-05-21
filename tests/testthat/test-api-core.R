@@ -103,7 +103,7 @@ test_that("logic_score_lr validates requested neighborhood mode", {
   )
 })
 
-test_that("cell-type summaries report missing and invalid labels clearly", {
+test_that("cell-type summaries report missing labels and filter invalid labels clearly", {
   reo <- Matrix::Matrix(
     matrix(c(1, 0,
              0, 1), nrow = 2, byrow = TRUE,
@@ -126,14 +126,27 @@ test_that("cell-type summaries report missing and invalid labels clearly", {
     "cell_labels is missing labels for 1 cells.*C2"
   )
 
-  expect_error(
-    summarize_celltype_communication(
+  expect_message(
+    ct <- summarize_celltype_communication(
       reo,
       cell_labels = c(C1 = "A", C2 = NA_character_),
       lr_db = lr_db,
       mode = "global",
+      verbose = TRUE
+    ),
+    "Filtered 1 cells with missing or empty cell type labels.*C2"
+  )
+  expect_equal(names(ct$cell_labels), "C1")
+  expect_equal(ct$cell_labels, c(C1 = "A"))
+
+  expect_error(
+    summarize_celltype_communication(
+      reo,
+      cell_labels = c(C1 = NA_character_, C2 = ""),
+      lr_db = lr_db,
+      mode = "global",
       verbose = FALSE
     ),
-    "cell_labels contains 1 missing or empty label values.*C2"
+    "All cell_labels are missing or empty"
   )
 })
