@@ -102,3 +102,38 @@ test_that("logic_score_lr validates requested neighborhood mode", {
     "requires seurat_obj or knn_mat"
   )
 })
+
+test_that("cell-type summaries report missing and invalid labels clearly", {
+  reo <- Matrix::Matrix(
+    matrix(c(1, 0,
+             0, 1), nrow = 2, byrow = TRUE,
+           dimnames = list(c("L", "R"), c("C1", "C2"))),
+    sparse = TRUE
+  )
+  lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
+                      stringsAsFactors = FALSE)
+  lr_db$ligand_genes <- list("L")
+  lr_db$receptor_genes <- list("R")
+
+  expect_error(
+    summarize_celltype_communication(
+      reo,
+      cell_labels = c(C1 = "A"),
+      lr_db = lr_db,
+      mode = "global",
+      verbose = FALSE
+    ),
+    "cell_labels is missing labels for 1 cells.*C2"
+  )
+
+  expect_error(
+    summarize_celltype_communication(
+      reo,
+      cell_labels = c(C1 = "A", C2 = NA_character_),
+      lr_db = lr_db,
+      mode = "global",
+      verbose = FALSE
+    ),
+    "cell_labels contains 1 missing or empty label values.*C2"
+  )
+})

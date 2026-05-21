@@ -69,7 +69,6 @@ summarize_celltype_communication <- function(reo_mat,
   .validate_lr_db_for_celltype(lr_db)
 
   labels <- .resolve_celltype_labels(cell_labels, seurat_obj, label_col, colnames(reo_mat))
-  if (anyNA(labels) || any(!nzchar(labels))) stop("cell_labels must cover every cell in reo_mat.")
   cell_types <- sort(unique(labels))
   n_by_type <- table(factor(labels, levels = cell_types))
   celltype_sizes <- data.frame(cell_type = names(n_by_type), n_cells = as.integer(n_by_type), stringsAsFactors = FALSE)
@@ -333,7 +332,29 @@ celltype_comm_to_lcs <- function(ct_comm,
     if (length(cell_labels) != length(cell_names)) stop("Unnamed cell_labels must have length ncol(reo_mat).")
     names(cell_labels) <- cell_names
   }
-  cell_labels[cell_names]
+
+  missing_cells <- setdiff(cell_names, names(cell_labels))
+  if (length(missing_cells) > 0) {
+    stop(
+      "cell_labels is missing labels for ", length(missing_cells),
+      " cells in reo_mat; first missing cells: ",
+      paste(utils::head(missing_cells, 5), collapse = ", "),
+      "."
+    )
+  }
+
+  labels <- cell_labels[cell_names]
+  invalid <- is.na(labels) | !nzchar(labels)
+  if (any(invalid)) {
+    invalid_cells <- cell_names[invalid]
+    stop(
+      "cell_labels contains ", sum(invalid),
+      " missing or empty label values; first affected cells: ",
+      paste(utils::head(invalid_cells, 5), collapse = ", "),
+      ". Remove these cells or assign valid cell type labels before summarizing communication."
+    )
+  }
+  labels
 }
 
 .sum_by_group <- function(values, group, n_groups) {
