@@ -595,6 +595,19 @@ test_that("new cell-type visualization and uncertainty helpers return expected o
   null_pair <- permute_celltype_communication(ct, reo_mat = reo, n_perm = 5, metric = "sum_lcs", seed = 1, verbose = FALSE)
   expect_true(is.data.frame(null_pair))
   expect_true(all(c("empirical_p", "n_null_nonmissing", "metric") %in% names(null_pair)))
+  adaptive_messages <- character(0)
+  adaptive_pair <- withCallingHandlers(
+    permute_celltype_communication(
+      ct, reo_mat = reo, n_perm = 2, adaptive = TRUE, adaptive_top_n = 1,
+      adaptive_n_perm = 4, metric = "sum_lcs", seed = 1, verbose = TRUE
+    ),
+    message = function(m) {
+      adaptive_messages <<- c(adaptive_messages, conditionMessage(m))
+      invokeRestart("muffleMessage")
+    }
+  )
+  expect_true(is.data.frame(adaptive_pair))
+  expect_true(any(grepl("Starting adaptive refinement", adaptive_messages)))
 
   reo_unlabeled <- Matrix::Matrix(
     matrix(c(1, 1, 0,

@@ -65,11 +65,14 @@ bootstrap_celltype_communication <- function(ct_comm,
 #' @param n_perm Number of permutations.
 #' @param metric Pair-level metric to test.
 #' @param seed Optional random seed.
-#' @param adaptive If TRUE, refine top preliminary candidates.
+#' @param adaptive If TRUE, refine top preliminary candidates after the first
+#'   \code{n_perm} permutations.
 #' @param adaptive_top_n Number of preliminary candidates to refine.
-#' @param adaptive_n_perm Target permutations for adaptive candidates.
+#' @param adaptive_n_perm Target total permutations for adaptive candidates. For
+#'   example, \code{n_perm = 100} and \code{adaptive_n_perm = 1000} runs 900
+#'   additional full permutations for the top candidates.
 #' @param min_n_perm_publication Recommended minimum permutation count.
-#' @param verbose Print progress.
+#' @param verbose Print progress, including adaptive-phase elapsed time.
 #' @param ... Passed to \code{summarize_celltype_communication()}.
 #' @return Pair-level null summary with empirical p-values.
 #' @export
@@ -158,9 +161,14 @@ permute_celltype_communication <- function(ct_comm = NULL,
     vals <- stats::setNames(perm$pair_summary[[metric]], key_perm)
     vals[feature]
   }
+  null_start <- proc.time()[["elapsed"]]
+  null_step <- max(1, floor(n_perm / 10))
   for (b in seq_len(n_perm)) {
     null_mat[, b] <- run_perm()
-    if (isTRUE(verbose) && (b %% max(1, floor(n_perm / 10)) == 0)) message(sprintf("[CellTypeComm null] %d/%d permutations", b, n_perm))
+    if (isTRUE(verbose) && (b == 1 || b %% null_step == 0 || b == n_perm)) {
+      elapsed_min <- (proc.time()[["elapsed"]] - null_start) / 60
+      message(sprintf("[CellTypeComm null] %d/%d permutations | elapsed %.1f min", b, n_perm, elapsed_min))
+    }
   }
   obs <- observed[[metric]]
   if (isTRUE(adaptive) && is.finite(adaptive_n_perm) && adaptive_n_perm > n_perm) {
@@ -172,13 +180,24 @@ permute_celltype_communication <- function(ct_comm = NULL,
     top_idx <- ord[seq_len(min(adaptive_top_n, length(ord)))]
     extra_n <- as.integer(adaptive_n_perm - n_perm)
     if (length(top_idx) > 0 && extra_n > 0) {
+      if (isTRUE(verbose)) {
+        message(
+          sprintf(
+            "[CellTypeComm null adaptive] Starting adaptive refinement: %d additional full permutations for top %d candidates; target n_perm=%d. This is about %.1fx the preliminary run.",
+            extra_n, length(top_idx), adaptive_n_perm, extra_n / max(1, n_perm)
+          )
+        )
+      }
       extra_mat <- matrix(NA_real_, nrow = nrow(observed), ncol = extra_n,
                           dimnames = list(feature, paste0("adaptive", seq_len(extra_n))))
+      adaptive_start <- proc.time()[["elapsed"]]
+      adaptive_step <- max(1, floor(extra_n / 20))
       for (b in seq_len(extra_n)) {
         vals <- run_perm()
         extra_mat[top_idx, b] <- vals[top_idx]
-        if (isTRUE(verbose) && (b %% max(1, floor(extra_n / 10)) == 0)) {
-          message(sprintf("[CellTypeComm null adaptive] %d/%d additional permutations for top %d candidates", b, extra_n, length(top_idx)))
+        if (isTRUE(verbose) && (b == 1 || b %% adaptive_step == 0 || b == extra_n)) {
+          elapsed_min <- (proc.time()[["elapsed"]] - adaptive_start) / 60
+          message(sprintf("[CellTypeComm null adaptive] %d/%d additional permutations for top %d candidates | elapsed %.1f min", b, extra_n, length(top_idx), elapsed_min))
         }
       }
       null_mat <- cbind(null_mat, extra_mat)

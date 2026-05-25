@@ -42,15 +42,18 @@ when necessary.}
 
 \item{seed}{Optional random seed.}
 
-\item{adaptive}{If TRUE, refine top preliminary candidates.}
+\item{adaptive}{If TRUE, refine top preliminary candidates after the first
+\code{n_perm} permutations.}
 
 \item{adaptive_top_n}{Number of preliminary candidates to refine.}
 
-\item{adaptive_n_perm}{Target permutations for adaptive candidates.}
+\item{adaptive_n_perm}{Target total permutations for adaptive candidates. For
+example, \code{n_perm = 100} and \code{adaptive_n_perm = 1000} runs 900
+additional full permutations for the top candidates.}
 
 \item{min_n_perm_publication}{Recommended minimum permutation count.}
 
-\item{verbose}{Print progress.}
+\item{verbose}{Print progress, including adaptive-phase elapsed time.}
 
 \item{...}{Passed to \code{summarize_celltype_communication()}.}
 }
