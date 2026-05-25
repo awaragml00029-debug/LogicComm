@@ -55,8 +55,12 @@ bootstrap_celltype_communication <- function(ct_comm,
 #'
 #' @param ct_comm Optional observed object. If NULL, it is computed from inputs.
 #' @param reo_mat Binary REO matrix or LogicCommREOResult.
-#' @param cell_labels Named cell-type labels.
-#' @param knn_mat Optional KNN/SNN graph.
+#' @param cell_labels Named cell-type labels. Defaults to \code{ct_comm$cell_labels}
+#'   when \code{ct_comm} is supplied. If \code{ct_comm} was built after filtering
+#'   unlabeled cells, \code{reo_mat} and named \code{knn_mat} inputs are aligned to
+#'   those retained cells automatically.
+#' @param knn_mat Optional KNN/SNN graph. Named graphs are subset to retained cells
+#'   when necessary.
 #' @param lr_db LR database. Defaults to \code{ct_comm$lr_db} when available.
 #' @param n_perm Number of permutations.
 #' @param metric Pair-level metric to test.
@@ -92,6 +96,52 @@ permute_celltype_communication <- function(ct_comm = NULL,
   }
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   if (is.null(cell_labels)) cell_labels <- ct_comm$cell_labels
+  label_names <- names(cell_labels)
+  cell_labels <- as.character(cell_labels)
+  if (!is.null(label_names)) names(cell_labels) <- label_names
+  if (is.null(names(cell_labels))) {
+    if (length(cell_labels) != ncol(reo_mat)) stop("Unnamed cell_labels must have length ncol(reo_mat).")
+    names(cell_labels) <- colnames(reo_mat)
+  }
+  missing_cells <- setdiff(colnames(reo_mat), names(cell_labels))
+  if (length(missing_cells) > 0) {
+    shared_cells <- intersect(colnames(reo_mat), names(cell_labels))
+    if (!length(shared_cells)) stop("cell_labels and reo_mat do not share any cells.")
+    if (isTRUE(verbose)) {
+      message(
+        "Filtered ", length(missing_cells),
+        " cells from permutation inputs because they are not present in cell_labels; first affected cells: ",
+        paste(utils::head(missing_cells, 5), collapse = ", "),
+        "."
+      )
+    }
+    reo_mat <- reo_mat[, shared_cells, drop = FALSE]
+    cell_labels <- cell_labels[shared_cells]
+  } else {
+    cell_labels <- cell_labels[colnames(reo_mat)]
+  }
+  invalid_labels <- is.na(cell_labels) | !nzchar(cell_labels)
+  if (any(invalid_labels)) {
+    n_filtered <- sum(invalid_labels)
+    filtered_cells <- names(cell_labels)[invalid_labels]
+    if (n_filtered == length(cell_labels)) {
+      stop("All cell_labels are missing or empty; assign valid cell type labels before permutation.")
+    }
+    if (isTRUE(verbose)) {
+      message(
+        "Filtered ", n_filtered,
+        " cells with missing or empty cell type labels before permutation; first affected cells: ",
+        paste(utils::head(filtered_cells, 5), collapse = ", "),
+        "."
+      )
+    }
+    cell_labels <- cell_labels[!invalid_labels]
+    reo_mat <- reo_mat[, names(cell_labels), drop = FALSE]
+  }
+  if (!is.null(knn_mat) && !is.null(rownames(knn_mat)) && !is.null(colnames(knn_mat)) &&
+      all(names(cell_labels) %in% rownames(knn_mat)) && all(names(cell_labels) %in% colnames(knn_mat))) {
+    knn_mat <- knn_mat[names(cell_labels), names(cell_labels), drop = FALSE]
+  }
   if (is.null(lr_db)) lr_db <- ct_comm$lr_db
   observed <- ct_comm$pair_summary
   if (!metric %in% names(observed)) stop("metric not found in pair_summary: ", metric)

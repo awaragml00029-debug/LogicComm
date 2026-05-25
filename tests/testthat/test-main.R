@@ -592,6 +592,29 @@ test_that("new cell-type visualization and uncertainty helpers return expected o
   expect_s3_class(plot_lr_evidence(ct, sender = "A", receiver = "B", lr_pair = "L_R"), "ggplot")
   boot <- bootstrap_celltype_communication(ct, n_boot = 5, seed = 1)
   expect_true(is.data.frame(boot))
+  null_pair <- permute_celltype_communication(ct, reo_mat = reo, n_perm = 5, metric = "sum_lcs", seed = 1, verbose = FALSE)
+  expect_true(is.data.frame(null_pair))
+  expect_true(all(c("empirical_p", "n_null_nonmissing", "metric") %in% names(null_pair)))
+
+  reo_unlabeled <- Matrix::Matrix(
+    matrix(c(1, 1, 0,
+             0, 1, 1), nrow = 2, byrow = TRUE,
+           dimnames = list(c("L", "R"), c("C1", "C2", "C3"))),
+    sparse = TRUE
+  )
+  labels_unlabeled <- setNames(c("A", "B", NA_character_), c("C1", "C2", "C3"))
+  ct_unlabeled <- summarize_celltype_communication(
+    reo_unlabeled, cell_labels = labels_unlabeled, lr_db = lr_db, mode = "global",
+    lcs_threshold = 0.1, min_edges = 1, verbose = FALSE
+  )
+  expect_equal(names(ct_unlabeled$cell_labels), c("C1", "C2"))
+  null_unlabeled <- permute_celltype_communication(
+    ct_comm = ct_unlabeled, reo_mat = reo_unlabeled, n_perm = 3,
+    metric = "sum_lcs", seed = 1, verbose = FALSE
+  )
+  expect_true(is.data.frame(null_unlabeled))
+  expect_equal(unique(null_unlabeled$metric), "sum_lcs")
+
   response_db <- data.frame(lr_pair = "L_R", response_genes = "R", stringsAsFactors = FALSE)
   resp <- score_receiver_response(ct, reo, response_db)
   expect_true("response_integrated_score" %in% names(resp))

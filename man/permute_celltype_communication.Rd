@@ -26,9 +26,13 @@ permute_celltype_communication(
 
 \item{reo_mat}{Binary REO matrix or LogicCommREOResult.}
 
-\item{cell_labels}{Named cell-type labels.}
+\item{cell_labels}{Named cell-type labels. Defaults to \code{ct_comm$cell_labels}
+when \code{ct_comm} is supplied. If \code{ct_comm} was built after filtering
+unlabeled cells, \code{reo_mat} and named \code{knn_mat} inputs are aligned to
+those retained cells automatically.}
 
-\item{knn_mat}{Optional KNN/SNN graph.}
+\item{knn_mat}{Optional KNN/SNN graph. Named graphs are subset to retained cells
+when necessary.}
 
 \item{lr_db}{LR database. Defaults to \code{ct_comm$lr_db} when available.}
 
