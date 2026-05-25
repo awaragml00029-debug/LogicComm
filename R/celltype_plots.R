@@ -38,6 +38,28 @@ plot_celltype_network <- function(ct_comm,
   edges$edge_color <- if (color_edges_by == "range") edges$dominant_communication_range else edges$top_pathway
   edges$edge_linetype <- ifelse(edges$dominant_communication_range == "distal/endocrine", "distal/endocrine", "local/mixed")
   edges$value <- edges[[metric]]
+  self_edge <- is.finite(edges$x) & is.finite(edges$y) & is.finite(edges$xend) & is.finite(edges$yend) &
+    abs(edges$x - edges$xend) < .Machine$double.eps & abs(edges$y - edges$yend) < .Machine$double.eps
+  if (any(self_edge)) {
+    tx <- -edges$y[self_edge]
+    ty <- edges$x[self_edge]
+    norm <- sqrt(tx^2 + ty^2)
+    norm[norm == 0] <- 1
+    tx <- tx / norm
+    ty <- ty / norm
+    rx <- edges$x[self_edge]
+    ry <- edges$y[self_edge]
+    rnorm <- sqrt(rx^2 + ry^2)
+    rnorm[rnorm == 0] <- 1
+    rx <- rx / rnorm
+    ry <- ry / rnorm
+    loop_radius <- 0.14
+    inward_shift <- 0.05
+    edges$x[self_edge] <- edges$x[self_edge] + loop_radius * tx - inward_shift * rx
+    edges$y[self_edge] <- edges$y[self_edge] + loop_radius * ty - inward_shift * ry
+    edges$xend[self_edge] <- edges$xend[self_edge] - loop_radius * tx - inward_shift * rx
+    edges$yend[self_edge] <- edges$yend[self_edge] - loop_radius * ty - inward_shift * ry
+  }
 
   p <- ggplot2::ggplot() +
     ggplot2::geom_curve(data = edges,
@@ -195,6 +217,8 @@ plot_lr_bubble_by_celltype <- function(ct_comm,
 #' @param receiver Optional receiver filter.
 #' @param top_n_pathways Number of pathways to display.
 #' @param title Optional title.
+#' @param cluster_rows Cluster pathway rows using the selected metric across cell-type pairs.
+#' @param cluster_cols Cluster sender-receiver pair columns using the selected metric across pathways.
 #' @return A ggplot2 object.
 #' @export
 plot_pathway_heatmap <- function(ct_comm,
@@ -202,7 +226,9 @@ plot_pathway_heatmap <- function(ct_comm,
                                  sender = NULL,
                                  receiver = NULL,
                                  top_n_pathways = 30,
-                                 title = NULL) {
+                                 title = NULL,
+                                 cluster_rows = FALSE,
+                                 cluster_cols = FALSE) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   metric <- match.arg(metric)
   df <- ct_comm$pathway_summary
@@ -214,6 +240,23 @@ plot_pathway_heatmap <- function(ct_comm,
   keep <- names(sort(totals, decreasing = TRUE))[seq_len(min(top_n_pathways, length(totals)))]
   df <- df[df$pathway %in% keep, , drop = FALSE]
   df$celltype_pair <- paste(df$sender_type, df$receiver_type, sep = " -> ")
+  if (isTRUE(cluster_rows) || isTRUE(cluster_cols)) {
+    cluster_values <- df[[metric]]
+    cluster_values[!is.finite(cluster_values) | is.na(cluster_values)] <- 0
+    cluster_df <- stats::aggregate(
+      cluster_values,
+      by = list(pathway = df$pathway, celltype_pair = df$celltype_pair),
+      FUN = sum,
+      na.rm = TRUE
+    )
+    mat <- stats::xtabs(x ~ pathway + celltype_pair, data = cluster_df)
+    if (isTRUE(cluster_rows) && nrow(mat) > 1) {
+      df$pathway <- factor(df$pathway, levels = rownames(mat)[stats::hclust(stats::dist(mat))$order])
+    }
+    if (isTRUE(cluster_cols) && ncol(mat) > 1) {
+      df$celltype_pair <- factor(df$celltype_pair, levels = colnames(mat)[stats::hclust(stats::dist(t(mat)))$order])
+    }
+  }
   if (is.null(title)) title <- paste("Pathway communication:", metric)
   ggplot2::ggplot(df, ggplot2::aes(x = celltype_pair, y = pathway, fill = .data[[metric]])) +
     ggplot2::geom_tile(color = "white", linewidth = 0.2) +

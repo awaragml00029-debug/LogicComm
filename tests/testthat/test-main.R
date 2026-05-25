@@ -494,11 +494,30 @@ test_that("cell-type plotting helpers return ggplot objects", {
     reo, cell_labels = labels, lr_db = lr_db,
     mode = "global", lcs_threshold = 0.1, min_edges = 1, verbose = FALSE
   )
+  expect_true(all(c("plot_communication_range_summary", "plot_lr_bubble_advanced") %in% getNamespaceExports("LogicComm")))
   expect_s3_class(plot_celltype_heatmap(ct), "ggplot")
   expect_s3_class(plot_celltype_roles(ct), "ggplot")
   expect_s3_class(plot_celltype_network(ct), "ggplot")
+  expect_s3_class(plot_communication_range_summary(ct), "ggplot")
   expect_s3_class(plot_lr_bubble_by_celltype(ct, active_only = FALSE), "ggplot")
+  expect_s3_class(plot_lr_bubble_advanced(ct), "ggplot")
   expect_s3_class(plot_pathway_heatmap(ct), "ggplot")
+  expect_s3_class(plot_pathway_heatmap(ct, cluster_rows = TRUE, cluster_cols = TRUE), "ggplot")
+
+  reo_loop <- Matrix::Matrix(
+    matrix(c(1, 1,
+             1, 1), nrow = 2, byrow = TRUE,
+           dimnames = list(c("L", "R"), c("C1", "C2"))),
+    sparse = TRUE
+  )
+  labels_loop <- setNames(c("A", "A"), c("C1", "C2"))
+  ct_loop <- summarize_celltype_communication(
+    reo_loop, cell_labels = labels_loop, lr_db = lr_db,
+    mode = "global", lcs_threshold = 0.1, min_edges = 1, verbose = FALSE
+  )
+  p_loop <- plot_celltype_network(ct_loop, min_weight = 0, color_edges_by = "range")
+  expect_s3_class(p_loop, "ggplot")
+  expect_s3_class(ggplot2::ggplotGrob(p_loop), "gtable")
 
   ex <- explain_celltype_interaction(ct, sender = "A", receiver = "B", lr_pair = "L_R")
   expect_true(is.list(ex))

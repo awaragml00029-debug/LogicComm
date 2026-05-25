@@ -10,7 +10,9 @@ plot_pathway_heatmap(
   sender = NULL,
   receiver = NULL,
   top_n_pathways = 30,
-  title = NULL
+  title = NULL,
+  cluster_rows = FALSE,
+  cluster_cols = FALSE
 )
 }
 \arguments{
@@ -25,6 +27,10 @@ plot_pathway_heatmap(
 \item{top_n_pathways}{Number of pathways to display.}
 
 \item{title}{Optional title.}
+
+\item{cluster_rows}{Cluster pathway rows using the selected metric across cell-type pairs.}
+
+\item{cluster_cols}{Cluster sender-receiver pair columns using the selected metric across pathways.}
 }
 \value{
 A ggplot2 object.
