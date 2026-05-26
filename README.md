@@ -57,7 +57,7 @@ install.packages("igraph")
 ### Install LogicComm from a local source tarball
 
 ```r
-install.packages("LogicComm_0.6.6.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.6.7.tar.gz", repos = NULL, type = "source")
 ```
 
 If installing from the unpacked source directory during development:
@@ -670,7 +670,7 @@ Multimer rule: all subunits in `ligand_genes` or `receptor_genes` must be presen
 
 ## Publication-Level Extensions
 
-LogicComm 0.6.6 extends several modules intended for manuscript-grade analyses.
+LogicComm 0.6.7 extends several modules intended for manuscript-grade analyses.
 They do not change the core REO/LCS definition; instead they add stronger
 biological context, statistical modeling, and figure/report scaffolding.
 

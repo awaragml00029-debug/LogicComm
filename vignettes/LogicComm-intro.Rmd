@@ -51,7 +51,7 @@ install.packages("pheatmap")              # heatmap plotting
 install.packages(c("Seurat", "SeuratObject"))  # Seurat input / KNN extraction
 
 # Install from local source tarball
-install.packages("LogicComm_0.6.6.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.6.7.tar.gz", repos = NULL, type = "source")
 ```
 
 Input matrices should be **genes x cells**. Sparse matrices are supported. By default, REO anchors are computed from all genes in each cell, while `lr_genes` controls only which genes are returned and scored. On Windows, keep `mc_cores = 1` in `run_multisample()` unless you provide another parallel backend.

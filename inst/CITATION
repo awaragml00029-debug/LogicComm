@@ -3,5 +3,5 @@ bibentry(
   title = "LogicComm: Logic-Based Cell-Cell Communication Analysis for Multi-Sample scRNA-seq",
   author = person("LogicComm", "Developer"),
   year = "2026",
-  note = "R package version 0.6.6"
+  note = "R package version 0.6.7"
 )

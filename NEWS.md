@@ -1,4 +1,4 @@
-# LogicComm 0.6.6
+# LogicComm 0.6.7
 
 ## PBMC multi-sample validation and publication cleanup
 
@@ -6,7 +6,7 @@
 * Added `vignettes/PBMC_multisample_demo.Rmd` with detailed PBMC1-4 Case/Ctrl simulation design, expected output, plotting code, and interpretation cautions for low sample counts.
 * Added a regression test for four named PBMC-style samples with a known ligand-receptor perturbation.
 * Quieted known role-summary warnings from directed acyclic igraph eigen-centrality calls and all-NA role-score rescaling.
-* Updated package citation and installation examples to the 0.6.6 source tarball.
+* Updated package citation and installation examples to the 0.6.7 source tarball.
 
 # LogicComm 0.6.1
 

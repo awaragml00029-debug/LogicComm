@@ -74,7 +74,7 @@ The script performs these operations:
 
 ## Expected Validation Result
 
-Using LogicComm 0.6.6 on PBMC3K with `seed = 20260526`, `perturb_lambda = 50`,
+Using LogicComm 0.6.7 on PBMC3K with `seed = 20260526`, `perturb_lambda = 50`,
 and `lcs_threshold = 0.2`, the targeted Case perturbation is recovered as follows:
 
 | lr_pair | pathway | case_freq | ctrl_freq | asymmetry | log2fc_lcs | fdr_fisher |
