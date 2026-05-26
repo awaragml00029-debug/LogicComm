@@ -89,6 +89,53 @@ test_that("CompareLogicGroups returns LogicCommResult", {
   expect_true(vegfa_row$case_freq >= vegfa_row$ctrl_freq)
 })
 
+test_that("run_multisample validates four named PBMC-style samples with a known perturbation", {
+  genes <- c("MIF", "CD74", paste0("BG", seq_len(20)))
+  make_sample <- function(active = FALSE) {
+    mat <- matrix(1, nrow = length(genes), ncol = 12,
+                  dimnames = list(genes, paste0("C", seq_len(12))))
+    if (isTRUE(active)) {
+      mat["MIF", ] <- 20
+      mat["CD74", ] <- 20
+    } else {
+      mat["MIF", ] <- 0
+      mat["CD74", ] <- 0
+    }
+    Matrix::Matrix(mat, sparse = TRUE)
+  }
+
+  lr_db <- data.frame(lr_pair = "MIF_CD74", ligand = "MIF", receptor = "CD74",
+                      pathway = "MIF", annotation = "demo", stringsAsFactors = FALSE)
+  lr_db$ligand_genes <- list("MIF")
+  lr_db$receptor_genes <- list("CD74")
+
+  samples <- list(
+    pbmc1 = make_sample(TRUE),
+    pbmc2 = make_sample(TRUE),
+    pbmc3 = make_sample(FALSE),
+    pbmc4 = make_sample(FALSE)
+  )
+  groups <- c(pbmc1 = "Case", pbmc2 = "Case", pbmc3 = "Ctrl", pbmc4 = "Ctrl")
+
+  result <- run_multisample(
+    samples,
+    group_info = groups,
+    lr_db = lr_db,
+    rank_threshold = 0.5,
+    lcs_threshold = 0.5,
+    min_samples_per_group = 2,
+    verbose = FALSE
+  )
+
+  row <- result$comparison[result$comparison$lr_pair == "MIF_CD74", , drop = FALSE]
+  expect_s3_class(result, "LogicCommMulti")
+  expect_equal(names(result$lcs_list), names(samples))
+  expect_equal(row$case_freq, 1)
+  expect_equal(row$ctrl_freq, 0)
+  expect_equal(row$asymmetry, 1)
+  expect_gt(row$case_mean_lcs, row$ctrl_mean_lcs)
+})
+
 test_that("score_lr_activity returns valid scores", {
   
   lr_g <- all_lr_genes(lr_pairs_human)
@@ -271,7 +318,7 @@ test_that("REO anchors are computed from all genes by default, not only retained
   reo <- calc_REO_matrix(expr, lr_genes = c("L", "R"),
                          rank_threshold = 0.5, verbose = FALSE)
   expect_equal(rownames(reo), c("L", "R"))
-  expect_false(any(as.matrix(reo)))
+  expect_false(any(as.matrix(reo) != 0))
   expect_equal(attr(reo, "anchor_n_genes"), 4L)
 })
 
@@ -568,6 +615,14 @@ test_that("cell-type role summary exposes disambiguated count fields and low com
                     "outgoing_target_type_count", "incoming_source_type_count",
                     "outgoing_unique_lr_count", "role_confidence_label") %in% names(ct$role_summary)))
   expect_true(any(ct$role_summary$dominant_role == "Low-communication"))
+})
+
+test_that("cell-type role helpers are quiet for degenerate role scores", {
+  adj <- matrix(c(0, 1, 0, 0), nrow = 2, byrow = TRUE,
+                dimnames = list(c("A", "B"), c("A", "B")))
+  expect_no_warning(role_summary <- .communication_role_summary(adj, adj, min_role_event_count = 0))
+  expect_true(is.data.frame(role_summary))
+  expect_equal(.rescale01(c(NA_real_, NA_real_)), c(0, 0))
 })
 
 test_that("new cell-type visualization and uncertainty helpers return expected objects", {

@@ -1,3 +1,13 @@
+# LogicComm 0.6.6
+
+## PBMC multi-sample validation and publication cleanup
+
+* Added an executable PBMC3K four-sample validation demo at `inst/examples/pbmc_multisample_demo.R`. The script splits PBMC3K into `pbmc1`, `pbmc2`, `pbmc3`, and `pbmc4`, applies a controlled Case perturbation to `pbmc1` and `pbmc2`, and verifies that LogicComm recovers the expected sample-level MIF, galectin, and MHC-I LR signals.
+* Added `vignettes/PBMC_multisample_demo.Rmd` with detailed PBMC1-4 Case/Ctrl simulation design, expected output, plotting code, and interpretation cautions for low sample counts.
+* Added a regression test for four named PBMC-style samples with a known ligand-receptor perturbation.
+* Quieted known role-summary warnings from directed acyclic igraph eigen-centrality calls and all-NA role-score rescaling.
+* Updated package citation and installation examples to the 0.6.6 source tarball.
+
 # LogicComm 0.6.1
 
 ## Specificity, diagnostics, and safer biological interpretation

@@ -2,7 +2,7 @@
 title: "Seurat_demo: PBMC3K LogicComm Tutorial / PBMC3K 中英文教程"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Seurat_demo: PBMC3K LogicComm Tutorial}
+  %\VignetteIndexEntry{Seurat_demo: PBMC3K LogicComm Tutorial / PBMC3K 中英文教程}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -104,7 +104,7 @@ install.packages(c("Seurat", "SeuratObject"))
 install.packages("pheatmap")
 
 # Install LogicComm from local source tarball
-install.packages("LogicComm_0.6.1.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.6.6.tar.gz", repos = NULL, type = "source")
 ```
 
 The PBMC3K data are available from SeuratData:

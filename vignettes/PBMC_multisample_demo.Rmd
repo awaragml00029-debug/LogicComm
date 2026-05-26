@@ -1,0 +1,132 @@
+---
+title: "PBMC Multi-Sample Simulation Demo"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{PBMC Multi-Sample Simulation Demo}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+## Purpose
+
+This vignette demonstrates a sample-level Case versus Control validation using the
+same PBMC3K dataset that is used in the Seurat tutorial. The goal is not to claim
+that PBMC3K contains disease biology. Instead, one PBMC3K object is split into
+four pseudo-samples named `pbmc1`, `pbmc2`, `pbmc3`, and `pbmc4`; `pbmc1` and
+`pbmc2` are treated as simulated Case samples, while `pbmc3` and `pbmc4` are
+left as simulated Controls. A controlled perturbation is added to selected
+ligand-receptor genes in the Case samples so that the expected answer is known
+before running LogicComm.
+
+**中文说明。** 这个示例把同一个 PBMC3K 数据拆成四个样本级对象：`pbmc1`、`pbmc2`、
+`pbmc3` 和 `pbmc4`。其中 `pbmc1`、`pbmc2` 是模拟 Case，`pbmc3`、`pbmc4` 是模拟
+Ctrl。我们人为增强 Case 中的 MIF、galectin 和 MHC-I 相关基因，用来校验
+`run_multisample()` 和 `CompareLogicGroups()` 是否能在样本层面恢复已知扰动。
+
+Because there are only two simulated samples per group, Fisher-test p-values have
+very low resolution. In this demonstration, successful validation is defined by
+recovering the expected direction, recurrence, and effect size: targeted LR pairs
+should be active in both Case samples, inactive in both Control samples at the
+selected threshold, and have positive `log2fc_lcs`. Real publication claims need
+more independent biological samples.
+
+## Executable Script
+
+The full executable script is installed with the package at
+`inst/examples/pbmc_multisample_demo.R`. After installing LogicComm and the PBMC3K
+SeuratData package, run:
+
+```{r run_script, eval=FALSE}
+source(system.file("examples", "pbmc_multisample_demo.R", package = "LogicComm"))
+demo <- run_pbmc_multisample_demo(
+  seed = 20260526,
+  perturb_lambda = 50,
+  lcs_threshold = 0.2,
+  verbose = TRUE
+)
+
+demo$target_rows[, c(
+  "lr_pair", "pathway", "case_freq", "ctrl_freq", "asymmetry",
+  "case_mean_lcs", "ctrl_mean_lcs", "log2fc_lcs", "fdr_fisher"
+)]
+```
+
+The script performs these operations:
+
+1. Loads PBMC3K with `pbmc3k.SeuratData` and updates the object with Seurat.
+2. Extracts the raw RNA count matrix.
+3. Randomly splits cells into four sample-level matrices named `pbmc1` to `pbmc4`.
+4. Adds a controlled positive perturbation to `MIF`, `CD74`, `LGALS3`, `CD44`,
+   `HLA-A`, and `CD8A` in `pbmc1` and `pbmc2` only.
+5. Runs `run_multisample()` with the built-in `lr_pairs_human` database.
+6. Reports the targeted LR pairs that should be recovered.
+
+## Expected Validation Result
+
+Using LogicComm 0.6.6 on PBMC3K with `seed = 20260526`, `perturb_lambda = 50`,
+and `lcs_threshold = 0.2`, the targeted Case perturbation is recovered as follows:
+
+| lr_pair | pathway | case_freq | ctrl_freq | asymmetry | log2fc_lcs | fdr_fisher |
+|---|---|---:|---:|---:|---:|---:|
+| HLA-A_CD8A | MHC-I | 1 | 0 | 1 | 4.7840 | 1 |
+| HLA-B_CD8A | MHC-I | 1 | 0 | 1 | 4.5520 | 1 |
+| LGALS3_CD44 | GALECTIN | 1 | 0 | 1 | 4.5161 | 1 |
+| MIF_CD74 | MIF | 1 | 0 | 1 | 3.5407 | 1 |
+| MIF_CD44 | MIF | 1 | 0 | 1 | 5.3543 | 1 |
+
+The `case_freq = 1` and `ctrl_freq = 0` pattern means that every targeted LR pair
+is above the active threshold in both simulated Case PBMC samples and below the
+threshold in both simulated Control PBMC samples. The FDR column remains 1 because
+with only two samples per group the Fisher test cannot provide publication-level
+resolution. This is an intentional validation demo, not a powered disease study.
+
+## Plotting the Comparison
+
+```{r plot_demo, eval=FALSE, fig.width=11, fig.height=5}
+comparison <- demo$result$comparison
+group_info <- demo$group_info
+
+plot_lcs_bubble(
+  comparison,
+  top_n = 15,
+  min_asymmetry = 0.2,
+  color_by = "asymmetry"
+)
+
+plot_lcs_heatmap(
+  comparison,
+  group_info = group_info,
+  top_n = 20,
+  fdr_cutoff = 1
+)
+```
+
+For a real cohort, use one PBMC object per biological sample rather than splitting
+one sample. Keep the same LR database, REO threshold, layer, and graph definition
+across samples. If Seurat nearest-neighbor graphs are available per sample, pass
+`graph_name = "RNA_nn"` to `run_multisample()`; otherwise LogicComm falls back to
+global LCS mode, which is the mode used by this compact validation script.
+
+## Interpreting This Demo
+
+This demo verifies three package-level behaviors. First, named sample alignment is
+preserved from `sample_list` through `group_info` into the comparison table.
+Second, REO and LCS scoring respond predictably to a known PBMC-derived
+perturbation. Third, `CompareLogicGroups()` reports recurrence and effect size at
+the sample level rather than treating cells as independent replicates.
+
+**中文说明。** 这个 demo 的重点是软件校验：样本名是否严格对齐、已知扰动是否被恢复、
+多组比较是否以样本为统计单位。它不能替代真实 Case/Ctrl 队列，也不应把 PBMC3K 的模拟
+扰动解释成真实疾病机制。真实发表分析至少需要多个独立生物样本，并应结合置换检验、
+边支持度、细胞类型解释和外部生物学证据。

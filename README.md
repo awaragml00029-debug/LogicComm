@@ -57,7 +57,7 @@ install.packages("igraph")
 ### Install LogicComm from a local source tarball
 
 ```r
-install.packages("LogicComm_0.6.1.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.6.6.tar.gz", repos = NULL, type = "source")
 ```
 
 If installing from the unpacked source directory during development:
@@ -132,6 +132,16 @@ Important KNN rules:
 - If KNN cells do not cover all REO cells, the function errors instead of silently producing wrong LCS values.
 
 ---
+
+## PBMC3K Four-Sample Validation Demo
+
+A publication-style PBMC validation walkthrough is included in `vignettes/PBMC_multisample_demo.Rmd`. It splits PBMC3K into `pbmc1`, `pbmc2`, `pbmc3`, and `pbmc4`, adds a known Case perturbation to `pbmc1` and `pbmc2`, and verifies that `run_multisample()` recovers the expected Case-enriched MIF, galectin, and MHC-I LR axes at the sample level.
+
+```r
+source(system.file("examples", "pbmc_multisample_demo.R", package = "LogicComm"))
+demo <- run_pbmc_multisample_demo()
+demo$target_rows[, c("lr_pair", "case_freq", "ctrl_freq", "asymmetry", "log2fc_lcs")]
+```
 
 ## Quick Start: Multi-Sample Case vs Control
 
@@ -660,7 +670,7 @@ Multimer rule: all subunits in `ligand_genes` or `receptor_genes` must be presen
 
 ## Publication-Level Extensions
 
-LogicComm 0.6.1 extends several modules intended for manuscript-grade analyses.
+LogicComm 0.6.6 extends several modules intended for manuscript-grade analyses.
 They do not change the core REO/LCS definition; instead they add stronger
 biological context, statistical modeling, and figure/report scaffolding.
 

@@ -24,7 +24,10 @@
   if (requireNamespace("igraph", quietly = TRUE)) {
     g <- igraph::graph_from_adjacency_matrix(adj_strength, mode = "directed", weighted = TRUE, diag = TRUE)
     betweenness <- tryCatch(as.numeric(igraph::betweenness(g, normalized = TRUE)), error = function(e) rep(0, n))
-    information <- tryCatch(as.numeric(igraph::eigen_centrality(g, directed = TRUE, weights = igraph::E(g)$weight)$vector), error = function(e) rep(0, n))
+    information <- tryCatch(
+      suppressWarnings(as.numeric(igraph::eigen_centrality(g, directed = TRUE, weights = igraph::E(g)$weight)$vector)),
+      error = function(e) rep(0, n)
+    )
   }
 
   active_lr <- if (!is.null(lr_table) && nrow(lr_table) > 0 && "active" %in% names(lr_table)) {
@@ -219,6 +222,7 @@ plot_celltype_role_radar <- function(ct_comm, cell_types = NULL, scaled = TRUE, 
 
 .rescale01 <- function(x) {
   x <- as.numeric(x)
+  if (!any(is.finite(x))) return(rep(0, length(x)))
   rng <- range(x, na.rm = TRUE)
   if (!all(is.finite(rng)) || rng[1] == rng[2]) return(rep(0, length(x)))
   (x - rng[1]) / (rng[2] - rng[1])
