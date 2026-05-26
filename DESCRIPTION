@@ -1,8 +1,8 @@
 Package: LogicComm
 Type: Package
 Title: Logic-Based Cell-Cell Communication Analysis for Multi-Sample scRNA-seq
-Version: 0.6.7
-Date: 2026-05-25
+Version: 0.7
+Date: 2026-05-26
 Authors@R: person("LogicComm", "Developer", role = c("aut", "cre"),
     email = "dev@logiccomm.io")
 Author: LogicComm Developer
@@ -17,8 +17,8 @@ Description: Identifies cell-cell communication signals by converting single-cel
     receiver-response logic scoring, spatial and pseudotime communication
     modules, sample-level quasibinomial differential modeling, publication-ready
     specificity scoring, permutation-null diagnostics, role-evidence interpretation,
-    report helpers, BPCells on-disk matrices, and Rcpp high-performance
-    computation.
+    rank-aware REO evidence, threshold-stability scoring, report helpers,
+    BPCells on-disk matrices, and Rcpp high-performance computation.
 License: MIT + file LICENSE
 LazyData: true
 Encoding: UTF-8

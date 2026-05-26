@@ -104,7 +104,7 @@ install.packages(c("Seurat", "SeuratObject"))
 install.packages("pheatmap")
 
 # Install LogicComm from local source tarball
-install.packages("LogicComm_0.6.7.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.7.tar.gz", repos = NULL, type = "source")
 ```
 
 The PBMC3K data are available from SeuratData:

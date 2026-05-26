@@ -1,3 +1,15 @@
+# LogicComm 0.7
+
+## Rank-aware REO evidence for publication-grade interpretation
+
+* Added `calc_REO_rank_score_matrix()` to expose within-cell rank percentiles for ligand-receptor genes without replacing the original binary REO workflow.
+* Added `IdentifyRankLogicConsensus()` with binary LCS, rank dominance, rank margin, threshold stability, cell-label specificity, and evidence-tier annotations.
+* Added `score_lr_rank_activity()` for continuous per-cell sender and receiver LR rank activity.
+* Added `CompareRankLogicGroups()` for sample-level Case/Ctrl comparisons when binary active frequency is saturated but rank evidence differs.
+* Added a 0.7 design note at `inst/design/LogicComm_0.7_rank_aware_reo.md` documenting publication-level package targets, evidence tiers, and RankComp/DRM-inspired rationale.
+* Added regression tests showing that rank-aware evidence recovers simulated Case/Ctrl strength differences even when binary LCS is identical.
+* Extended the PBMC multi-sample demo with 0.7 rank-aware Case/Ctrl evidence output.
+
 # LogicComm 0.6.7
 
 ## PBMC multi-sample validation and publication cleanup

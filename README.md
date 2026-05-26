@@ -2,7 +2,7 @@
 
 **Logic-Based Cell-Cell Communication Analysis for Multi-Sample scRNA-seq**
 
-LogicComm converts single-cell expression matrices into **Relative Expression Ordering (REO)** binary logic states and scores ligand-receptor communication with **Logic Consensus Scores (LCS)**. It is designed for single-sample exploration and cohort-level **Case vs Control** comparisons.
+LogicComm converts single-cell expression matrices into **Relative Expression Ordering (REO)** binary logic states, preserves optional within-cell rank evidence, and scores ligand-receptor communication with **Logic Consensus Scores (LCS)**. It is designed for single-sample exploration and cohort-level **Case vs Control** comparisons.
 
 ---
 
@@ -10,10 +10,11 @@ LogicComm converts single-cell expression matrices into **Relative Expression Or
 
 1. **REO conversion**: each gene is marked active/inactive within each cell by comparing it with that cell's expression anchor.
 2. **LCS scoring**: each ligand-receptor pair receives a score based on ligand-active sender cells and receptor-active receiver cells.
-3. **Multi-sample comparison**: active L-R pairs are compared across N Case vs N Control samples using frequency voting plus statistical tests.
-4. **Per-cell activity scoring**: cells can be ranked by sender, receiver, or combined communication potential.
+3. **Rank-aware REO evidence**: rank dominance, margin, threshold stability, and cell-type-pair specificity complement binary active calls.
+4. **Multi-sample comparison**: active L-R pairs are compared across N Case vs N Control samples using frequency voting, continuous rank evidence, and statistical tests.
+5. **Per-cell activity scoring**: cells can be ranked by sender, receiver, or combined communication potential.
 5. **Cell-type-resolved interpretation**: summarize celltypeA -> celltypeB communication counts, logic strength, pathway drivers, and signaling roles.
-6. **Publication-level diagnostics**: spatial neighborhoods, pseudotime dynamics, sample-level GLMs, QC plots, and markdown report helpers.
+7. **Publication-level diagnostics**: spatial neighborhoods, pseudotime dynamics, sample-level GLMs, QC plots, and markdown report helpers.
 
 | Feature | LogicComm behavior |
 |---|---|
@@ -57,7 +58,7 @@ install.packages("igraph")
 ### Install LogicComm from a local source tarball
 
 ```r
-install.packages("LogicComm_0.6.7.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.7.tar.gz", repos = NULL, type = "source")
 ```
 
 If installing from the unpacked source directory during development:
@@ -68,6 +69,19 @@ R CMD INSTALL path/to/LogicComm
 
 ---
 
+## Rank-Aware REO Evidence
+
+LogicComm 0.7 adds an experimental continuous evidence layer inspired by rank-order methods. The original binary REO/LCS functions remain unchanged, but users can now keep the rank margin that is lost when every above-threshold gene becomes a simple active call.
+
+```r
+reo <- calc_REO_matrix(count_matrix, lr_genes = all_lr_genes(lr_pairs_human),
+                       return_rank = TRUE, verbose = FALSE)
+rank_ev <- IdentifyRankLogicConsensus(reo, lr_db = lr_pairs_human,
+                                      threshold_grid = c(0.4, 0.5, 0.6, 0.7))
+head(rank_ev[order(-rank_ev$specificity_weighted_rank_lcs), ])
+```
+
+For multi-sample designs, use `CompareRankLogicGroups()` on one rank-evidence table per biological sample. This is most useful when a permissive binary threshold makes Case and Control both active, but Case has stronger rank dominance and better threshold stability.
 ## Quick Start: Single Sample
 
 ```r
@@ -670,7 +684,7 @@ Multimer rule: all subunits in `ligand_genes` or `receptor_genes` must be presen
 
 ## Publication-Level Extensions
 
-LogicComm 0.6.7 extends several modules intended for manuscript-grade analyses.
+LogicComm 0.7 extends several modules intended for manuscript-grade analyses.
 They do not change the core REO/LCS definition; instead they add stronger
 biological context, statistical modeling, and figure/report scaffolding.
 

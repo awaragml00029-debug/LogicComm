@@ -53,12 +53,19 @@ demo <- run_pbmc_multisample_demo(
   seed = 20260526,
   perturb_lambda = 50,
   lcs_threshold = 0.2,
+  rank_threshold_grid = c(0.4, 0.5, 0.6, 0.7, 0.8),
+  run_rank_evidence = TRUE,
   verbose = TRUE
 )
 
 demo$target_rows[, c(
   "lr_pair", "pathway", "case_freq", "ctrl_freq", "asymmetry",
   "case_mean_lcs", "ctrl_mean_lcs", "log2fc_lcs", "fdr_fisher"
+)]
+
+demo$rank_target_rows[, c(
+  "lr_pair", "pathway", "case_mean_rank_score", "ctrl_mean_rank_score",
+  "delta_rank_score", "log2fc_rank_score", "case_mean_binary_lcs", "ctrl_mean_binary_lcs"
 )]
 ```
 
@@ -70,11 +77,12 @@ The script performs these operations:
 4. Adds a controlled positive perturbation to `MIF`, `CD74`, `LGALS3`, `CD44`,
    `HLA-A`, and `CD8A` in `pbmc1` and `pbmc2` only.
 5. Runs `run_multisample()` with the built-in `lr_pairs_human` database.
-6. Reports the targeted LR pairs that should be recovered.
+6. Runs the 0.7 rank-aware REO evidence layer for each pseudo-sample and compares Case versus Ctrl rank scores.
+7. Reports the targeted LR pairs that should be recovered.
 
 ## Expected Validation Result
 
-Using LogicComm 0.6.7 on PBMC3K with `seed = 20260526`, `perturb_lambda = 50`,
+Using LogicComm 0.7 on PBMC3K with `seed = 20260526`, `perturb_lambda = 50`,
 and `lcs_threshold = 0.2`, the targeted Case perturbation is recovered as follows:
 
 | lr_pair | pathway | case_freq | ctrl_freq | asymmetry | log2fc_lcs | fdr_fisher |
@@ -91,6 +99,18 @@ threshold in both simulated Control PBMC samples. The FDR column remains 1 becau
 with only two samples per group the Fisher test cannot provide publication-level
 resolution. This is an intentional validation demo, not a powered disease study.
 
+## Rank-Aware 0.7 Validation
+
+LogicComm 0.7 also reports continuous rank-aware evidence. This is important when a permissive binary LCS threshold makes both groups look active, while the simulated Case samples still place the ligand and receptor higher in each cell's within-cell rank order. In that setting, `CompareRankLogicGroups()` should show positive `delta_rank_score` for the targeted LR pairs even when `case_mean_binary_lcs` and `ctrl_mean_binary_lcs` are similar.
+
+```{r rank_demo, eval=FALSE}
+demo$rank_target_rows[, c(
+  "lr_pair", "pathway", "case_mean_rank_score", "ctrl_mean_rank_score",
+  "delta_rank_score", "log2fc_rank_score", "case_mean_binary_lcs", "ctrl_mean_binary_lcs"
+)]
+```
+
+Interpret the rank-aware table as an effect-size companion to the binary LCS table. It is not a replacement for biological replication or external validation, but it prevents the analysis from depending on a single hard LCS cutoff.
 ## Plotting the Comparison
 
 ```{r plot_demo, eval=FALSE, fig.width=11, fig.height=5}

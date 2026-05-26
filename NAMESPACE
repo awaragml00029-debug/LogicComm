@@ -21,11 +21,15 @@ export(logic_grade_evidence)
 
 # Main analysis functions
 export(calc_REO_matrix)
+export(calc_REO_rank_score_matrix)
 export(IdentifyLogicConsensus)
+export(IdentifyRankLogicConsensus)
 export(IdentifyLogicGateConsensus)
 export(CompareLogicGroups)
+export(CompareRankLogicGroups)
 export(AutoLabelLogicClusters)
 export(score_lr_activity)
+export(score_lr_rank_activity)
 export(rank_comm_cells)
 export(filter_lcs)
 

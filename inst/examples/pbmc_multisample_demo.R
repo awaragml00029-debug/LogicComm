@@ -50,6 +50,8 @@ boost_pbmc_lr_axis <- function(mat,
 run_pbmc_multisample_demo <- function(seed = 20260526,
                                       perturb_lambda = 50,
                                       lcs_threshold = 0.2,
+                                      rank_threshold_grid = c(0.4, 0.5, 0.6, 0.7, 0.8),
+                                      run_rank_evidence = TRUE,
                                       verbose = TRUE) {
   if (!requireNamespace("LogicComm", quietly = TRUE)) {
     stop("The PBMC demo requires LogicComm to be installed.", call. = FALSE)
@@ -84,12 +86,54 @@ run_pbmc_multisample_demo <- function(seed = 20260526,
   target_rows <- result$comparison[result$comparison$lr_pair %in% targets, , drop = FALSE]
   target_rows <- target_rows[order(-target_rows$asymmetry, -target_rows$log2fc_lcs), , drop = FALSE]
 
+  rank_results <- rank_comparison <- rank_target_rows <- NULL
+  if (isTRUE(run_rank_evidence)) {
+    lr_genes <- LogicComm::all_lr_genes(LogicComm::lr_pairs_human)
+    rank_results <- lapply(names(pbmc_list), function(sname) {
+      if (verbose) message(sprintf("[PBMC rank demo] Scoring rank-aware REO evidence for %s...", sname))
+      reo <- LogicComm::calc_REO_matrix(
+        pbmc_list[[sname]],
+        lr_genes = lr_genes,
+        rank_threshold = 0.5,
+        return_rank = TRUE,
+        rank_output = "percentile",
+        chunk_size = 2000,
+        verbose = FALSE
+      )
+      LogicComm::IdentifyRankLogicConsensus(
+        reo,
+        lr_db = LogicComm::lr_pairs_human,
+        threshold_grid = rank_threshold_grid,
+        lcs_threshold = 0.01,
+        verbose = FALSE
+      )
+    })
+    names(rank_results) <- names(pbmc_list)
+    rank_comparison <- LogicComm::CompareRankLogicGroups(
+      rank_results,
+      group_info = group_info,
+      lr_db = LogicComm::lr_pairs_human,
+      verbose = FALSE
+    )
+    rank_target_rows <- rank_comparison[rank_comparison$lr_pair %in% targets, , drop = FALSE]
+    rank_target_rows <- rank_target_rows[order(-rank_target_rows$delta_rank_score), , drop = FALSE]
+  }
+
   list(
     pbmc_list = pbmc_list,
     group_info = group_info,
     result = result,
     target_rows = target_rows,
-    parameters = list(seed = seed, perturb_lambda = perturb_lambda, lcs_threshold = lcs_threshold)
+    rank_results = rank_results,
+    rank_comparison = rank_comparison,
+    rank_target_rows = rank_target_rows,
+    parameters = list(
+      seed = seed,
+      perturb_lambda = perturb_lambda,
+      lcs_threshold = lcs_threshold,
+      rank_threshold_grid = rank_threshold_grid,
+      run_rank_evidence = run_rank_evidence
+    )
   )
 }
 
@@ -101,7 +145,21 @@ if (sys.nframe() == 0L) {
     names(demo$target_rows)
   )
   print(demo$target_rows[, display_cols, drop = FALSE], row.names = FALSE)
+  if (!is.null(demo$rank_target_rows)) {
+    rank_cols <- intersect(
+      c("lr_pair", "pathway", "case_mean_rank_score", "ctrl_mean_rank_score",
+        "delta_rank_score", "log2fc_rank_score", "case_mean_binary_lcs", "ctrl_mean_binary_lcs"),
+      names(demo$rank_target_rows)
+    )
+    cat("\nRank-aware 0.7 evidence for targeted LR pairs:\n")
+    print(demo$rank_target_rows[, rank_cols, drop = FALSE], row.names = FALSE)
+  }
   cat("\nDemo validation: ", sum(demo$target_rows$asymmetry == 1, na.rm = TRUE),
       " targeted LR pairs are active in both Case PBMC samples and inactive in both Ctrl PBMC samples at the selected threshold.\n",
       sep = "")
+  if (!is.null(demo$rank_target_rows)) {
+    cat("Rank validation: ", sum(demo$rank_target_rows$delta_rank_score > 0, na.rm = TRUE),
+        " targeted LR pairs have stronger rank-aware evidence in Case than Ctrl.\n",
+        sep = "")
+  }
 }
