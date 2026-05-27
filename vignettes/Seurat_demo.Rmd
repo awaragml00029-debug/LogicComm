@@ -778,7 +778,89 @@ ex$evidence
 ex$plot
 ```
 
-### 9.4 Receiver downstream response evidence
+### 9.4 Audit a significant sender-receiver pair
+
+After a permutation result such as `head(null_pair[order(null_pair$fdr), ], 10)`,
+the next question is not only whether a sender-receiver pair is significant. For
+publication interpretation, audit the pair by asking which L-R pairs drive it,
+whether those L-R pairs are broad or pair-specific, whether edge support is
+adequate, whether specificity is high, and whether the signal repeats across
+biological samples.
+
+**中文说明。** `null_pair` 显著只能说明某个 sender -> receiver 组合高于随机标签背景。
+发表解释时还要继续追问：到底哪些 L-R pair 在驱动？是不是 MHC/MIF 这类广泛轴？边支持
+是否足够？specificity 是否高？在多样本中是否重复出现？
+
+```{r audit_significant_celltype_pair, eval=FALSE}
+# Choose the strongest permutation-supported sender-receiver pair.
+top_pair <- null_pair[order(null_pair$fdr), ][1, ]
+audit_sender <- top_pair$sender_type
+audit_receiver <- top_pair$receiver_type
+
+# Add specificity annotations before auditing L-R drivers.
+ct_comm <- score_communication_specificity(ct_comm)
+
+lr_audit <- ct_comm$lr_table[
+  ct_comm$lr_table$sender_type == audit_sender &
+    ct_comm$lr_table$receiver_type == audit_receiver &
+    ct_comm$lr_table$active %in% TRUE &
+    is.finite(ct_comm$lr_table$lcs),
+  ,
+  drop = FALSE
+]
+
+lr_audit <- lr_audit[order(-lr_audit$lcs, -lr_audit$n_active_edges), ]
+
+audit_cols <- intersect(c(
+  "sender_type", "receiver_type", "lr_pair", "pathway",
+  "lcs", "communication_range",
+  "n_edges", "n_active_edges", "edge_weight_sum", "active_edge_weight_sum",
+  "sender_cell_count", "receiver_cell_count",
+  "ligand_active_frac_sender", "receptor_active_frac_receiver",
+  "pair_specificity", "specificity_class"
+), names(lr_audit))
+
+head(lr_audit[, audit_cols, drop = FALSE], 20)
+```
+
+Interpret the audit table as follows:
+
+1. **L-R drivers.** The rows with the largest `lcs` and `n_active_edges` are the
+   main L-R pairs driving this sender-receiver signal.
+2. **Broad or pair-specific.** `specificity_class` separates
+   `Pair-specific candidate` from `Broad/ubiquitous axis` and
+   `Identity-associated axis`. Broad axes can be real biology, but should not be
+   overclaimed as a highly specific mechanism.
+3. **Edge support.** `n_edges`, `edge_weight_sum`, `n_active_edges`, and
+   `active_edge_weight_sum` show whether the signal is supported by enough
+   sender-receiver opportunities. Very small edge counts require caution even
+   when `lcs` is high.
+4. **Specificity score.** `pair_specificity` close to 1 means the L-R pair is
+   concentrated in fewer sender-receiver combinations. Low values mean the L-R
+   pair is distributed broadly across the cell-type network.
+5. **Multi-sample recurrence.** A single PBMC object can support mechanism
+   discovery, but publication-level claims require recurrence across biological
+   samples.
+
+If you have already built `ct_comparison` from multiple samples, check whether
+the same celltypeA -> celltypeB -> L-R feature is recurrent:
+
+```{r audit_multisample_recurrence, eval=FALSE}
+top_lr <- lr_audit$lr_pair[1]
+feature_id <- paste(audit_sender, audit_receiver, top_lr, sep = "|")
+
+ct_comparison[ct_comparison$lr_pair == feature_id, intersect(c(
+  "lr_pair", "case_freq", "ctrl_freq", "asymmetry",
+  "case_mean_lcs", "ctrl_mean_lcs", "log2fc_lcs",
+  "n_case_avail", "n_ctrl_avail", "fdr_fisher"
+), names(ct_comparison)), drop = FALSE]
+```
+
+If this row is absent or has low `n_case_avail` / `n_ctrl_avail`, the feature has
+not yet passed the sample-recurrence check. In that case, describe it as a
+single-dataset candidate and validate it in an independent cohort.
+
+### 9.5 Receiver downstream response evidence
 
 L-R logic identifies communication potential. A stronger biological argument asks
 whether the receiver also shows downstream response-state logic. You can provide
@@ -805,7 +887,7 @@ ct_comm <- add_receiver_response_score(
 head(ct_comm$lr_table[order(ct_comm$lr_table$response_integrated_score, decreasing = TRUE), ], 10)
 ```
 
-### 9.5 Bootstrap, permutation null, and threshold sensitivity
+### 9.6 Bootstrap, permutation null, and threshold sensitivity
 
 For publication-level interpretation, inspect uncertainty and null expectations.
 The bootstrap is fast and approximate; the permutation null is slower but asks
@@ -890,7 +972,7 @@ stability.
 ---
 
 
-### 9.6 Publication-ready QC and report generation
+### 9.7 Publication-ready QC and report generation
 
 A high LCS is more convincing when it is supported by enough edge opportunities,
 active edge evidence, and stable role assignments. The following helpers provide
