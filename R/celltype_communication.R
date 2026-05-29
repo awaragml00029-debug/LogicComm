@@ -281,6 +281,11 @@ summarize_celltype_communication <- function(reo_mat,
     lr_db = lr_db,
     params = list(
       mode = mode,
+      graph_name = graph_name,
+      graph_symmetrize = graph_symmetrize,
+      edge_weight_mode = edge_weight_mode,
+      remove_self_edges = remove_self_edges,
+      include_self = include_self,
       lcs_threshold = lcs_threshold,
       min_edges = min_edges,
       min_active_edges = min_active_edges,
@@ -392,6 +397,18 @@ celltype_comm_to_lcs <- function(ct_comm,
     active_sub <- sub[sub$active %in% TRUE, , drop = FALSE]
     finite_sub <- sub[is.finite(sub$lcs), , drop = FALSE]
     support_frac <- if (nrow(active_sub) > 0) active_sub$n_active_edges / pmax(active_sub$n_edges, 1) else numeric(0)
+    n_local_active <- sum(sub$local_active %in% TRUE)
+    n_distal_candidate <- sum(sub$distal_candidate %in% TRUE)
+    local_support_fraction <- if (nrow(active_sub) > 0) n_local_active / nrow(active_sub) else NA_real_
+    support_label <- if (nrow(active_sub) == 0) {
+      "inactive"
+    } else if (n_local_active == 0 && n_distal_candidate > 0) {
+      "global_only_candidate"
+    } else if (n_distal_candidate == 0 && n_local_active > 0) {
+      "local_graph_supported"
+    } else {
+      "mixed_local_global"
+    }
     top_lr <- if (nrow(active_sub) > 0) active_sub$lr_pair[which.max(active_sub$lcs)] else NA_character_
     top_pathway <- if (nrow(active_sub) > 0) {
       pw_sum <- tapply(active_sub$lcs, active_sub$pathway, sum, na.rm = TRUE)
@@ -410,9 +427,11 @@ celltype_comm_to_lcs <- function(ct_comm,
       n_scored_lr = nrow(finite_sub),
       n_active_lr = nrow(active_sub),
       active_lr_event_count = nrow(active_sub),
-      n_local_active = sum(sub$local_active %in% TRUE),
+      n_local_active = n_local_active,
       n_global_candidate_active = sum(sub$global_candidate_active %in% TRUE),
-      n_distal_candidate = sum(sub$distal_candidate %in% TRUE),
+      n_distal_candidate = n_distal_candidate,
+      local_support_fraction_active = local_support_fraction,
+      communication_support_label = support_label,
       n_juxtacrine = sum(active_sub$communication_range == "juxtacrine"),
       n_paracrine = sum(active_sub$communication_range == "paracrine"),
       n_distal = sum(active_sub$communication_range == "distal/endocrine"),
@@ -449,6 +468,16 @@ celltype_comm_to_lcs <- function(ct_comm,
   out <- lapply(sp, function(ii) {
     sub <- df[ii, , drop = FALSE]
     support_frac <- sub$n_active_edges / pmax(sub$n_edges, 1)
+    n_local_active <- sum(sub$local_active %in% TRUE)
+    n_distal_candidate <- sum(sub$distal_candidate %in% TRUE)
+    local_support_fraction <- n_local_active / nrow(sub)
+    support_label <- if (n_local_active == 0 && n_distal_candidate > 0) {
+      "global_only_candidate"
+    } else if (n_distal_candidate == 0 && n_local_active > 0) {
+      "local_graph_supported"
+    } else {
+      "mixed_local_global"
+    }
     ranges <- table(sub$communication_range)
     top_lr <- sub$lr_pair[which.max(sub$lcs)]
     data.frame(
@@ -456,9 +485,11 @@ celltype_comm_to_lcs <- function(ct_comm,
       receiver_type = sub$receiver_type[1],
       pathway = sub$pathway[1],
       n_active_lr = nrow(sub),
-      n_local_active = sum(sub$local_active %in% TRUE),
+      n_local_active = n_local_active,
       n_global_candidate_active = sum(sub$global_candidate_active %in% TRUE),
-      n_distal_candidate = sum(sub$distal_candidate %in% TRUE),
+      n_distal_candidate = n_distal_candidate,
+      local_support_fraction_active = local_support_fraction,
+      communication_support_label = support_label,
       sum_lcs = sum(sub$lcs, na.rm = TRUE),
       sum_lcs_all = sum(sub$lcs, na.rm = TRUE),
       mean_lcs_active = mean(sub$lcs, na.rm = TRUE),
@@ -586,6 +617,8 @@ celltype_comm_to_lcs <- function(ct_comm,
     n_local_active = integer(nrow(group_defs)),
     n_global_candidate_active = integer(nrow(group_defs)),
     n_distal_candidate = integer(nrow(group_defs)),
+    local_support_fraction_active = rep(NA_real_, nrow(group_defs)),
+    communication_support_label = rep("inactive", nrow(group_defs)),
     n_juxtacrine = integer(nrow(group_defs)),
     n_paracrine = integer(nrow(group_defs)),
     n_distal = integer(nrow(group_defs)),
@@ -607,9 +640,9 @@ celltype_comm_to_lcs <- function(ct_comm,
 .empty_pathway_summary <- function() {
   data.frame(
     sender_type = character(), receiver_type = character(), pathway = character(), n_active_lr = integer(), n_local_active = integer(),
-    n_global_candidate_active = integer(), n_distal_candidate = integer(), sum_lcs = numeric(), sum_lcs_all = numeric(), mean_lcs_active = numeric(),
-    sum_active_edges = numeric(), sum_active_edge_weight = numeric(), mean_edge_support_fraction_active = numeric(), dominant_communication_range = character(),
-    top_lr_pair = character(), stringsAsFactors = FALSE
+    n_global_candidate_active = integer(), n_distal_candidate = integer(), local_support_fraction_active = numeric(), communication_support_label = character(),
+    sum_lcs = numeric(), sum_lcs_all = numeric(), mean_lcs_active = numeric(), sum_active_edges = numeric(), sum_active_edge_weight = numeric(),
+    mean_edge_support_fraction_active = numeric(), dominant_communication_range = character(), top_lr_pair = character(), stringsAsFactors = FALSE
   )
 }
 

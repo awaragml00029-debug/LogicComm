@@ -15,8 +15,9 @@ if (getRversion() >= "2.15.1") {
     "pair_specificity", "total_lcs", "mean_lcs", "lr_pairs_human",
     "estimate", "top_pathway", "xm", "ym", "edge_text", "raw_score",
     "evidence", "sender_role_score", "receiver_role_score", "bin_order",
-    "n_edges", "sum_lcs", "n_active_lr", "mean_edge_support_fraction_active",
-    "size_val", "fraction", "neg_log10_fdr", "color_var", "role_confidence",
+    "n_edges", "sum_lcs", "n_active_lr", "n_local_active", "n_distal_candidate",
+    "mean_edge_support_fraction_active", "communication_support_label", "edge_support_alpha",
+    "point_alpha", "size_val", "fraction", "neg_log10_fdr", "color_var", "role_confidence",
     "specificity_class"
   ))
 }

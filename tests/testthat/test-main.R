@@ -497,6 +497,9 @@ test_that("hybrid cell-type scoring separates local, global, and denominator sup
   ps_ab <- ct_distal$pair_summary[ct_distal$pair_summary$sender_type == "A" &
                                     ct_distal$pair_summary$receiver_type == "B", ]
   expect_equal(ps_ab$n_distal, 1)
+  expect_equal(ps_ab$n_local_active, 0)
+  expect_equal(ps_ab$local_support_fraction_active, 0)
+  expect_equal(ps_ab$communication_support_label, "global_only_candidate")
 
   ct_global <- summarize_celltype_communication(
     reo, cell_labels = labels, lr_db = lr_db, mode = "global",
@@ -565,6 +568,7 @@ test_that("cell-type plotting helpers return ggplot objects", {
   p_loop <- plot_celltype_network(ct_loop, min_weight = 0, color_edges_by = "range")
   expect_s3_class(p_loop, "ggplot")
   expect_s3_class(ggplot2::ggplotGrob(p_loop), "gtable")
+  expect_match(p_loop$labels$caption, "global-only")
 
   ex <- explain_celltype_interaction(ct, sender = "A", receiver = "B", lr_pair = "L_R")
   expect_true(is.list(ex))
@@ -650,6 +654,14 @@ test_that("new cell-type visualization and uncertainty helpers return expected o
   null_pair <- permute_celltype_communication(ct, reo_mat = reo, n_perm = 5, metric = "sum_lcs", seed = 1, verbose = FALSE)
   expect_true(is.data.frame(null_pair))
   expect_true(all(c("empirical_p", "n_null_nonmissing", "metric") %in% names(null_pair)))
+  expect_equal(ct$params$edge_weight_mode, "binary")
+  expect_warning(
+    permute_celltype_communication(
+      ct, reo_mat = reo, n_perm = 2, metric = "sum_lcs", seed = 1,
+      edge_weight_mode = "weighted", verbose = FALSE
+    ),
+    "differs from ct_comm"
+  )
   adaptive_messages <- character(0)
   adaptive_pair <- withCallingHandlers(
     permute_celltype_communication(
@@ -718,8 +730,12 @@ test_that("publication extensions support spatial graphs, dynamics, and reports"
 
   findings <- summarize_communication_findings(ct, top_n = 2)
   expect_true(inherits(findings, "LogicCommFindings"))
+  expect_true("distal_candidate_pairs" %in% names(findings))
+  expect_false(any(findings$top_celltype_pairs$communication_support_label == "global_only_candidate"))
   tf <- tempfile(fileext = ".md")
   expect_true(file.exists(write_communication_report(ct, file = tf)))
+  report_text <- paste(readLines(tf, warn = FALSE), collapse = "\n")
+  expect_match(report_text, "Global-only distal candidate pairs")
 
   dyn <- summarize_communication_dynamics(
     reo, pseudotime = setNames(c(0.1, 0.2, 0.8, 0.9), paste0("C", 1:4)),

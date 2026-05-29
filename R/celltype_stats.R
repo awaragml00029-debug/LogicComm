@@ -91,13 +91,32 @@ permute_celltype_communication <- function(ct_comm = NULL,
                                            verbose = TRUE,
                                            ...) {
   if (!is.null(seed)) set.seed(seed)
+  dots <- list(...)
   if (is.list(reo_mat) && !is.null(reo_mat$logic)) reo_mat <- reo_mat$logic
   if (is.null(ct_comm)) {
-    ct_comm <- summarize_celltype_communication(reo_mat, cell_labels = cell_labels,
-                                                knn_mat = knn_mat, lr_db = lr_db,
-                                                verbose = FALSE, ...)
+    ct_comm <- do.call(
+      summarize_celltype_communication,
+      c(list(reo_mat = reo_mat, cell_labels = cell_labels, knn_mat = knn_mat,
+             lr_db = lr_db, verbose = FALSE), dots)
+    )
   }
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
+  inherited_params <- intersect(
+    names(ct_comm$params),
+    c("mode", "graph_symmetrize", "edge_weight_mode", "remove_self_edges",
+      "include_self", "lcs_threshold", "min_edges", "min_active_edges")
+  )
+  for (param in inherited_params) {
+    if (is.null(dots[[param]])) {
+      dots[[param]] <- ct_comm$params[[param]]
+    } else if (!identical(dots[[param]], ct_comm$params[[param]])) {
+      warning(
+        "Permutation parameter '", param, "' differs from ct_comm$params$", param,
+        "; observed and null summaries may use different scoring definitions.",
+        call. = FALSE
+      )
+    }
+  }
   if (is.null(cell_labels)) cell_labels <- ct_comm$cell_labels
   label_names <- names(cell_labels)
   cell_labels <- as.character(cell_labels)
@@ -154,9 +173,11 @@ permute_celltype_communication <- function(ct_comm = NULL,
   run_perm <- function() {
     perm_labels <- sample(as.character(cell_labels))
     names(perm_labels) <- names(cell_labels)
-    perm <- summarize_celltype_communication(reo_mat, cell_labels = perm_labels,
-                                             knn_mat = knn_mat, lr_db = lr_db,
-                                             verbose = FALSE, ...)
+    perm <- do.call(
+      summarize_celltype_communication,
+      c(list(reo_mat = reo_mat, cell_labels = perm_labels, knn_mat = knn_mat,
+             lr_db = lr_db, verbose = FALSE), dots)
+    )
     key_perm <- paste(perm$pair_summary$sender_type, perm$pair_summary$receiver_type, sep = "|")
     vals <- stats::setNames(perm$pair_summary[[metric]], key_perm)
     vals[feature]

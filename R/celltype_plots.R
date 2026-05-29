@@ -35,8 +35,15 @@ plot_celltype_network <- function(ct_comm,
                  by.x = "sender_type", by.y = "cell_type", all.x = TRUE)
   edges <- merge(edges, nodes[, c("cell_type", "x", "y")],
                  by.x = "receiver_type", by.y = "cell_type", all.x = TRUE, suffixes = c("", "end"))
+  if (!"communication_support_label" %in% names(edges)) {
+    edges$communication_support_label <- ifelse(edges$n_active_lr > 0 & edges$n_local_active == 0 & edges$n_distal_candidate > 0,
+                                                "global_only_candidate",
+                                                ifelse(edges$n_distal_candidate > 0, "mixed_local_global", "local_graph_supported"))
+  }
   edges$edge_color <- if (color_edges_by == "range") edges$dominant_communication_range else edges$top_pathway
   edges$edge_linetype <- ifelse(edges$dominant_communication_range == "distal/endocrine", "distal/endocrine", "local/mixed")
+  edges$edge_support_alpha <- ifelse(edges$communication_support_label == "global_only_candidate", 0.35,
+                                     ifelse(edges$communication_support_label == "mixed_local_global", 0.6, 0.8))
   edges$value <- edges[[metric]]
   self_edge <- is.finite(edges$x) & is.finite(edges$y) & is.finite(edges$xend) & is.finite(edges$yend) &
     abs(edges$x - edges$xend) < .Machine$double.eps & abs(edges$y - edges$yend) < .Machine$double.eps
@@ -64,8 +71,9 @@ plot_celltype_network <- function(ct_comm,
   p <- ggplot2::ggplot() +
     ggplot2::geom_curve(data = edges,
                         ggplot2::aes(x = x, y = y, xend = xend, yend = yend,
-                                     linewidth = value, color = edge_color, linetype = edge_linetype),
-                        curvature = 0.18, alpha = 0.7,
+                                     linewidth = value, color = edge_color, linetype = edge_linetype,
+                                     alpha = edge_support_alpha),
+                        curvature = 0.18,
                         arrow = grid::arrow(length = grid::unit(arrow_size, "cm"), type = "closed"),
                         lineend = "round") +
     ggplot2::geom_point(data = nodes,
@@ -75,8 +83,10 @@ plot_celltype_network <- function(ct_comm,
     ggplot2::scale_fill_gradient2(low = "#2166ac", mid = "#f7f7f7", high = "#b2182b", midpoint = 0, name = "S-R Balance") +
     ggplot2::scale_size_continuous(range = c(3, 12), name = "Hub score") +
     ggplot2::scale_linetype_manual(values = c("local/mixed" = "solid", "distal/endocrine" = "dashed"), name = "Range style") +
+    ggplot2::scale_alpha_identity() +
     ggplot2::coord_equal() +
-    ggplot2::labs(title = "Cell-type communication network", color = if (color_edges_by == "range") "Range" else "Top pathway") +
+    ggplot2::labs(title = "Cell-type communication network", color = if (color_edges_by == "range") "Range" else "Top pathway",
+                  caption = "Faded dashed edges are global-only distal candidates without local active edge support.") +
     ggplot2::theme_void(base_size = 12) +
     ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"), legend.position = "right")
 
@@ -159,13 +169,16 @@ plot_lr_bubble_advanced <- function(ct_comm, senders = NULL, receivers = NULL, t
   keys <- paste(df$sender_type, df$receiver_type, sep = "|||")
   keep <- unlist(lapply(split(seq_len(nrow(df)), keys), function(ii) ii[order(df$lcs[ii], decreasing = TRUE)][seq_len(min(top_n_per_pair, length(ii)))]), use.names = FALSE)
   df <- df[keep, , drop = FALSE]
-  ggplot2::ggplot(df, ggplot2::aes(x = sender_type, y = receiver_type, size = lcs, color = communication_range)) +
-    ggplot2::geom_point(alpha = 0.75) +
+  df$point_alpha <- ifelse(df$communication_range == "distal/endocrine" & df$n_active_neighborhood == 0, 0.45, 0.8)
+  ggplot2::ggplot(df, ggplot2::aes(x = sender_type, y = receiver_type, size = lcs, color = communication_range, alpha = point_alpha)) +
+    ggplot2::geom_point() +
     ggplot2::facet_wrap(~pathway, scales = "free") +
     ggplot2::scale_color_manual(values = .logiccomm_palettes$range, na.value = "grey70") +
     ggplot2::scale_size_continuous(range = c(2, 8)) +
+    ggplot2::scale_alpha_identity() +
     theme_logiccomm() +
-    ggplot2::labs(title = "Cell-type LogicComm hotspots", x = "Sender type", y = "Receiver type") +
+    ggplot2::labs(title = "Cell-type LogicComm hotspots", x = "Sender type", y = "Receiver type",
+                  caption = "Faded distal bubbles are global-only candidates without local active edge support.") +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
 }
 

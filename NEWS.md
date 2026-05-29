@@ -1,3 +1,14 @@
+# LogicComm 0.7.1
+
+## Cell-type communication consistency and visualization audit
+
+* `permute_celltype_communication()` now inherits graph and scoring parameters from `ct_comm$params` so observed summaries and permutation nulls use matching definitions by default.
+* Added warnings when permutation calls intentionally override observed scoring parameters with different values.
+* Added local-support annotations to cell-type pair and pathway summaries, including `communication_support_label` and `local_support_fraction_active`, to distinguish local graph-supported, mixed, and global-only distal candidates.
+* Updated cell-type network and LR bubble plots to visually fade global-only distal candidates and document their interpretation in captions.
+* Split report output into primary local/mixed cell-type pairs and global-only distal candidate pairs so candidate distal signals are not overinterpreted as direct neighborhood interactions.
+* Updated the Seurat demo and regression tests to audit observed/null scoring consistency and global-only distal candidate reporting.
+
 # LogicComm 0.7
 
 ## Rank-aware REO evidence for publication-grade interpretation

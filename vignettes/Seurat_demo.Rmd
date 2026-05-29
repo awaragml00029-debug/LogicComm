@@ -814,7 +814,7 @@ lr_audit <- lr_audit[order(-lr_audit$lcs, -lr_audit$n_active_edges), ]
 audit_cols <- intersect(c(
   "sender_type", "receiver_type", "lr_pair", "pathway",
   "lcs", "communication_range",
-  "n_edges", "n_active_edges", "edge_weight_sum", "active_edge_weight_sum",
+  "n_edges", "n_active_edges", "n_active_neighborhood", "edge_weight_sum", "active_edge_weight_sum",
   "sender_cell_count", "receiver_cell_count",
   "ligand_active_frac_sender", "receptor_active_frac_receiver",
   "pair_specificity", "specificity_class"
@@ -831,10 +831,11 @@ Interpret the audit table as follows:
    `Pair-specific candidate` from `Broad/ubiquitous axis` and
    `Identity-associated axis`. Broad axes can be real biology, but should not be
    overclaimed as a highly specific mechanism.
-3. **Edge support.** `n_edges`, `edge_weight_sum`, `n_active_edges`, and
-   `active_edge_weight_sum` show whether the signal is supported by enough
-   sender-receiver opportunities. Very small edge counts require caution even
-   when `lcs` is high.
+3. **Edge support.** `n_edges`, `edge_weight_sum`, `n_active_edges`,
+   `n_active_neighborhood`, and `active_edge_weight_sum` show whether the signal
+   is supported by local sender-receiver opportunities. A high `lcs` with
+   `n_edges = 0` or `n_active_neighborhood = 0` is a global/distal candidate,
+   not a directly observed neighborhood interaction.
 4. **Specificity score.** `pair_specificity` close to 1 means the L-R pair is
    concentrated in fewer sender-receiver combinations. Low values mean the L-R
    pair is distributed broadly across the cell-type network.
@@ -911,14 +912,12 @@ head(boot_pair)
 null_pair <- permute_celltype_communication(
   ct_comm          = ct_comm,
   reo_mat          = reo_pbmc,
-  knn_mat          = pbmc@graphs$RNA_snn,
+  knn_mat          = pbmc@graphs$RNA_nn, # Match the graph used to compute ct_comm above.
   n_perm           = 100,
   adaptive         = TRUE,
   adaptive_top_n   = 25,
   adaptive_n_perm  = 1000,
   metric           = "sum_lcs",
-  graph_symmetrize = "max",
-  edge_weight_mode = "weighted",
   seed             = 1
 )
 head(null_pair[order(null_pair$fdr), ], 10)
@@ -990,6 +989,7 @@ diag
 findings <- summarize_communication_findings(ct_comm, top_n = 15)
 findings$qc
 findings$top_celltype_pairs
+findings$distal_candidate_pairs
 findings$top_lr_events
 findings$role_summary
 
