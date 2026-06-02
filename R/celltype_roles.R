@@ -26,7 +26,7 @@
     # mediator betweenness must use the INVERSE strength as a distance. Passing
     # strength directly would route shortest paths through the weakest edges and
     # invert the mediator role. Self-loops (diag) never lie on a shortest path
-    # and distort eigenvector centrality, so they are excluded from the graph.
+    # and distort centrality, so they are excluded from the graph.
     g <- igraph::graph_from_adjacency_matrix(adj_strength, mode = "directed",
                                              weighted = TRUE, diag = FALSE)
     if (igraph::ecount(g) > 0) {
@@ -37,14 +37,19 @@
       betweenness <- tryCatch(
         as.numeric(igraph::betweenness(g, weights = dist_w, normalized = TRUE)),
         error = function(e) rep(0, n))
+      # PageRank gives the influencer / information-flow score. It is the robust,
+      # well-conditioned analogue of incoming eigenvector centrality (a cell type
+      # is influential when influential cell types communicate with it) and,
+      # unlike eigen_centrality(directed = TRUE), it does not collapse to zeros or
+      # to sink nodes on the acyclic / weakly connected communication graphs that
+      # are common here. Higher edge weight = stronger random-walk flow.
       information <- tryCatch(
-        suppressWarnings(as.numeric(igraph::eigen_centrality(
-          g, directed = TRUE, weights = w)$vector)),
+        as.numeric(igraph::page_rank(g, directed = TRUE, weights = w)$vector),
         error = function(e) rep(0, n))
     }
   }
   # igraph::betweenness(normalized = TRUE) returns NaN for n == 1 (division by
-  # (n-1)(n-2)); eigen centrality can also be non-finite on degenerate graphs.
+  # (n-1)(n-2)); centrality scores can also be non-finite on degenerate graphs.
   betweenness[!is.finite(betweenness)] <- 0
   information[!is.finite(information)] <- 0
   names(betweenness) <- names(information) <- cell_types

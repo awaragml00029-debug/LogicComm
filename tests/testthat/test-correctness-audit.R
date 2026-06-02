@@ -31,6 +31,19 @@ test_that("single cell type role summary does not produce NaN or NA roles", {
   expect_true(is.finite(rs$influencer_role_score))
 })
 
+test_that("PageRank influencer score is non-degenerate on an acyclic graph", {
+  # On a feed-forward graph X -> Y -> Z, eigen_centrality(directed = TRUE)
+  # returned all zeros. PageRank must give finite, differentiated scores.
+  adj <- matrix(0, 3, 3, dimnames = list(c("X", "Y", "Z"), c("X", "Y", "Z")))
+  adj["X", "Y"] <- 3
+  adj["Y", "Z"] <- 3
+  rs <- .communication_role_summary(adj, (adj > 0) * 1, min_role_event_count = 0)
+  inf <- stats::setNames(rs$influencer_role_score, rs$cell_type)
+  expect_true(all(is.finite(inf)))
+  expect_gt(max(inf), 0)
+  expect_gt(length(unique(round(inf, 6))), 1)
+})
+
 test_that("built-in lr_pairs_human has unique lr_pair identifiers", {
   data(lr_pairs_human)
   expect_equal(sum(duplicated(lr_pairs_human$lr_pair)), 0L)

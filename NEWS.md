@@ -8,10 +8,15 @@ Correctness fixes (with new regression tests in
 * Fixed an inverted Mediator role: `summarize_celltype_communication()` role
   centrality passed communication strength to `igraph::betweenness()`, which
   treats edge weights as distances, so betweenness now uses inverse strength.
-* Non-finite betweenness/eigenvector centrality (for example a single cell type,
-  where normalized betweenness is `NaN`) is sanitized to `0` instead of
-  propagating to `NA` roles, and self-loops are excluded from the centrality
-  graph.
+* Non-finite betweenness/centrality (for example a single cell type, where
+  normalized betweenness is `NaN`) is sanitized to `0` instead of propagating to
+  `NA` roles, and self-loops are excluded from the centrality graph.
+* The Influencer / information-flow score now uses PageRank instead of
+  `eigen_centrality(directed = TRUE)`, which returned all zeros (or collapsed
+  onto sink nodes) on the acyclic / weakly connected communication graphs that
+  are common in practice. PageRank is the robust analogue of incoming
+  eigenvector centrality and keeps the same `influencer_role_score` /
+  `information_score` columns.
 * Resolved a duplicate `lr_pair` in `lr_pairs_human` (`POSTN_ITGAV` is now
   `POSTN_ITGAV_ITGB1` and `POSTN_ITGAV_ITGB3`) that caused silent row-name
   collisions in per-cell scoring.
