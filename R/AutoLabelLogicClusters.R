@@ -86,7 +86,7 @@ AutoLabelLogicClusters <- function(reo_mat,
     n_cl <- sum(in_cl)
     if (n_cl == 0) next
 
-    active_in_cl <- sum(logic_vec[in_cl])
+    active_in_cl <- sum(logic_vec[in_cl], na.rm = TRUE)
     frac_in_cl <- active_in_cl / n_cl
     if (frac_in_cl < min_frac) next
 

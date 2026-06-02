@@ -818,23 +818,38 @@ print.LogicCommFindings <- function(x, ...) {
 .extract_comm_count_table <- function(ct, level = c("celltype_lr", "celltype_pair")) {
   stopifnot(inherits(ct, "LogicCommCellTypeComm"))
   level <- match.arg(level)
+  df <- ct$lr_table
+  # Build active counts in the SAME universe as the n_edges denominator.
+  # lcs_unweighted = active / n_edges in both neighborhood mode (active
+  # neighborhood edges / neighborhood edges) and global mode (active global
+  # pairs / possible global pairs), so lcs_unweighted * n_edges recovers the
+  # consistent active count. The previous code used n_active_edges, which for
+  # distal candidates holds a global cell-count product against a neighborhood
+  # n_edges denominator and was then silently clamped to 100% by pmin().
+  n_edges <- as.numeric(df$n_edges)
+  active_consistent <- as.numeric(df$lcs_unweighted) * n_edges
+  scored <- is.finite(active_consistent) & is.finite(n_edges) & n_edges > 0
   if (level == "celltype_lr") {
-    df <- ct$lr_table
     out <- data.frame(
       feature = paste(df$sender_type, df$receiver_type, df$lr_pair, sep = "|"),
-      success = as.numeric(df$n_active_edges),
-      total = as.numeric(df$n_edges),
+      success = round(active_consistent),
+      total = n_edges,
       lcs = as.numeric(df$lcs),
       stringsAsFactors = FALSE
     )
   } else {
-    df <- ct$pair_summary
-    denom <- as.numeric(df$n_edges) * pmax(as.numeric(df$n_scored_lr), 1)
+    # n_edges is constant across LR pairs within a sender-receiver group, so the
+    # pair-level binomial sums consistent per-LR (active, opportunity) counts.
+    key <- paste(df$sender_type, df$receiver_type, sep = "|")[scored]
+    agg_success <- tapply(round(active_consistent[scored]), key, sum)
+    agg_total <- tapply(n_edges[scored], key, sum)
+    agg_lcs <- tapply(as.numeric(df$lcs_unweighted[scored]), key, mean)
+    feats <- names(agg_total)
     out <- data.frame(
-      feature = paste(df$sender_type, df$receiver_type, sep = "|"),
-      success = as.numeric(df$sum_active_edges),
-      total = denom,
-      lcs = as.numeric(df$sum_lcs_all) / pmax(as.numeric(df$n_scored_lr), 1),
+      feature = feats,
+      success = as.numeric(agg_success[feats]),
+      total = as.numeric(agg_total[feats]),
+      lcs = as.numeric(agg_lcs[feats]),
       stringsAsFactors = FALSE
     )
   }

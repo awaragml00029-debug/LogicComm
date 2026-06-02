@@ -20,15 +20,34 @@
 
   betweenness <- rep(0, n)
   information <- rep(0, n)
-  names(betweenness) <- names(information) <- cell_types
-  if (requireNamespace("igraph", quietly = TRUE)) {
-    g <- igraph::graph_from_adjacency_matrix(adj_strength, mode = "directed", weighted = TRUE, diag = TRUE)
-    betweenness <- tryCatch(as.numeric(igraph::betweenness(g, normalized = TRUE)), error = function(e) rep(0, n))
-    information <- tryCatch(
-      suppressWarnings(as.numeric(igraph::eigen_centrality(g, directed = TRUE, weights = igraph::E(g)$weight)$vector)),
-      error = function(e) rep(0, n)
-    )
+  if (requireNamespace("igraph", quietly = TRUE) && n > 1) {
+    # adj_strength stores communication strength (sum_lcs): larger = stronger.
+    # igraph interprets edge weights as distances/costs (smaller = closer), so
+    # mediator betweenness must use the INVERSE strength as a distance. Passing
+    # strength directly would route shortest paths through the weakest edges and
+    # invert the mediator role. Self-loops (diag) never lie on a shortest path
+    # and distort eigenvector centrality, so they are excluded from the graph.
+    g <- igraph::graph_from_adjacency_matrix(adj_strength, mode = "directed",
+                                             weighted = TRUE, diag = FALSE)
+    if (igraph::ecount(g) > 0) {
+      w <- as.numeric(igraph::E(g)$weight)
+      pos_w <- w[is.finite(w) & w > 0]
+      dist_w <- 1 / w
+      dist_w[!is.finite(dist_w)] <- if (length(pos_w)) 1e3 / min(pos_w) else 1
+      betweenness <- tryCatch(
+        as.numeric(igraph::betweenness(g, weights = dist_w, normalized = TRUE)),
+        error = function(e) rep(0, n))
+      information <- tryCatch(
+        suppressWarnings(as.numeric(igraph::eigen_centrality(
+          g, directed = TRUE, weights = w)$vector)),
+        error = function(e) rep(0, n))
+    }
   }
+  # igraph::betweenness(normalized = TRUE) returns NaN for n == 1 (division by
+  # (n-1)(n-2)); eigen centrality can also be non-finite on degenerate graphs.
+  betweenness[!is.finite(betweenness)] <- 0
+  information[!is.finite(information)] <- 0
+  names(betweenness) <- names(information) <- cell_types
 
   active_lr <- if (!is.null(lr_table) && nrow(lr_table) > 0 && "active" %in% names(lr_table)) {
     lr_table[lr_table$active %in% TRUE, , drop = FALSE]

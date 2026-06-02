@@ -21,7 +21,11 @@
   mat_sub <- rank_mat[available, , drop = FALSE]
   if (nrow(mat_sub) == 1) return(as.numeric(mat_sub[1, ]))
   fun <- switch(aggregate, min = min, mean = mean, max = max)
-  apply(mat_sub, 2, fun, na.rm = TRUE)
+  res <- apply(mat_sub, 2, fun, na.rm = TRUE)
+  # A fully-NA column yields Inf/-Inf from min/max with na.rm; treat as missing
+  # so it cannot contaminate downstream rank comparisons.
+  res[!is.finite(res)] <- NA_real_
+  res
 }
 
 #' Get a list-column entry safely

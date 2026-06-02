@@ -106,6 +106,11 @@ run_multisample <- function(sample_list,
     names(group_info) <- names(sample_list)
   }
   group_info <- group_info[names(sample_list)]
+  if (anyNA(group_info)) {
+    missing <- names(sample_list)[is.na(group_info)]
+    stop("group_info must provide a label for every sample in sample_list; missing labels for: ",
+         paste(utils::head(missing, 5), collapse = ", "), ".")
+  }
 
   lr_genes <- all_lr_genes(lr_db)
   n_samples <- length(sample_list)

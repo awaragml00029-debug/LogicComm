@@ -142,11 +142,18 @@ rank_comm_cells <- function(activity_scores, n = 50, cell_labels = NULL) {
   df$rank <- seq_len(nrow(df))
 
   if (!is.null(cell_labels)) {
-    cl_vec <- as.character(cell_labels)
     if (!is.null(names(cell_labels))) {
-      cl_vec <- cell_labels[df$cell]
+      cl_vec <- as.character(cell_labels)[match(df$cell, names(cell_labels))]
+    } else {
+      # df has been reordered by comm_score, so unnamed labels (assumed to be in
+      # the original scored-cell order) must be aligned to df$cell rather than
+      # pasted on in sorted order.
+      if (length(cell_labels) != length(cells)) {
+        stop("Unnamed cell_labels must have length equal to the number of scored cells.")
+      }
+      cl_vec <- stats::setNames(as.character(cell_labels), cells)[df$cell]
     }
-    df$cluster <- cl_vec
+    df$cluster <- unname(cl_vec)
   }
 
   utils::head(df, n)
