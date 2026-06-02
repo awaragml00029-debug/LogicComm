@@ -85,6 +85,12 @@ export(plot_celltype_role_dotplot)
 export(plot_specificity_stability)
 export(plot_celltype_network_publication)
 export(plot_pathway_network)
+
+# Cell-type communication participation profiles
+export(summarize_celltype_participation)
+export(plot_celltype_participation)
+export(plot_celltype_pathway_composition)
+export(plot_celltype_communication_profile)
 S3method(print, LogicCommDynamics)
 S3method(print, LogicCommFindings)
 S3method(print, LogicCommGLMResult)
@@ -98,6 +104,7 @@ S3method(print, LogicCommResult)
 S3method(print, LogicCommREOResult)
 S3method(print, LogicGateResult)
 S3method(print, LogicCommCellTypeComm)
+S3method(print, LogicCommParticipation)
 
 # Imports
 importFrom(Matrix, Matrix, summary)
