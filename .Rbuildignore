@@ -1,0 +1,9 @@
+^\.github$
+^\.gitignore$
+^\.Rbuildignore$
+^data-raw$
+^LogicComm\.Rcheck$
+^LogicComm_.*\.tar\.gz$
+^.*\.tar\.gz$
+^.*\.Rproj$
+^\.Rproj\.user$
