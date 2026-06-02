@@ -381,21 +381,30 @@ plot_lr_evidence <- function(ct_comm, sender, receiver, lr_pair, title = NULL) {
 #' @return A ggplot2 object.
 #' @export
 plot_differential_celltype_heatmap <- function(result, metric = "asymmetry", top_n = 30, title = NULL) {
-  df <- as.data.frame(result)
-  if (!metric %in% names(df)) stop("metric not found: ", metric)
-  if (!"lr_pair" %in% names(df)) stop("result must contain lr_pair.")
+  if (inherits(result, "LogicCommDifferential")) {
+    df <- result$lr
+    if (!metric %in% names(df)) stop("metric not found: ", metric)
+    df$sender_receiver <- paste(df$sender_type, "\u2192", df$receiver_type)
+    df$lr_label <- df$lr_pair
+  } else {
+    df <- as.data.frame(result)
+    if (!metric %in% names(df)) stop("metric not found: ", metric)
+    if (!"lr_pair" %in% names(df)) stop("result must contain lr_pair.")
+    parts <- strsplit(as.character(df$lr_pair), "|", fixed = TRUE)
+    sender <- vapply(parts, function(x) if (length(x) >= 1) x[1] else "feature", character(1))
+    receiver <- vapply(parts, function(x) if (length(x) >= 2) x[2] else NA_character_, character(1))
+    df$sender_receiver <- ifelse(is.na(receiver), sender, paste(sender, "\u2192", receiver))
+    df$lr_label <- vapply(parts, function(x) if (length(x) >= 3) paste(x[3:length(x)], collapse = "|") else x[length(x)], character(1))
+  }
   df <- df[order(abs(df[[metric]]), decreasing = TRUE), , drop = FALSE]
   df <- utils::head(df, top_n)
-  parts <- strsplit(as.character(df$lr_pair), "\\|", fixed = FALSE)
-  df$sender_type <- vapply(parts, function(x) if (length(x) >= 1) x[1] else "feature", character(1))
-  df$receiver_type <- vapply(parts, function(x) if (length(x) >= 2) x[2] else "feature", character(1))
-  df$feature <- df$lr_pair
   if (is.null(title)) title <- paste("Differential cell-type communication:", metric)
-  ggplot2::ggplot(df, ggplot2::aes(x = sender_type, y = feature, fill = .data[[metric]])) +
+  ggplot2::ggplot(df, ggplot2::aes(x = sender_receiver, y = lr_label, fill = .data[[metric]])) +
     ggplot2::geom_tile(color = "white", linewidth = 0.2) +
     ggplot2::scale_fill_gradient2(low = "#2166ac", mid = "white", high = "#b2182b", midpoint = 0, name = metric) +
-    ggplot2::labs(title = title, x = "Sender", y = "Feature") +
-    theme_logiccomm()
+    ggplot2::labs(title = title, x = "Sender \u2192 receiver", y = "L-R pair") +
+    theme_logiccomm() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
 }
 
 #' Plot Differential Cell-Type Communication Volcano

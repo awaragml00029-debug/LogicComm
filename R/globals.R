@@ -18,6 +18,7 @@ if (getRversion() >= "2.15.1") {
     "n_edges", "sum_lcs", "n_active_lr", "n_local_active", "n_distal_candidate",
     "mean_edge_support_fraction_active", "communication_support_label", "edge_support_alpha",
     "point_alpha", "size_val", "fraction", "neg_log10_fdr", "color_var", "role_confidence",
-    "specificity_class", "participation_type", "share", "grp_key", "direction"
+    "specificity_class", "participation_type", "share", "grp_key", "direction",
+    "sender_receiver", "lr_label", "count", "diff_direction"
   ))
 }

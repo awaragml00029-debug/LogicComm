@@ -91,6 +91,11 @@ export(summarize_celltype_participation)
 export(plot_celltype_participation)
 export(plot_celltype_pathway_composition)
 export(plot_celltype_communication_profile)
+
+# Subgroup-resolved multi-sample differential communication
+export(differential_celltype_communication)
+export(plot_differential_communication_summary)
+S3method(print, LogicCommDifferential)
 S3method(print, LogicCommDynamics)
 S3method(print, LogicCommFindings)
 S3method(print, LogicCommGLMResult)
