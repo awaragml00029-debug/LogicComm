@@ -3,13 +3,13 @@
 #' Prepare REO logic input for LogicComm
 #'
 #' @param object Expression matrix, sparse matrix, Seurat object, or BPCells input.
-#' @param genes Optional genes to retain. If \\code{NULL}, genes are extracted from
-#'   \\code{lr_db}; set both \\code{genes = NULL} and \\code{lr_db = NULL} to retain
+#' @param genes Optional genes to retain. If \code{NULL}, genes are extracted from
+#'   \code{lr_db}; set both \code{genes = NULL} and \code{lr_db = NULL} to retain
 #'   all genes.
 #' @param lr_db Optional LogicComm ligand-receptor database used to choose retained
-#'   genes when \\code{genes} is \\code{NULL}.
+#'   genes when \code{genes} is \code{NULL}.
 #' @param include_modulators Include LR modulator genes when extracting genes from
-#'   \\code{lr_db}.
+#'   \code{lr_db}.
 #' @param rank_threshold Per-cell REO anchor quantile.
 #' @param layer Seurat assay layer/slot.
 #' @param chunk_size Cells per processing chunk.
@@ -17,8 +17,8 @@
 #' @param rank_output Rank output mode.
 #' @param anchor_genes Optional gene universe for REO anchors.
 #' @param verbose Print progress messages.
-#' @return A REO sparse matrix, or a \\code{LogicCommREOResult} when
-#'   \\code{return_rank = TRUE}.
+#' @return A REO sparse matrix, or a \code{LogicCommREOResult} when
+#'   \code{return_rank = TRUE}.
 #' @export
 logic_prepare <- function(object,
                           genes = NULL,
@@ -63,8 +63,8 @@ logic_get_lr_genes <- function(lr_db = lr_pairs_human, include_modulators = FALS
 #' Import an LR database into LogicComm format
 #'
 #' @param x Source database object.
-#' @param source Source format. Currently \\code{"cellchat"} converts a CellChatDB
-#'   object; \\code{"logiccomm"} validates and returns an existing LogicComm-format
+#' @param source Source format. Currently \code{"cellchat"} converts a CellChatDB
+#'   object; \code{"logiccomm"} validates and returns an existing LogicComm-format
 #'   database.
 #' @param ... Arguments passed to the source-specific importer.
 #' @return LogicComm-format ligand-receptor database.
@@ -83,10 +83,10 @@ logic_import_lrdb <- function(x, source = c("cellchat", "logiccomm"), ...) {
 #' Check a LogicComm ligand-receptor database
 #'
 #' @param lr_db Candidate ligand-receptor database.
-#' @param require_metadata Require recommended metadata columns \\code{ligand},
-#'   \\code{receptor}, \\code{pathway}, and \\code{annotation}.
+#' @param require_metadata Require recommended metadata columns \code{ligand},
+#'   \code{receptor}, \code{pathway}, and \code{annotation}.
 #' @param stop_on_error Stop when required fields are missing or malformed.
-#' @return A \\code{LogicCommLRDBCheck} list with validation details.
+#' @return A \code{LogicCommLRDBCheck} list with validation details.
 #' @export
 logic_check_lrdb <- function(lr_db, require_metadata = FALSE, stop_on_error = FALSE) {
   required <- c("lr_pair", "ligand_genes", "receptor_genes")
@@ -160,21 +160,21 @@ logic_check_lrdb <- function(lr_db, require_metadata = FALSE, stop_on_error = FA
 
 #' Score ligand-receptor communication logic
 #'
-#' @param reo REO matrix or \\code{LogicCommREOResult}.
+#' @param reo REO matrix or \code{LogicCommREOResult}.
 #' @param seurat_obj Optional Seurat object for graph extraction.
 #' @param knn_mat Optional cells x cells graph.
 #' @param lr_db LogicComm ligand-receptor database.
 #' @param graph_name Optional Seurat graph name.
-#' @param mode \\code{"auto"}, \\code{"neighborhood"}, or \\code{"global"}.
-#' @param gates Use gate-aware LR scoring via \\code{IdentifyLogicGateConsensus()}.
+#' @param mode \code{"auto"}, \code{"neighborhood"}, or \code{"global"}.
+#' @param gates Use gate-aware LR scoring via \code{IdentifyLogicGateConsensus()}.
 #' @param lcs_threshold LCS activity threshold.
 #' @param remove_self_edges Remove cell-level graph self-loops.
-#' @param graph_symmetrize Optional graph symmetrization mode. If \\code{NULL}, the
+#' @param graph_symmetrize Optional graph symmetrization mode. If \code{NULL}, the
 #'   scorer default is used.
 #' @param edge_weight_mode Edge weight handling.
 #' @param verbose Print progress messages.
 #' @param ... Additional arguments passed to the underlying scorer.
-#' @return \\code{LCSVector} for ordinary scoring, or \\code{LogicGateResult} for
+#' @return \code{LCSVector} for ordinary scoring, or \code{LogicGateResult} for
 #'   gate-aware scoring.
 #' @export
 logic_score_lr <- function(reo,
@@ -224,18 +224,18 @@ logic_score_lr <- function(reo,
 
 #' Summarize cell-type-resolved LogicComm communication
 #'
-#' @param reo REO matrix or \\code{LogicCommREOResult}.
+#' @param reo REO matrix or \code{LogicCommREOResult}.
 #' @param cell_labels Named cell type labels.
 #' @param seurat_obj Optional Seurat object.
 #' @param label_col Optional Seurat metadata column.
 #' @param knn_mat Optional cells x cells graph.
 #' @param lr_db LogicComm ligand-receptor database.
 #' @param graph_name Optional Seurat graph name.
-#' @param mode \\code{"auto"}, \\code{"neighborhood"}, or \\code{"global"}.
+#' @param mode \code{"auto"}, \code{"neighborhood"}, or \code{"global"}.
 #' @param include_self Include same-cell-type sender/receiver pairs.
 #' @param remove_self_edges Remove cell-level graph self-loops.
-#' @param ... Additional arguments passed to \\code{summarize_celltype_communication()}.
-#' @return \\code{LogicCommCellTypeComm} object.
+#' @param ... Additional arguments passed to \code{summarize_celltype_communication()}.
+#' @return \code{LogicCommCellTypeComm} object.
 #' @export
 logic_summarize_celltypes <- function(reo,
                                       cell_labels = NULL,
@@ -267,12 +267,12 @@ logic_summarize_celltypes <- function(reo,
 
 #' Compare LogicComm scores between sample groups
 #'
-#' @param x Named list of LCS vectors, \\code{LogicCommMulti}, or
-#'   \\code{LogicCommAnalysis}.
-#' @param group_info Named group labels. Optional when \\code{x} already contains a
+#' @param x Named list of LCS vectors, \code{LogicCommMulti}, or
+#'   \code{LogicCommAnalysis}.
+#' @param group_info Named group labels. Optional when \code{x} already contains a
 #'   comparison result.
-#' @param ... Additional arguments passed to \\code{CompareLogicGroups()}.
-#' @return \\code{LogicCommResult}.
+#' @param ... Additional arguments passed to \code{CompareLogicGroups()}.
+#' @return \code{LogicCommResult}.
 #' @export
 logic_compare_groups <- function(x, group_info = NULL, ...) {
   if (inherits(x, "LogicCommAnalysis") || inherits(x, "LogicCommMulti")) {
@@ -288,8 +288,8 @@ logic_compare_groups <- function(x, group_info = NULL, ...) {
 #'
 #' @param samples Named list of expression matrices or Seurat objects.
 #' @param group_info Named group labels.
-#' @param ... Additional arguments passed to \\code{run_multisample()}.
-#' @return A \\code{LogicCommAnalysis} object.
+#' @param ... Additional arguments passed to \code{run_multisample()}.
+#' @return A \code{LogicCommAnalysis} object.
 #' @export
 logic_run <- function(samples, group_info, ...) {
   out <- run_multisample(sample_list = samples, group_info = group_info, ...)

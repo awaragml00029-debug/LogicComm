@@ -739,8 +739,6 @@ print.LogicCommFindings <- function(x, ...) {
 
 # Internal helpers ------------------------------------------------------------
 
-`%||%` <- function(a, b) if (is.null(a)) b else a
-
 .prepare_xy_coordinates <- function(coords, coord_cols = NULL) {
   if (is.null(coords)) stop("coords must not be NULL.")
   coords <- as.data.frame(coords)

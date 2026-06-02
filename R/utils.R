@@ -56,8 +56,7 @@ all_lr_genes <- function(lr_db, include_modulators = FALSE) {
 #' lr_db <- as_logiccomm_lr_db_from_cellchat(CellChatDB.human)
 #' head(lr_db)
 #' }
-#' @seealso \code{all_lr_genes}
-#' as_logiccomm_lr_db_from_cellchat
+#' @seealso \code{\link{all_lr_genes}}
 as_logiccomm_lr_db_from_cellchat <- function(cellchat_db,
                                              pathway_col = "pathway_name",
                                              annotation_col = "annotation",
@@ -302,3 +301,13 @@ as_logiccomm_lr_db_from_cellchat <- function(cellchat_db,
     ifelse(p < 0.01, "**",
       ifelse(p < 0.05, "*", "ns")))
 }
+
+#' Null-coalescing operator: return \code{a} unless it is \code{NULL}
+#'
+#' Package-internal helper. Defined once here and shared across LogicComm so the
+#' operator is not duplicated in multiple source files.
+#' @param a Value to return when not \code{NULL}.
+#' @param b Fallback value used when \code{a} is \code{NULL}.
+#' @return \code{a} when it is not \code{NULL}, otherwise \code{b}.
+#' @noRd
+`%||%` <- function(a, b) if (is.null(a)) b else a

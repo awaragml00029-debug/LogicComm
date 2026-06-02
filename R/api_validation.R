@@ -42,13 +42,13 @@
 
 #' Validate receiver read-receipt response for LogicComm events
 #'
-#' @param ct_comm A \\code{LogicCommCellTypeComm} object.
-#' @param reo_mat REO matrix or \\code{LogicCommREOResult}.
-#' @param response_db Data frame with \\code{lr_pair} and \\code{response_genes}.
+#' @param ct_comm A \code{LogicCommCellTypeComm} object.
+#' @param reo_mat REO matrix or \code{LogicCommREOResult}.
+#' @param response_db Data frame with \code{lr_pair} and \code{response_genes}.
 #' @param response_mode Response gene logic mode.
-#' @param attach If \\code{TRUE}, return the updated \\code{ct_comm}; otherwise return
+#' @param attach If \code{TRUE}, return the updated \code{ct_comm}; otherwise return
 #'   the validation table.
-#' @return Updated \\code{LogicCommCellTypeComm} or validation data frame.
+#' @return Updated \code{LogicCommCellTypeComm} or validation data frame.
 #' @export
 logic_validate_receiver_response <- function(ct_comm,
                                              reo_mat,
@@ -83,15 +83,15 @@ logic_validate_receiver_response <- function(ct_comm,
 
 #' Attach NicheNet-style ligand target evidence to LogicComm events
 #'
-#' @param ct_comm A \\code{LogicCommCellTypeComm} object.
+#' @param ct_comm A \code{LogicCommCellTypeComm} object.
 #' @param target_evidence Data frame with target evidence. Required columns are
-#'   \\code{target_gene}, \\code{target_score}, and either \\code{lr_pair} or
-#'   \\code{ligand}, depending on \\code{by}. Optional \\code{sender_type} and
-#'   \\code{receiver_type} columns restrict matches to specific cell-type pairs.
-#' @param by Match target evidence by \\code{"lr_pair"} or \\code{"ligand"}.
-#' @param attach If \\code{TRUE}, return updated \\code{ct_comm}; otherwise return
+#'   \code{target_gene}, \code{target_score}, and either \code{lr_pair} or
+#'   \code{ligand}, depending on \code{by}. Optional \code{sender_type} and
+#'   \code{receiver_type} columns restrict matches to specific cell-type pairs.
+#' @param by Match target evidence by \code{"lr_pair"} or \code{"ligand"}.
+#' @param attach If \code{TRUE}, return updated \code{ct_comm}; otherwise return
 #'   the validation table.
-#' @return Updated \\code{LogicCommCellTypeComm} or validation data frame.
+#' @return Updated \code{LogicCommCellTypeComm} or validation data frame.
 #' @export
 logic_validate_targets <- function(ct_comm,
                                    target_evidence,
@@ -154,15 +154,15 @@ logic_validate_targets <- function(ct_comm,
 
 #' Attach TF-switch validation evidence to LogicComm events
 #'
-#' @param ct_comm A \\code{LogicCommCellTypeComm} object.
+#' @param ct_comm A \code{LogicCommCellTypeComm} object.
 #' @param tf_activity Data frame with receiver TF activity. Required columns are
-#'   \\code{receiver_type}, \\code{tf}, and \\code{tf_activity_score}.
+#'   \code{receiver_type}, \code{tf}, and \code{tf_activity_score}.
 #' @param lr_tf_map Data frame mapping LR events, pathways, or ligands to TFs.
-#'   Must contain \\code{tf} and at least one of \\code{lr_pair}, \\code{pathway},
-#'   or \\code{ligand}.
-#' @param attach If \\code{TRUE}, return updated \\code{ct_comm}; otherwise return
+#'   Must contain \code{tf} and at least one of \code{lr_pair}, \code{pathway},
+#'   or \code{ligand}.
+#' @param attach If \code{TRUE}, return updated \code{ct_comm}; otherwise return
 #'   the validation table.
-#' @return Updated \\code{LogicCommCellTypeComm} or validation data frame.
+#' @return Updated \code{LogicCommCellTypeComm} or validation data frame.
 #' @export
 logic_validate_tf_switch <- function(ct_comm,
                                      tf_activity,
@@ -231,16 +231,16 @@ logic_validate_tf_switch <- function(ct_comm,
 
 #' Attach external validation evidence to LogicComm events
 #'
-#' @param ct_comm A \\code{LogicCommCellTypeComm} object.
+#' @param ct_comm A \code{LogicCommCellTypeComm} object.
 #' @param evidence_table Data frame with optional identity columns such as
-#'   \\code{sender_type}, \\code{receiver_type}, \\code{lr_pair}, \\code{ligand},
-#'   \\code{receptor}, or \\code{pathway}, and optional \\code{evidence_score},
-#'   \\code{evidence_label}, \\code{evidence_source}, and \\code{evidence_type}.
+#'   \code{sender_type}, \code{receiver_type}, \code{lr_pair}, \code{ligand},
+#'   \code{receptor}, or \code{pathway}, and optional \code{evidence_score},
+#'   \code{evidence_label}, \code{evidence_source}, and \code{evidence_type}.
 #' @param evidence_type Optional evidence type to assign when not present in
-#'   \\code{evidence_table}.
-#' @param attach If \\code{TRUE}, return updated \\code{ct_comm}; otherwise return
+#'   \code{evidence_table}.
+#' @param attach If \code{TRUE}, return updated \code{ct_comm}; otherwise return
 #'   the validation table.
-#' @return Updated \\code{LogicCommCellTypeComm} or validation data frame.
+#' @return Updated \code{LogicCommCellTypeComm} or validation data frame.
 #' @export
 logic_add_external_evidence <- function(ct_comm,
                                         evidence_table,
@@ -307,13 +307,13 @@ logic_add_external_evidence <- function(ct_comm,
 
 #' Grade LogicComm communication evidence
 #'
-#' @param ct_comm A \\code{LogicCommCellTypeComm} object.
-#' @param use_validation Include attached \\code{validation_*} evidence columns when
+#' @param ct_comm A \code{LogicCommCellTypeComm} object.
+#' @param use_validation Include attached \code{validation_*} evidence columns when
 #'   assigning grades.
 #' @param min_edges Optional minimum edge threshold for caution text.
 #' @param min_active_edges Optional minimum active-edge threshold for caution text.
-#' @return Updated \\code{LogicCommCellTypeComm} with evidence-grade columns added
-#'   to \\code{lr_table}.
+#' @return Updated \code{LogicCommCellTypeComm} with evidence-grade columns added
+#'   to \code{lr_table}.
 #' @export
 logic_grade_evidence <- function(ct_comm,
                                  use_validation = TRUE,

@@ -1,0 +1,26 @@
+# R build artifacts
+*.tar.gz
+*.Rcheck/
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Compiled native code
+src/*.o
+src/*.so
+src/*.dll
+
+# Generated docs/output scratch
+/doc/
+/Meta/
+inst/doc/*.html
+inst/doc/*.R
+
+# Test/plot side effects
+Rplots.pdf
+tests/testthat/Rplots.pdf
+
+# Editor / OS
+.DS_Store
+*~

@@ -10,10 +10,10 @@
 #'
 #' @details
 #' Self-loops and same-cell-type communication are intentionally separated.
-#' With the default \\code{remove_self_edges = TRUE}, diagonal graph entries
+#' With the default \code{remove_self_edges = TRUE}, diagonal graph entries
 #' such as cell A -> cell A are removed before neighborhood scoring, which avoids
 #' treating within-cell ligand/receptor co-expression as direct intercellular
-#' communication evidence. With the default \\code{include_self = TRUE}, sender
+#' communication evidence. With the default \code{include_self = TRUE}, sender
 #' and receiver cell types are still allowed to be identical, so rows such as
 #' Tumor -> Tumor or Macrophage -> Macrophage are retained and should be
 #' interpreted as autocrine-like, homotypic, or within-cell-type signaling

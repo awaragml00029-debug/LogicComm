@@ -253,6 +253,3 @@ plot_umap_logic <- function(reo_mat,
       axis.line = ggplot2::element_line(color = "grey80")
     )
 }
-
-# ── helper ────────────────────────────────────────────────────────────────────
-`%||%` <- function(a, b) if (!is.null(a)) a else b
