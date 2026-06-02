@@ -76,7 +76,7 @@ score_communication_specificity <- function(ct_comm,
   cell_types <- ct_comm$role_summary$cell_type
   if (is.null(cell_types)) cell_types <- sort(unique(c(lr$sender_type, lr$receiver_type)))
   
-  pair_levels <- paste(ct_comm$pair_summary$sender_type, ct_comm$pair_summary$receiver_type, sep = "|||")
+  pair_levels <- unique(paste(ct_comm$pair_summary$sender_type, ct_comm$pair_summary$receiver_type, sep = "|||"))
   
   use <- !is.na(lr$lcs) & is.finite(lr$lcs)
   if (isTRUE(active_only) && "active" %in% names(lr)) use <- use & lr$active %in% TRUE
