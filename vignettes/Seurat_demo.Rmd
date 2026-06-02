@@ -1135,6 +1135,49 @@ matching receiver-response program, stable edge support, and external biological
 knowledge.
 
 
+### 9.9 Cell-type communication participation profiles (0.8.0)
+
+Not every cell in a cluster communicates. `summarize_celltype_participation()`
+reports, for each cell type, the fraction of cells that express the
+ligand/receptor machinery, the pathway and L-R composition of its outgoing and
+incoming communication, and whether it is a major communication hub.
+
+**中文说明。** 这一步回答"群里有多少细胞真在通讯、通讯走哪些通路/配受体对、它是不是
+重要通讯亚群"。占比按配/受体 REO 激活态计算，不依赖邻域图。
+
+```{r celltype_participation, eval=FALSE}
+part <- summarize_celltype_participation(ct_comm, reo_mat = reo_pbmc)
+part   # communicating-cell fractions + major-hub label per cell type
+
+# Fraction of cells engaged in communication (sender / receiver) per cell type.
+plot_celltype_participation(part)
+
+# Pathway composition of each cell type's outgoing communication.
+plot_celltype_pathway_composition(part, direction = "outgoing", level = "pathway")
+
+# One subgroup's profile card: the pathways and L-R pairs it sends and receives.
+top_hub <- part$group_participation$cell_type[1]
+plot_celltype_communication_profile(part, cell_type = top_hub)
+```
+
+### 9.10 Integrated discovery ranking and landscape (0.8.0)
+
+`rank_communication_axes()` (computed as `ranked_axes` above) integrates
+communication strength, cell-type-pair specificity, threshold stability
+(`sens`), cell-label permutation support (`null_pair`), and receiver response
+into one `discovery_score` with an `evidence_tier` (Tier 1-4).
+`plot_communication_discovery()` shows the strength-versus-specificity landscape
+coloured by tier, so strong, specific, supported axes stand out in the upper
+right.
+
+```{r discovery_landscape, eval=FALSE}
+head(ranked_axes[, c("sender_type", "receiver_type", "lr_pair",
+                     "strength_score", "specificity_score",
+                     "discovery_score", "evidence_tier")], 20)
+
+plot_communication_discovery(ranked_axes)
+```
+
 ## Step 10: Optional Cell-Type-Level Case vs Control Comparison
 
 For multi-sample studies, compute cell-type-resolved communication inside each
@@ -1234,6 +1277,31 @@ The GLM coefficient is a log-odds effect for active edge support. A positive
 Case after adjusting for the supplied covariates.
 
 ---
+
+### 10.2 Subgroup-resolved differential communication (0.8.0)
+
+`differential_celltype_communication()` reorganizes the cohort comparison by the
+sender -> receiver subgroup on which each L-R change occurs, so the cell-type
+pairs that carry the differential signaling are directly visible.
+
+**中文说明。** 这一步直接回答"主要差异通讯对发生在哪些亚群上"。注意小样本时
+Fisher FDR 会饱和到 1，应按效应量（asymmetry / log2fc）排序，并配合
+`fit_celltype_comm_glm()` 与更多生物学重复，而不要把 FDR 当作"无差异"的证据。
+
+```{r differential_subgroup, eval=FALSE}
+# sample_ct_list: named list of per-sample LogicCommCellTypeComm objects (Step 10).
+diff <- differential_celltype_communication(
+  sample_ct_list, group_info,
+  case_label = "Case", ctrl_label = "Ctrl"
+)
+diff                     # top differential sender -> receiver subgroups + FDR caveat
+
+# How many L-R pairs change per sender -> receiver subgroup, split by direction.
+plot_differential_communication_summary(diff)
+
+# sender -> receiver subgroup x L-R pair, coloured by Case/Ctrl asymmetry.
+plot_differential_celltype_heatmap(diff, metric = "asymmetry")
+```
 
 ## Step 11: Optional Cell Type Annotation
 

@@ -1,8 +1,9 @@
 name: release
 
 # Builds the R source tarball on GitHub's runners and publishes it as a
-# downloadable asset on a GitHub Release. Triggered by pushing a version tag
-# (for example v0.7.2); can also be run manually from the Actions tab.
+# downloadable asset on a GitHub Release. The version and release notes are read
+# from DESCRIPTION and NEWS.md, so cutting a new release only requires bumping
+# the version and running this workflow (or pushing a matching version tag).
 on:
   push:
     tags:
@@ -36,44 +37,19 @@ jobs:
       - name: Build source tarball
         run: R CMD build . --no-build-vignettes
 
+      - name: Read package version and release notes
+        id: meta
+        run: |
+          version=$(grep '^Version:' DESCRIPTION | sed 's/Version:[[:space:]]*//')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Use the top (most recent) section of NEWS.md as the release body.
+          awk '/^# /{n++} n==2{exit} n>=1{print}' NEWS.md > RELEASE_NOTES.md
+
       - name: Publish release with the source tarball
         uses: softprops/action-gh-release@v2
         with:
-          name: LogicComm 0.7.2
-          tag_name: v0.7.2
+          name: LogicComm ${{ steps.meta.outputs.version }}
+          tag_name: v${{ steps.meta.outputs.version }}
           fail_on_unmatched_files: true
           files: LogicComm_*.tar.gz
-          body: |
-            ## Summary
-            LogicComm 0.7.2 is a correctness, documentation, and packaging release.
-
-            - Fixed an inverted Mediator role: betweenness centrality now uses the
-              inverse communication strength as the edge distance.
-            - Sanitized non-finite role centrality (a single cell type no longer
-              yields `NA` roles) and switched the Influencer / information-flow
-              score to PageRank, which stays well-defined on the acyclic or weakly
-              connected communication graphs that are common in practice.
-            - Resolved a duplicate `lr_pair` in `lr_pairs_human`
-              (`POSTN_ITGAV` -> `POSTN_ITGAV_ITGB1` / `POSTN_ITGAV_ITGB3`).
-            - `rank_comm_cells()` aligns unnamed cell labels to the ranked cells.
-            - `fit_celltype_comm_glm()` no longer clamps distal-candidate features
-              to 100% active; binomial counts use a single opportunity universe.
-            - Regenerated all documentation from roxygen (idempotent), fixed
-              malformed `\code{}` tags, and de-duplicated the internal `%||%`.
-            - Made the intro-vignette heatmap conditional on the suggested
-              `pheatmap` package, dropped unused `Suggests`, and added
-              `.gitignore` / `.Rbuildignore`.
-
-            ## Validation
-            - testthat (via `R CMD check` / `test_check`): 224 passed, 0 failed,
-              0 warnings, 0 skipped.
-            - `R CMD check`: no errors or warnings under a UTF-8 locale; only the
-              expected note that suggested packages are unavailable in the
-              offline build environment.
-
-            ## Download
-            The built source tarball `LogicComm_0.7.2.tar.gz` is attached below:
-
-            ```r
-            install.packages("LogicComm_0.7.2.tar.gz", repos = NULL, type = "source")
-            ```
+          body_path: RELEASE_NOTES.md
