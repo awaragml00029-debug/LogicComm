@@ -146,13 +146,38 @@ score_communication_specificity <- function(ct_comm,
   ct_comm
 }
 
-#' Rank Publication-Priority Communication Axes
+#' Rank Communication Axes by Integrated Discovery Evidence
+#'
+#' Produces a single prioritized list of candidate sender -> receiver -> L-R
+#' communication axes by integrating the evidence layers LogicComm computes:
+#' communication strength, cell-type-pair specificity, REO threshold stability,
+#' cell-label permutation support, and (when available) receiver downstream
+#' response. This is the end of the discovery workflow: it turns the separate
+#' diagnostics into one evidence-tiered ranking.
+#'
+#' @details
+#' Each component is scaled to \code{[0, 1]} and combined into a
+#' \code{discovery_score} using weights over whichever components are available
+#' (strength 0.35, specificity 0.25, threshold stability 0.15, permutation
+#' support 0.15, receiver response 0.10, renormalized). Stability is joined from
+#' \code{sens} by the \code{sender|receiver|lr_pair} feature key; permutation
+#' support (\code{1 - empirical_p}) is joined from \code{null_pair} by the
+#' sender/receiver subgroup. An \code{evidence_tier} summarizes the axes from
+#' Tier 1 (strong, specific, and supported) to Tier 4 (weak or context
+#' dependent); when stability or permutation evidence is not supplied, the tier
+#' degrades gracefully to strength and specificity. Tiers are an interpretation
+#' aid for hypothesis prioritization, not hypothesis-test p-values.
 #'
 #' @param ct_comm Cell-type communication object.
-#' @param null_pair Optional output from \code{permute_celltype_communication()}.
-#' @param sens Optional output from \code{sensitivity_REO_threshold()}.
+#' @param null_pair Optional output from \code{\link{permute_celltype_communication}}.
+#' @param sens Optional output from \code{\link{sensitivity_REO_threshold}}.
 #' @param top_n Number of rows to return.
-#' @return Data frame ranked by publication priority.
+#' @return The active \code{lr_table} rows augmented with \code{strength_score},
+#'   \code{specificity_score}, \code{threshold_stability}, \code{null_support},
+#'   \code{discovery_score}, and \code{evidence_tier}, sorted by
+#'   \code{discovery_score}. \code{publication_priority_score} is kept as a
+#'   backward-compatible alias.
+#' @seealso \code{\link{plot_communication_discovery}}
 #' @export
 rank_communication_axes <- function(ct_comm,
                                     null_pair = NULL,
@@ -162,21 +187,111 @@ rank_communication_axes <- function(ct_comm,
   if (is.null(ct_comm$specificity_summary)) {
     ct_comm <- score_communication_specificity(ct_comm, verbose = FALSE)
   }
-  
+
   df <- ct_comm$lr_table
   df <- df[df$active %in% TRUE & is.finite(df$lcs), , drop = FALSE]
   if (!nrow(df)) return(df)
-  
-  df$publication_priority_score <- .rescale01(df$lcs) * 0.4 + 
-    .rescale01(ifelse(is.na(df$pair_specificity), 0, df$pair_specificity)) * 0.4
-    
-  if (!is.null(null_pair)) {
-    # Add permutation component
+
+  strength <- .rescale01(df$lcs)
+  specificity <- .rescale01(ifelse(is.na(df$pair_specificity), 0, df$pair_specificity))
+
+  # Threshold stability: fraction of REO thresholds at which the axis stays
+  # active, joined from sensitivity_REO_threshold() by the feature key.
+  feature_key <- paste(df$sender_type, df$receiver_type, df$lr_pair, sep = "|")
+  stability <- rep(NA_real_, nrow(df))
+  if (!is.null(sens) && !is.null(sens$stability) && "feature" %in% names(sens$stability)) {
+    stability <- sens$stability$active_fraction[match(feature_key, sens$stability$feature)]
   }
-  
-  df <- df[order(df$publication_priority_score, decreasing = TRUE), , drop = FALSE]
-  if (!is.null(top_n)) df <- head(df, top_n)
+  df$threshold_stability <- stability
+
+  # Permutation support: 1 - empirical_p from the cell-label shuffle null,
+  # joined by sender/receiver subgroup (the null is pair-level).
+  support <- rep(NA_real_, nrow(df))
+  if (!is.null(null_pair) && all(c("sender_type", "receiver_type", "empirical_p") %in% names(null_pair))) {
+    nk <- paste(null_pair$sender_type, null_pair$receiver_type)
+    ep <- null_pair$empirical_p[match(paste(df$sender_type, df$receiver_type), nk)]
+    support <- 1 - ep
+    df$permutation_empirical_p <- ep
+  }
+  df$null_support <- support
+
+  response <- rep(NA_real_, nrow(df))
+  resp_col <- intersect(c("response_integrated_score", "receiver_response_score"), names(df))
+  if (length(resp_col)) {
+    response <- .rescale01(ifelse(is.na(df[[resp_col[1]]]), 0, df[[resp_col[1]]]))
+  }
+
+  comp <- list(strength = strength, specificity = specificity,
+               stability = stability, support = support, response = response)
+  w0 <- c(strength = 0.35, specificity = 0.25, stability = 0.15, support = 0.15, response = 0.10)
+  avail <- vapply(comp, function(x) any(is.finite(x)), logical(1))
+  w <- w0[avail]
+  w <- w / sum(w)
+  score_mat <- vapply(names(w), function(nm) {
+    v <- comp[[nm]]; v[!is.finite(v)] <- 0; v
+  }, numeric(nrow(df)))
+  if (is.null(dim(score_mat))) score_mat <- matrix(score_mat, nrow = nrow(df))
+  df$discovery_score <- as.numeric(score_mat %*% w)
+  df$strength_score <- strength
+  df$specificity_score <- specificity
+
+  has_stab <- any(is.finite(stability))
+  has_stat <- any(is.finite(support))
+  stab_ok <- if (has_stab) is.finite(stability) & stability >= 0.5 else rep(TRUE, nrow(df))
+  stat_ok <- if (has_stat) is.finite(support) & support >= 0.6 else rep(TRUE, nrow(df))
+  spec_hi <- specificity >= 0.6
+  str_hi <- strength >= 0.5
+  df$evidence_tier <- ifelse(
+    str_hi & spec_hi & stab_ok & stat_ok, "Tier 1: strong, specific, supported",
+    ifelse(str_hi & (spec_hi | (has_stat & stat_ok)), "Tier 2: strong candidate",
+    ifelse(strength >= 0.25 | spec_hi, "Tier 3: emerging candidate",
+           "Tier 4: weak / context-dependent")))
+
+  df$publication_priority_score <- df$discovery_score
+  df <- df[order(df$discovery_score, decreasing = TRUE), , drop = FALSE]
+  rownames(df) <- NULL
+  if (!is.null(top_n)) df <- utils::head(df, top_n)
   df
+}
+
+#' Plot the Communication Discovery Landscape
+#'
+#' Scatter of candidate communication axes by scaled communication strength
+#' versus cell-type-pair specificity, sized by permutation support (or
+#' discovery score) and coloured by evidence tier. Strong, specific, supported
+#' axes sit in the upper right; broad or weak axes fall to the lower left.
+#'
+#' @param ranked Output of \code{\link{rank_communication_axes}}.
+#' @param top_n_label Number of top axes (by discovery score) to label.
+#' @param title Optional plot title.
+#' @return A ggplot2 object.
+#' @export
+plot_communication_discovery <- function(ranked, top_n_label = 15, title = NULL) {
+  stopifnot(is.data.frame(ranked))
+  needed <- c("strength_score", "specificity_score", "discovery_score",
+              "sender_type", "receiver_type", "lr_pair")
+  if (!all(needed %in% names(ranked))) {
+    stop("ranked must be the output of rank_communication_axes().")
+  }
+  if (!nrow(ranked)) stop("No active communication axes to plot.")
+  df <- ranked
+  df$axis <- paste0(df$sender_type, "\u2192", df$receiver_type, ": ", df$lr_pair)
+  df$tier <- if ("evidence_tier" %in% names(df)) df$evidence_tier else "Unranked"
+  use_support <- "null_support" %in% names(df) && any(is.finite(df$null_support))
+  size_raw <- if (use_support) df$null_support else df$discovery_score
+  df$disc_size <- ifelse(is.finite(size_raw), size_raw, 0)
+  df$to_label <- FALSE
+  df$to_label[seq_len(min(top_n_label, nrow(df)))] <- TRUE
+  if (is.null(title)) title <- "Communication discovery landscape"
+  ggplot2::ggplot(df, ggplot2::aes(x = strength_score, y = specificity_score)) +
+    ggplot2::geom_point(ggplot2::aes(size = disc_size, color = tier), alpha = 0.8) +
+    ggrepel::geom_text_repel(data = df[df$to_label, , drop = FALSE],
+                             ggplot2::aes(label = axis), size = 3, max.overlaps = Inf) +
+    ggplot2::scale_size_continuous(range = c(2, 7),
+                                   name = if (use_support) "Null support" else "Discovery score") +
+    ggplot2::labs(title = title, x = "Communication strength (scaled)",
+                  y = "Pair specificity (scaled)", color = "Evidence tier") +
+    theme_logiccomm()
 }
 
 #' Interpret Cell-Type Communication Roles

@@ -58,7 +58,7 @@ install.packages("igraph")
 ### Install LogicComm from a local source tarball
 
 ```r
-install.packages("LogicComm_0.7.2.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.8.0.tar.gz", repos = NULL, type = "source")
 ```
 
 If installing from the unpacked source directory during development:
@@ -896,6 +896,48 @@ For very large on-disk data, use BPCells input if available.
 
 ---
 
+## End-to-End Discovery Workflow
+
+Once a KNN/SNN-aware `summarize_celltype_communication()` result (`ct_comm`) is
+available, these steps take you from "the package ran" to "here are the
+prioritized, evidence-backed interactions, who drives them, and what changes
+between conditions".
+
+```r
+# 1. Which cell types communicate, how broadly, and through what?
+part <- summarize_celltype_participation(ct_comm, reo_mat = reo)
+part                                            # major hubs + communicating-cell fractions
+plot_celltype_participation(part)               # fraction of communicating cells per type
+plot_celltype_pathway_composition(part, "outgoing")
+plot_celltype_communication_profile(part, "CD14+ Mono")   # one subgroup's profile card
+
+# 2. Prioritize effective interactions by integrated evidence.
+ct_comm <- score_communication_specificity(ct_comm)
+null_pair <- permute_celltype_communication(ct_comm, reo_mat = reo, n_perm = 1000)
+sens      <- sensitivity_REO_threshold(my_seurat, lr_db = lr_pairs_human,
+                                       cell_labels = cell_labels, knn_mat = knn_mat)
+ranked <- rank_communication_axes(ct_comm, null_pair = null_pair, sens = sens)
+ranked[, c("sender_type","receiver_type","lr_pair","discovery_score","evidence_tier")][1:20, ]
+plot_communication_discovery(ranked)            # strength vs specificity, coloured by tier
+
+# 3. For a cohort, where do the differences occur (which sender -> receiver pair)?
+diff <- differential_celltype_communication(sample_ct_list, group_info,
+                                            case_label = "Case", ctrl_label = "Ctrl")
+diff                                            # top differential subgroups + FDR caveat
+plot_differential_communication_summary(diff)   # differential L-R counts per subgroup
+plot_differential_celltype_heatmap(diff, metric = "asymmetry")
+```
+
+`discovery_score` integrates communication strength, cell-type-pair specificity,
+REO threshold stability, cell-label permutation support, and (when available)
+receiver response; `evidence_tier` summarizes Tier 1 (strong, specific,
+supported) to Tier 4. For cohorts, see the FDR-and-sample-size note in
+`?differential_celltype_communication`: with few replicates per group Fisher FDR
+saturates near 1, so prioritize by effect size and corroborate with
+`fit_celltype_comm_glm()`.
+
+---
+
 ## Core Functions
 
 | Function | Description |
@@ -927,6 +969,14 @@ For very large on-disk data, use BPCells input if available.
 | `plot_celltype_role_dotplot()` | Dotplot of sender/receiver/mediator/influencer scores with evidence alpha |
 | `plot_specificity_stability()` | Compare REO-threshold stability and cell-type-pair specificity |
 | `all_lr_genes()` | Extract all unique genes from an LR database |
+| `summarize_celltype_participation()` | Per-cell-type communicating-cell fraction, pathway/L-R composition, and major-hub label |
+| `plot_celltype_participation()` | Fraction of communicating cells per cell type |
+| `plot_celltype_pathway_composition()` | Pathway/L-R composition of a cell type's outgoing/incoming communication |
+| `plot_celltype_communication_profile()` | Single cell type's communication profile card |
+| `differential_celltype_communication()` | Subgroup-resolved multi-sample differential communication |
+| `plot_differential_communication_summary()` | Differential L-R pairs per sender -> receiver subgroup |
+| `rank_communication_axes()` | Integrated discovery ranking (strength + specificity + stability + permutation + response) |
+| `plot_communication_discovery()` | Strength-vs-specificity discovery landscape by evidence tier |
 
 ---
 

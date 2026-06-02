@@ -2,22 +2,47 @@
 % Please edit documentation in R/specificity_diagnostics.R
 \name{rank_communication_axes}
 \alias{rank_communication_axes}
-\title{Rank Publication-Priority Communication Axes}
+\title{Rank Communication Axes by Integrated Discovery Evidence}
 \usage{
 rank_communication_axes(ct_comm, null_pair = NULL, sens = NULL, top_n = NULL)
 }
 \arguments{
 \item{ct_comm}{Cell-type communication object.}
 
-\item{null_pair}{Optional output from \code{permute_celltype_communication()}.}
+\item{null_pair}{Optional output from \code{\link{permute_celltype_communication}}.}
 
-\item{sens}{Optional output from \code{sensitivity_REO_threshold()}.}
+\item{sens}{Optional output from \code{\link{sensitivity_REO_threshold}}.}
 
 \item{top_n}{Number of rows to return.}
 }
 \value{
-Data frame ranked by publication priority.
+The active \code{lr_table} rows augmented with \code{strength_score},
+  \code{specificity_score}, \code{threshold_stability}, \code{null_support},
+  \code{discovery_score}, and \code{evidence_tier}, sorted by
+  \code{discovery_score}. \code{publication_priority_score} is kept as a
+  backward-compatible alias.
 }
 \description{
-Rank Publication-Priority Communication Axes
+Produces a single prioritized list of candidate sender -> receiver -> L-R
+communication axes by integrating the evidence layers LogicComm computes:
+communication strength, cell-type-pair specificity, REO threshold stability,
+cell-label permutation support, and (when available) receiver downstream
+response. This is the end of the discovery workflow: it turns the separate
+diagnostics into one evidence-tiered ranking.
+}
+\details{
+Each component is scaled to \code{[0, 1]} and combined into a
+\code{discovery_score} using weights over whichever components are available
+(strength 0.35, specificity 0.25, threshold stability 0.15, permutation
+support 0.15, receiver response 0.10, renormalized). Stability is joined from
+\code{sens} by the \code{sender|receiver|lr_pair} feature key; permutation
+support (\code{1 - empirical_p}) is joined from \code{null_pair} by the
+sender/receiver subgroup. An \code{evidence_tier} summarizes the axes from
+Tier 1 (strong, specific, and supported) to Tier 4 (weak or context
+dependent); when stability or permutation evidence is not supplied, the tier
+degrades gracefully to strength and specificity. Tiers are an interpretation
+aid for hypothesis prioritization, not hypothesis-test p-values.
+}
+\seealso{
+\code{\link{plot_communication_discovery}}
 }

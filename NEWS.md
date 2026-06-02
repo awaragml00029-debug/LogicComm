@@ -1,3 +1,46 @@
+# LogicComm 0.8.0
+
+## A clearer discovery workflow: who communicates, what changes, and what to prioritize
+
+This release adds three layers that turn LogicComm's computed evidence into
+results you can read off directly. The REO/LCS core is unchanged.
+
+### Per-cell-type communication participation (which subgroup, how broadly, through what)
+
+* `summarize_celltype_participation()`: for every cell type, the fraction of
+  cells that actually express the ligand/receptor machinery
+  (`frac_communicating` / `frac_sender_active` / `frac_receiver_active`, using
+  graph-independent within-cell REO activity), the pathway and ligand-receptor
+  composition of its outgoing and incoming communication, and a transparent
+  major-hub importance label.
+* `plot_celltype_participation()`, `plot_celltype_pathway_composition()`, and
+  `plot_celltype_communication_profile()` visualize the communicating-cell
+  fraction, the pathway/L-R composition, and a single subgroup's profile card.
+
+### Subgroup-resolved multi-sample differential communication (which cell-type pair carries the change)
+
+* `differential_celltype_communication()`: compares cell-type-resolved
+  communication between sample groups and splits results into explicit
+  `sender_type` / `receiver_type` / `lr_pair` / `pathway` / `direction` columns
+  plus a per sender -> receiver subgroup summary, so the differential pairs and
+  the subgroups that carry them are directly visible.
+* `plot_differential_communication_summary()` shows differential L-R counts per
+  subgroup; `plot_differential_celltype_heatmap()` now plots
+  sender -> receiver x L-R pair (it previously dropped the receiver).
+* The output documents the small-sample FDR caveat: with few replicates per
+  group Fisher FDR saturates near 1, so rank by effect size and corroborate with
+  `fit_celltype_comm_glm()` and more replicates.
+
+### Integrated discovery ranking (a single prioritized candidate list)
+
+* `rank_communication_axes()` now integrates communication strength,
+  cell-type-pair specificity, REO threshold stability (`sens`), cell-label
+  permutation support (`null_pair`), and receiver response into a single
+  `discovery_score` with an `evidence_tier` (previously it ignored `null_pair`
+  and `sens`).
+* `plot_communication_discovery()` draws the strength-vs-specificity discovery
+  landscape coloured by evidence tier.
+
 # LogicComm 0.7.2
 
 ## Correctness audit, documentation pipeline, and check hygiene

@@ -19,6 +19,7 @@ if (getRversion() >= "2.15.1") {
     "mean_edge_support_fraction_active", "communication_support_label", "edge_support_alpha",
     "point_alpha", "size_val", "fraction", "neg_log10_fdr", "color_var", "role_confidence",
     "specificity_class", "participation_type", "share", "grp_key", "direction",
-    "sender_receiver", "lr_label", "count", "diff_direction"
+    "sender_receiver", "lr_label", "count", "diff_direction",
+    "strength_score", "specificity_score", "disc_size", "axis", "tier"
   ))
 }
