@@ -24,3 +24,8 @@ tests/testthat/Rplots.pdf
 # Editor / OS
 .DS_Store
 *~
+
+# Vignette local render artifacts
+vignettes/*_files/
+vignettes/*_cache/
+vignettes/*.html

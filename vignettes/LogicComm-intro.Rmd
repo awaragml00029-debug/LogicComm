@@ -211,7 +211,7 @@ plot_lcs_bubble(result$comparison, top_n = 15, min_asymmetry = 0.2)
 
 ## Step 5: Heatmap Across Samples
 
-```{r heatmap, fig.height=6, fig.cap="LCS values across all 8 samples for the top differentially active pairs."}
+```{r heatmap, fig.height=6, eval=requireNamespace("pheatmap", quietly = TRUE), fig.cap="LCS values across all 8 samples for the top differentially active pairs (rendered when the suggested pheatmap package is installed)."}
 plot_lcs_heatmap(result$comparison, group_info = group_info,
                  top_n = 20, fdr_cutoff = 1)  # show top demo pairs even when the small simulation is underpowered
 ```

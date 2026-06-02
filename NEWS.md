@@ -1,3 +1,38 @@
+# LogicComm 0.7.2
+
+## Correctness audit, documentation pipeline, and check hygiene
+
+Correctness fixes (with new regression tests in
+`tests/testthat/test-correctness-audit.R`):
+
+* Fixed an inverted Mediator role: `summarize_celltype_communication()` role
+  centrality passed communication strength to `igraph::betweenness()`, which
+  treats edge weights as distances, so betweenness now uses inverse strength.
+* Non-finite betweenness/eigenvector centrality (for example a single cell type,
+  where normalized betweenness is `NaN`) is sanitized to `0` instead of
+  propagating to `NA` roles, and self-loops are excluded from the centrality
+  graph.
+* Resolved a duplicate `lr_pair` in `lr_pairs_human` (`POSTN_ITGAV` is now
+  `POSTN_ITGAV_ITGB1` and `POSTN_ITGAV_ITGB3`) that caused silent row-name
+  collisions in per-cell scoring.
+* `rank_comm_cells()` now aligns unnamed `cell_labels` to the ranked cells
+  instead of the original order.
+* `fit_celltype_comm_glm()` no longer clamps distal-candidate features to 100%
+  active; binomial successes are taken from the same opportunity universe as the
+  edge-count denominator.
+* `run_multisample()` errors when `group_info` does not label every sample, and
+  minor `na.rm`/non-finite hardening was added to modulator and cluster helpers.
+
+Documentation and packaging:
+
+* All `man/*.Rd` pages are regenerated from roxygen source so documentation is
+  idempotent; previously 26 hand-written pages had drifted from the source
+  comments. Fixed malformed `\code{}` tags and de-duplicated the internal
+  `%||%` operator.
+* Made the intro-vignette heatmap chunk conditional on the suggested `pheatmap`
+  package so vignettes build without it, dropped unused `Suggests`
+  (`ggnetwork`, `viridis`), and added a `.gitignore` for build artifacts.
+
 # LogicComm 0.7.1
 
 ## Cell-type communication consistency and visualization audit
