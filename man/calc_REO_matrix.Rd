@@ -13,6 +13,8 @@ calc_REO_matrix(
   return_rank = FALSE,
   rank_output = c("percentile", "none"),
   anchor_genes = NULL,
+  gene_background = c("none", "quantile"),
+  gene_background_quantile = 0.5,
   verbose = TRUE
 )
 }
@@ -45,6 +47,18 @@ retained genes.}
 to compute per-cell anchors and rank percentiles. The default \code{NULL}
 uses all genes in \code{expr_mat}. Use with care: anchors computed on a small
 subset are less comparable across databases or studies.}
+
+\item{gene_background}{Cell-type-free ambient guard. \code{"none"} (default)
+keeps the original within-cell REO rule. \code{"quantile"} additionally
+requires each gene's count to exceed its own across-cell background (the
+\code{gene_background_quantile} quantile of that gene over all cells), which
+removes ambient/dropout counts that clear the within-cell anchor but are low
+for the gene itself (for example ambient \code{CD8A} in non-CD8 cells). It
+needs no cell-type annotation. For rigorous ambient removal, prefer an
+upstream tool such as SoupX, DecontX, or CellBender.}
+
+\item{gene_background_quantile}{Across-cell quantile used as each gene's
+background when \code{gene_background = "quantile"}. Default: \code{0.5}.}
 
 \item{verbose}{Print progress messages. Default: \code{TRUE}.}
 }

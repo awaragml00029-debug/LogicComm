@@ -1,3 +1,26 @@
+# LogicComm 0.9.0
+
+## Cell-type-free ambient guard for REO activity calls
+
+The within-cell REO anchor (a gene is active if it exceeds that cell's own
+median gene) cannot tell genuine expression from ambient RNA: a marker such as
+`CD8A` that contaminates non-CD8 cells with a few ambient counts still clears the
+cell's low median and is called active. This produced biologically impossible
+results such as a `HLA-B -> CD8A` axis with a Treg receiver.
+
+* `calc_REO_matrix()` (and `logic_prepare()`) gain `gene_background` and
+  `gene_background_quantile`. With `gene_background = "quantile"`, a gene is
+  active in a cell only if it also exceeds its own across-cell background (the
+  given quantile of that gene over all cells), which removes ambient activity
+  **without requiring any cell-type annotation**. The default is `"none"` for
+  backward compatibility; the Seurat demo and README now recommend the guard.
+* In a controlled ambient simulation this drops the spurious sender -> Treg CD8A
+  axis from LCS ~0.79 to ~0.02 while preserving genuine CD8 T self-signal.
+* Documentation recommends upstream decontamination (SoupX / DecontX /
+  CellBender) for rigorous ambient removal, and explains that REO is a
+  within-cell relative measure.
+* Added regression tests for the ambient guard.
+
 # LogicComm 0.8.1
 
 ## Publication-figure readability pass

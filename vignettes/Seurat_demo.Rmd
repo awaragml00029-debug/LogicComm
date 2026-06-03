@@ -315,15 +315,26 @@ lr_genes <- all_lr_genes(lr_pairs_human)
 
 reo_pbmc <- calc_REO_matrix(
   pbmc,
-  lr_genes       = lr_genes,
-  rank_threshold = 0.5,
-  layer          = "counts",
-  chunk_size     = 2000,
-  verbose        = TRUE
+  lr_genes        = lr_genes,
+  rank_threshold  = 0.5,
+  layer           = "counts",
+  chunk_size      = 2000,
+  gene_background = "quantile",   # cell-type-free ambient guard (recommended)
+  verbose         = TRUE
 )
 
 reo_pbmc
 ```
+
+**Why `gene_background = "quantile"`?** The within-cell REO anchor asks only
+"is this gene above this cell's own median gene", so a marker like `CD8A` that
+leaks into non-CD8 cells as ambient RNA (a few counts, above the cell's low
+median) is wrongly called active — producing biologically impossible axes such
+as `HLA-B -> CD8A` with a Treg receiver. The `gene_background = "quantile"`
+guard additionally requires each gene to exceed its own across-cell background,
+which removes ambient activity (it needs no cell-type labels). For rigorous
+ambient removal, run SoupX, DecontX, or CellBender upstream and then build the
+REO matrix on the corrected counts.
 
 Important notes:
 

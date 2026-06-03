@@ -12,6 +12,8 @@
   return_rank = FALSE,
   rank_output = "percentile",
   anchor_genes = NULL,
+  gene_background = "none",
+  gene_background_quantile = 0.5,
   verbose = TRUE
 )
 }

@@ -1,8 +1,8 @@
 Package: LogicComm
 Type: Package
 Title: Logic-Based Cell-Cell Communication Analysis for Multi-Sample scRNA-seq
-Version: 0.8.1
-Date: 2026-06-02
+Version: 0.9.0
+Date: 2026-06-03
 Authors@R: person("LogicComm", "Developer", role = c("aut", "cre"),
     email = "dev@logiccomm.io")
 Author: LogicComm Developer

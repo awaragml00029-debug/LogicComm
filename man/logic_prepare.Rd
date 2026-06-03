@@ -15,6 +15,8 @@ logic_prepare(
   return_rank = FALSE,
   rank_output = c("percentile", "none"),
   anchor_genes = NULL,
+  gene_background = c("none", "quantile"),
+  gene_background_quantile = 0.5,
   verbose = TRUE
 )
 }
@@ -42,6 +44,12 @@ genes when \code{genes} is \code{NULL}.}
 \item{rank_output}{Rank output mode.}
 
 \item{anchor_genes}{Optional gene universe for REO anchors.}
+
+\item{gene_background}{Cell-type-free ambient guard passed to
+\code{\link{calc_REO_matrix}}: \code{"none"} or \code{"quantile"}.}
+
+\item{gene_background_quantile}{Across-cell background quantile used when
+\code{gene_background = "quantile"}.}
 
 \item{verbose}{Print progress messages.}
 }

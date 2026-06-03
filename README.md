@@ -58,7 +58,7 @@ install.packages("igraph")
 ### Install LogicComm from a local source tarball
 
 ```r
-install.packages("LogicComm_0.8.1.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.9.0.tar.gz", repos = NULL, type = "source")
 ```
 
 If installing from the unpacked source directory during development:
@@ -99,10 +99,11 @@ lr_genes <- all_lr_genes(lr_pairs_human)
 
 reo <- calc_REO_matrix(
   count_matrix,
-  lr_genes       = lr_genes,
-  rank_threshold = 0.5,
-  chunk_size     = 5000,
-  verbose        = TRUE
+  lr_genes        = lr_genes,
+  rank_threshold  = 0.5,
+  chunk_size      = 5000,
+  gene_background = "quantile",   # cell-type-free ambient guard (recommended)
+  verbose         = TRUE
 )
 
 # Global mode: no KNN graph required.
@@ -111,6 +112,17 @@ lcs_global <- IdentifyLogicConsensus(reo, verbose = FALSE)
 # View top pairs.
 sort(lcs_global, decreasing = TRUE)[1:20]
 ```
+
+> **Ambient RNA guard (`gene_background`).** The REO anchor is *within-cell*: a
+> gene is active if it exceeds that cell's own median gene. A marker such as
+> `CD8A` that leaks into non-CD8 cells as ambient RNA (a few counts, still above
+> the cell's low median) is therefore wrongly called active, which can surface
+> biologically impossible axes (for example an `HLA-B -> CD8A` interaction with a
+> Treg receiver). `gene_background = "quantile"` additionally requires each gene
+> to exceed its own across-cell background, removing ambient activity **without
+> any cell-type annotation**. It is `"none"` by default for backward
+> compatibility but recommended for biological interpretation; for rigorous
+> decontamination run SoupX, DecontX, or CellBender upstream.
 
 ---
 

@@ -16,6 +16,10 @@
 #' @param return_rank Return rank-percentile matrix with REO logic.
 #' @param rank_output Rank output mode.
 #' @param anchor_genes Optional gene universe for REO anchors.
+#' @param gene_background Cell-type-free ambient guard passed to
+#'   \code{\link{calc_REO_matrix}}: \code{"none"} or \code{"quantile"}.
+#' @param gene_background_quantile Across-cell background quantile used when
+#'   \code{gene_background = "quantile"}.
 #' @param verbose Print progress messages.
 #' @return A REO sparse matrix, or a \code{LogicCommREOResult} when
 #'   \code{return_rank = TRUE}.
@@ -30,8 +34,11 @@ logic_prepare <- function(object,
                           return_rank = FALSE,
                           rank_output = c("percentile", "none"),
                           anchor_genes = NULL,
+                          gene_background = c("none", "quantile"),
+                          gene_background_quantile = 0.5,
                           verbose = TRUE) {
   rank_output <- match.arg(rank_output)
+  gene_background <- match.arg(gene_background)
   if (is.null(genes) && !is.null(lr_db)) {
     genes <- logic_get_lr_genes(lr_db, include_modulators = include_modulators)
   }
@@ -45,6 +52,8 @@ logic_prepare <- function(object,
     return_rank = return_rank,
     rank_output = rank_output,
     anchor_genes = anchor_genes,
+    gene_background = gene_background,
+    gene_background_quantile = gene_background_quantile,
     verbose = verbose
   )
 }
