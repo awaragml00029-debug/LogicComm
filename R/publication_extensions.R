@@ -540,7 +540,8 @@ plot_celltype_glm_volcano <- function(glm_result,
   df <- as.data.frame(glm_result)
   if (!all(c("estimate", "fdr") %in% names(df))) stop("glm_result must contain estimate and fdr columns.")
   df$neglog10 <- -log10(pmax(df$fdr, .Machine$double.xmin))
-  df$label <- df$feature
+  if (!"sender_type" %in% names(df)) df$sender_type <- NA_character_
+  df$label <- .compact_feature_label(df$feature)
   ord <- order(df$fdr, -abs(df$estimate), na.last = NA)
   df$to_label <- FALSE
   if (length(ord) > 0 && top_n_label > 0) df$to_label[ord[seq_len(min(top_n_label, length(ord)))]] <- TRUE
@@ -549,7 +550,8 @@ plot_celltype_glm_volcano <- function(glm_result,
     ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey65") +
     ggplot2::geom_point(ggplot2::aes(color = sender_type), alpha = 0.8) +
     ggrepel::geom_text_repel(data = df[df$to_label, , drop = FALSE],
-                             ggplot2::aes(label = label), size = 3, max.overlaps = Inf) +
+                             ggplot2::aes(label = label), size = 3, max.overlaps = 12,
+                             min.segment.length = 0) +
     ggplot2::labs(title = title, x = "GLM coefficient (log odds)", y = "-log10(FDR)", color = "Sender") +
     ggplot2::theme_bw(base_size = 12) +
     ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))

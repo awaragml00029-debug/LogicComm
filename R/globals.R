@@ -20,6 +20,6 @@ if (getRversion() >= "2.15.1") {
     "point_alpha", "size_val", "fraction", "neg_log10_fdr", "color_var", "role_confidence",
     "specificity_class", "participation_type", "share", "grp_key", "direction",
     "sender_receiver", "lr_label", "count", "diff_direction",
-    "strength_score", "specificity_score", "disc_size", "axis", "tier"
+    "strength_score", "specificity_score", "disc_size", "axis", "tier", "node_label"
   ))
 }

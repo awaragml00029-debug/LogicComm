@@ -89,21 +89,25 @@ plot_celltype_role_dotplot <- function(ct_comm,
 #' @param ct_comm Optional cell-type communication object.
 #' @param specificity Optional specificity summary.
 #' @param top_n_label Number of top points to label.
+#' @param label_field Label content: \code{"lr_pair"} (default, short L-R names),
+#'   \code{"feature"} (compact sender/receiver/L-R key), or \code{"none"}.
 #' @param title Optional title.
 #' @return ggplot2 object.
 #' @export
 plot_specificity_stability <- function(sens,
                                        ct_comm = NULL,
                                        specificity = NULL,
-                                       top_n_label = 15,
+                                       top_n_label = 12,
+                                       label_field = c("lr_pair", "feature", "none"),
                                        title = NULL) {
   if (is.null(sens$stability)) stop("sens must be output from sensitivity_REO_threshold().")
+  label_field <- match.arg(label_field)
   st <- sens$stability
-  
+
   # Parse feature names (sender|receiver|lr_pair)
   parts <- .parse_celltype_feature_names(st$feature)
   st$lr_pair <- parts$feature
-  
+
   if (is.null(specificity)) {
     if (is.null(ct_comm)) stop("Provide ct_comm or specificity.")
     if (is.null(ct_comm$specificity_summary) || !nrow(ct_comm$specificity_summary)) {
@@ -111,32 +115,47 @@ plot_specificity_stability <- function(sens,
     }
     specificity <- ct_comm$specificity_summary
   }
-  
+
   mi <- match(st$lr_pair, specificity$lr_pair)
   st$pair_specificity <- specificity$pair_specificity[mi]
   st$pathway <- specificity$pathway[mi]
   st$specificity_class <- specificity$specificity_class[mi]
   st$total_lcs <- specificity$total_lcs[mi]
-  st$label <- st$feature
-  
-  ord <- order(st$active_fraction, st$pair_specificity, st$total_lcs, decreasing = TRUE, na.last = NA)
+  # Short labels keep the figure readable when cell-type names are long; the
+  # full composite key is available via label_field = "feature".
+  st$label <- switch(label_field,
+                     lr_pair = .short_label(st$lr_pair, 28L),
+                     feature = .compact_feature_label(st$feature),
+                     none = NA_character_)
+
+  # Label the strongest, most stable, most specific axes; ties (a crowded (1,1)
+  # corner) are broken by total LCS so labels do not pile up.
+  ord <- order(st$active_fraction, st$pair_specificity, st$total_lcs,
+               decreasing = TRUE, na.last = NA)
   st$to_label <- FALSE
-  if (length(ord) && top_n_label > 0) st$to_label[ord[seq_len(min(top_n_label, length(ord)))]] <- TRUE
-  
+  if (label_field != "none" && length(ord) && top_n_label > 0) {
+    st$to_label[ord[seq_len(min(top_n_label, length(ord)))]] <- TRUE
+  }
+
   if (is.null(title)) title <- "Communication stability vs specificity"
-  
-  ggplot2::ggplot(st, ggplot2::aes(x = active_fraction, y = pair_specificity)) +
+
+  p <- ggplot2::ggplot(st, ggplot2::aes(x = active_fraction, y = pair_specificity)) +
     ggplot2::geom_point(ggplot2::aes(size = total_lcs, color = specificity_class), alpha = 0.7) +
-    ggrepel::geom_text_repel(data = st[st$to_label, , drop = FALSE], 
-                             ggplot2::aes(label = label), size = 3, max.overlaps = Inf) +
     ggplot2::scale_size_continuous(range = c(2, 8), name = "Total LCS") +
-    ggplot2::scale_color_brewer(palette = "Set1", name = "Specificity class") +
+    ggplot2::scale_color_brewer(palette = "Set1", name = "Specificity class", na.value = "grey70") +
     ggplot2::labs(title = title, x = "REO-threshold stability", y = "Cell-type-pair specificity") +
     ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold", size = 14),
       panel.grid.minor = ggplot2::element_blank()
     )
+  if (any(st$to_label)) {
+    p <- p + ggrepel::geom_text_repel(
+      data = st[st$to_label, , drop = FALSE], ggplot2::aes(label = label),
+      size = 3, max.overlaps = 12, min.segment.length = 0, box.padding = 0.5,
+      segment.color = "grey60", segment.size = 0.3)
+  }
+  p
 }
 
 #' Plot Publication-Style Cell-Type Network
@@ -171,6 +190,7 @@ plot_celltype_network_publication <- function(ct_comm,
   n <- nrow(nodes)
   theta <- seq(0, 2 * pi, length.out = n + 1L)[seq_len(n)]
   nodes$x <- cos(theta); nodes$y <- sin(theta)
+  nodes$node_label <- .short_label(as.character(nodes$cell_type), 18L)
   
   edge_df <- merge(edges, nodes[, c("cell_type", "x", "y")], by.x = "sender_type", by.y = "cell_type", all.x = TRUE)
   edge_df <- merge(edge_df, nodes[, c("cell_type", "x", "y")], by.x = "receiver_type", by.y = "cell_type", all.x = TRUE, suffixes = c("", "end"))
@@ -191,21 +211,21 @@ plot_celltype_network_publication <- function(ct_comm,
                                  arrow = grid::arrow(length = grid::unit(0.12, "inches"), type = "closed"),
                                  lineend = "round", alpha = 0.7) +
       ggplot2::scale_linewidth_continuous(range = c(0.4, 3), name = metric) +
-      ggplot2::scale_color_brewer(palette = "Set2", name = "Top pathway")
-      
+      ggplot2::scale_color_viridis_d(option = "turbo", name = "Top pathway", na.value = "grey70")
+
     if (edge_label != "none") {
       edge_df$xm <- (edge_df$x + edge_df$xend) / 2
       edge_df$ym <- (edge_df$y + edge_df$yend) / 2
-      p <- p + ggrepel::geom_text_repel(data = edge_df, ggplot2::aes(x = xm, y = ym, label = edge_text), 
-                                        size = 3, max.overlaps = Inf, fontface = "italic")
+      p <- p + ggrepel::geom_text_repel(data = edge_df, ggplot2::aes(x = xm, y = ym, label = edge_text),
+                                        size = 3, max.overlaps = 15, fontface = "italic")
     }
   }
-  
+
   p + ggplot2::geom_point(data = nodes,
                           ggplot2::aes(x = x, y = y, size = hub_score, fill = sender_receiver_balance),
                           shape = 21, color = "black", stroke = 0.5) +
-    ggrepel::geom_text_repel(data = nodes, ggplot2::aes(x = x, y = y, label = cell_type), 
-                             size = 4, fontface = "bold", max.overlaps = Inf) +
+    ggrepel::geom_text_repel(data = nodes, ggplot2::aes(x = x, y = y, label = node_label),
+                             size = 4, fontface = "bold", max.overlaps = 20) +
     ggplot2::scale_size_continuous(range = c(4, 12), name = "Hub") +
     ggplot2::scale_fill_gradient2(low = "#2166ac", mid = "#f7f7f7", high = "#b2182b", midpoint = 0, name = "Balance")
 }

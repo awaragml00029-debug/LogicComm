@@ -275,7 +275,7 @@ plot_communication_discovery <- function(ranked, top_n_label = 15, title = NULL)
   }
   if (!nrow(ranked)) stop("No active communication axes to plot.")
   df <- ranked
-  df$axis <- paste0(df$sender_type, "\u2192", df$receiver_type, ": ", df$lr_pair)
+  df$axis <- .compact_feature_label(paste(df$sender_type, df$receiver_type, df$lr_pair, sep = "|"))
   df$tier <- if ("evidence_tier" %in% names(df)) df$evidence_tier else "Unranked"
   use_support <- "null_support" %in% names(df) && any(is.finite(df$null_support))
   size_raw <- if (use_support) df$null_support else df$discovery_score
@@ -286,7 +286,8 @@ plot_communication_discovery <- function(ranked, top_n_label = 15, title = NULL)
   ggplot2::ggplot(df, ggplot2::aes(x = strength_score, y = specificity_score)) +
     ggplot2::geom_point(ggplot2::aes(size = disc_size, color = tier), alpha = 0.8) +
     ggrepel::geom_text_repel(data = df[df$to_label, , drop = FALSE],
-                             ggplot2::aes(label = axis), size = 3, max.overlaps = Inf) +
+                             ggplot2::aes(label = axis), size = 3, max.overlaps = 12,
+                             min.segment.length = 0) +
     ggplot2::scale_size_continuous(range = c(2, 7),
                                    name = if (use_support) "Null support" else "Discovery score") +
     ggplot2::labs(title = title, x = "Communication strength (scaled)",

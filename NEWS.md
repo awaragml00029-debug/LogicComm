@@ -1,3 +1,26 @@
+# LogicComm 0.8.1
+
+## Publication-figure readability pass
+
+A visualization audit fixed labels and palettes that became unreadable on real
+datasets with long cell-type names and many pathways:
+
+* `plot_specificity_stability()` no longer piles overlapping full
+  `sender|receiver|L-R` keys at the top of the panel. It labels with short L-R
+  names by default, gains a `label_field` argument (`"lr_pair"`, `"feature"`,
+  `"none"`), breaks ties in the crowded high-stability/high-specificity corner by
+  total LCS, and uses a finite `max.overlaps`.
+* `plot_celltype_network_publication()` switched the pathway colour scale from
+  `Set2` (only 8 colours, which failed when there were more pathways) to a
+  viridis scale, and shortens node labels.
+* `plot_communication_discovery()`, `plot_differential_celltype_volcano()`,
+  `plot_celltype_glm_volcano()`, `plot_celltype_network()`, and
+  `plot_celltype_roles()` now use short/compact point and node labels and a
+  finite `max.overlaps` so labels repel legibly instead of stacking.
+* `plot_celltype_glm_volcano()` guards the optional `sender_type` colour column.
+* Added internal `.short_label()` / `.compact_feature_label()` helpers (ASCII
+  source, `…` / `→` escapes) and regression tests.
+
 # LogicComm 0.8.0
 
 ## A clearer discovery workflow: who communicates, what changes, and what to prioritize

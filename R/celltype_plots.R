@@ -31,6 +31,7 @@ plot_celltype_network <- function(ct_comm,
   theta <- seq(0, 2 * pi, length.out = n + 1L)[seq_len(n)]
   nodes$x <- cos(theta)
   nodes$y <- sin(theta)
+  nodes$node_label <- .short_label(as.character(nodes$cell_type), 18L)
   edges <- merge(pair_sum, nodes[, c("cell_type", "x", "y", "hub_score", "sender_receiver_balance")],
                  by.x = "sender_type", by.y = "cell_type", all.x = TRUE)
   edges <- merge(edges, nodes[, c("cell_type", "x", "y")],
@@ -96,8 +97,8 @@ plot_celltype_network <- function(ct_comm,
     p <- p + ggplot2::scale_color_discrete(na.translate = FALSE)
   }
   if (show_labels) {
-    p <- p + ggrepel::geom_text_repel(data = nodes, ggplot2::aes(x = x, y = y, label = cell_type),
-                                      size = 3.5, fontface = "bold", max.overlaps = Inf)
+    p <- p + ggrepel::geom_text_repel(data = nodes, ggplot2::aes(x = x, y = y, label = node_label),
+                                      size = 3.5, fontface = "bold", max.overlaps = 20)
   }
   p
 }
@@ -421,7 +422,9 @@ plot_differential_celltype_volcano <- function(result, x = "log2fc_lcs", fdr_col
   if (!x %in% names(df)) x <- if ("asymmetry" %in% names(df)) "asymmetry" else stop("x metric not found: ", x)
   if (!fdr_col %in% names(df)) fdr_col <- if ("fdr" %in% names(df)) "fdr" else stop("FDR column not found: ", fdr_col)
   df$neglog10 <- -log10(pmax(df[[fdr_col]], .Machine$double.xmin))
-  df$label <- if ("lr_pair" %in% names(df)) df$lr_pair else rownames(df)
+  raw_label <- if ("lr_pair" %in% names(df)) as.character(df$lr_pair) else rownames(df)
+  df$label <- ifelse(grepl("|", raw_label, fixed = TRUE),
+                     .compact_feature_label(raw_label), .short_label(raw_label, 28L))
   ord <- order(df[[fdr_col]], -abs(df[[x]]), na.last = NA)
   df$to_label <- FALSE
   if (length(ord) > 0) df$to_label[ord[seq_len(min(top_n_label, length(ord)))]] <- TRUE
@@ -429,7 +432,8 @@ plot_differential_celltype_volcano <- function(result, x = "log2fc_lcs", fdr_col
   ggplot2::ggplot(df, ggplot2::aes(x = .data[[x]], y = neglog10)) +
     ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
     ggplot2::geom_point(alpha = 0.75) +
-    ggrepel::geom_text_repel(data = df[df$to_label, , drop = FALSE], ggplot2::aes(label = label), size = 3, max.overlaps = Inf) +
+    ggrepel::geom_text_repel(data = df[df$to_label, , drop = FALSE], ggplot2::aes(label = label),
+                             size = 3, max.overlaps = 12, min.segment.length = 0) +
     ggplot2::labs(title = title, x = x, y = paste0("-log10(", fdr_col, ")")) +
     theme_logiccomm()
 }

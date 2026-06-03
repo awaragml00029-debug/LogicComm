@@ -151,6 +151,7 @@
 plot_celltype_roles <- function(ct_comm, label = TRUE, title = NULL) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   df <- ct_comm$role_summary
+  df$node_label <- .short_label(as.character(df$cell_type), 20L)
   if (is.null(title)) title <- "Cell-type communication role positioning"
 
   p <- ggplot2::ggplot(df, ggplot2::aes(x = sender_role_score, y = receiver_role_score)) +
@@ -164,7 +165,7 @@ plot_celltype_roles <- function(ct_comm, label = TRUE, title = NULL) {
     theme_logiccomm()
 
   if (isTRUE(label)) {
-    p <- p + ggrepel::geom_text_repel(ggplot2::aes(label = cell_type), size = 3.4, max.overlaps = Inf)
+    p <- p + ggrepel::geom_text_repel(ggplot2::aes(label = node_label), size = 3.4, max.overlaps = 20)
   }
   p
 }

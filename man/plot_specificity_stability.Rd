@@ -8,7 +8,8 @@ plot_specificity_stability(
   sens,
   ct_comm = NULL,
   specificity = NULL,
-  top_n_label = 15,
+  top_n_label = 12,
+  label_field = c("lr_pair", "feature", "none"),
   title = NULL
 )
 }
@@ -20,6 +21,9 @@ plot_specificity_stability(
 \item{specificity}{Optional specificity summary.}
 
 \item{top_n_label}{Number of top points to label.}
+
+\item{label_field}{Label content: \code{"lr_pair"} (default, short L-R names),
+\code{"feature"} (compact sender/receiver/L-R key), or \code{"none"}.}
 
 \item{title}{Optional title.}
 }

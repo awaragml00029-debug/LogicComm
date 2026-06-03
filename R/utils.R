@@ -311,3 +311,40 @@ as_logiccomm_lr_db_from_cellchat <- function(cellchat_db,
 #' @return \code{a} when it is not \code{NULL}, otherwise \code{b}.
 #' @noRd
 `%||%` <- function(a, b) if (is.null(a)) b else a
+
+#' Truncate a long label with a trailing ellipsis
+#'
+#' Keeps plot labels readable when cell-type or feature names are long.
+#' @param x Character vector.
+#' @param max_chars Maximum characters before truncating.
+#' @return Character vector no longer than \code{max_chars}.
+#' @keywords internal
+.short_label <- function(x, max_chars = 30L) {
+  x <- as.character(x)
+  long <- !is.na(x) & nchar(x) > max_chars
+  x[long] <- paste0(substr(x[long], 1L, max_chars - 1L), "\u2026")
+  x
+}
+
+#' Compact a sender|receiver|lr_pair feature key into a readable point label
+#'
+#' Turns a long composite feature key such as
+#' \code{"LongSenderName|LongReceiverName|VEGFA_KDR"} into
+#' \code{"VEGFA_KDR (LongSende…→LongRecei…)"} so labelled points stay
+#' legible. Keys without three components are returned (truncated) as-is.
+#' @param x Character vector of composite feature keys.
+#' @param max_chars Maximum characters in the final label.
+#' @return Character vector of compact labels.
+#' @keywords internal
+.compact_feature_label <- function(x, max_chars = 34L) {
+  parts <- strsplit(as.character(x), "|", fixed = TRUE)
+  out <- vapply(parts, function(p) {
+    if (length(p) >= 3) {
+      lr <- paste(p[3:length(p)], collapse = "|")
+      paste0(lr, " (", .short_label(p[1], 10L), "\u2192", .short_label(p[2], 10L), ")")
+    } else {
+      paste(p, collapse = "|")
+    }
+  }, character(1))
+  .short_label(out, max_chars)
+}

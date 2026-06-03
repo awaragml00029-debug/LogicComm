@@ -58,7 +58,7 @@ install.packages("igraph")
 ### Install LogicComm from a local source tarball
 
 ```r
-install.packages("LogicComm_0.8.0.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.8.1.tar.gz", repos = NULL, type = "source")
 ```
 
 If installing from the unpacked source directory during development:
