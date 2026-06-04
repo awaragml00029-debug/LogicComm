@@ -61,6 +61,11 @@ jobs:
         with:
           name: LogicComm ${{ steps.meta.outputs.version }}
           tag_name: v${{ steps.meta.outputs.version }}
+          # Pin the tag to the exact commit being built. Without this, a tag
+          # created on a workflow_dispatch event defaults to the repository's
+          # default branch, so dispatching from a feature branch would tag the
+          # release at main rather than at the built source.
+          target_commitish: ${{ github.sha }}
           fail_on_unmatched_files: true
           files: LogicComm_*.tar.gz
           body_path: RELEASE_NOTES.md
