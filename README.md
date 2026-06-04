@@ -58,7 +58,7 @@ install.packages("igraph")
 ### Install LogicComm from a local source tarball
 
 ```r
-install.packages("LogicComm_0.9.0.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.9.1.tar.gz", repos = NULL, type = "source")
 ```
 
 If installing from the unpacked source directory during development:
@@ -119,10 +119,12 @@ sort(lcs_global, decreasing = TRUE)[1:20]
 > the cell's low median) is therefore wrongly called active, which can surface
 > biologically impossible axes (for example an `HLA-B -> CD8A` interaction with a
 > Treg receiver). `gene_background = "quantile"` additionally requires each gene
-> to exceed its own across-cell background, removing ambient activity **without
-> any cell-type annotation**. It is `"none"` by default for backward
-> compatibility but recommended for biological interpretation; for rigorous
-> decontamination run SoupX, DecontX, or CellBender upstream.
+> to exceed its own background, taken over the cells that *detect* it (nonzero
+> counts) so the guard stays effective even for markers expressed in a minority
+> of cells. This removes ambient activity **without any cell-type annotation**.
+> It is `"none"` by default for backward compatibility but recommended for
+> biological interpretation; for rigorous decontamination run SoupX, DecontX, or
+> CellBender upstream.
 
 ---
 

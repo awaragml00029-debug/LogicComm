@@ -1,3 +1,20 @@
+# LogicComm 0.9.1
+
+## Make the ambient guard effective for minority-expressed genes
+
+The 0.9.0 `gene_background = "quantile"` guard took each gene's background
+quantile over *all* cells. For a marker detected in fewer than half of cells
+(the common case, e.g. `CD8A` in a mixed immune dataset) that quantile is 0, so
+the guard had no effect and ambient receptors such as `CD8A` in Treg still
+appeared.
+
+* The background is now taken over the cells that **detect** the gene (nonzero
+  counts), so it stays effective regardless of detection rate. In a low-detection
+  simulation the spurious sender -> Treg `CD8A` axis drops from LCS ~0.16 to 0
+  while genuine CD8 T expression is preserved; in high-detection data behaviour
+  is essentially unchanged.
+* Added a regression test for the minority-detection case.
+
 # LogicComm 0.9.0
 
 ## Cell-type-free ambient guard for REO activity calls

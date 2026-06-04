@@ -50,15 +50,18 @@ subset are less comparable across databases or studies.}
 
 \item{gene_background}{Cell-type-free ambient guard. \code{"none"} (default)
 keeps the original within-cell REO rule. \code{"quantile"} additionally
-requires each gene's count to exceed its own across-cell background (the
-\code{gene_background_quantile} quantile of that gene over all cells), which
-removes ambient/dropout counts that clear the within-cell anchor but are low
-for the gene itself (for example ambient \code{CD8A} in non-CD8 cells). It
-needs no cell-type annotation. For rigorous ambient removal, prefer an
-upstream tool such as SoupX, DecontX, or CellBender.}
+requires each gene's count to exceed its own background, taken as the
+\code{gene_background_quantile} quantile of that gene over the cells that
+detect it (nonzero counts). This removes ambient/dropout counts that clear
+the within-cell anchor but are low for the gene itself (for example ambient
+\code{CD8A} in non-CD8 cells), and stays effective even when the gene is
+detected in fewer than half of cells. It needs no cell-type annotation. For
+rigorous ambient removal, prefer an upstream tool such as SoupX, DecontX, or
+CellBender.}
 
-\item{gene_background_quantile}{Across-cell quantile used as each gene's
-background when \code{gene_background = "quantile"}. Default: \code{0.5}.}
+\item{gene_background_quantile}{Quantile of each gene's detected (nonzero)
+counts used as its background when \code{gene_background = "quantile"}.
+Default: \code{0.5} (the median detected count).}
 
 \item{verbose}{Print progress messages. Default: \code{TRUE}.}
 }

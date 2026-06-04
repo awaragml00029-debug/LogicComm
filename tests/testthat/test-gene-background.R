@@ -65,3 +65,28 @@ test_that("gene_background validates its quantile argument", {
                                gene_background_quantile = 1.5, verbose = FALSE))
   expect_error(calc_REO_matrix(d$m, lr_genes = "CD8A", gene_background = "bogus", verbose = FALSE))
 })
+
+test_that("gene_background gate works when the gene is detected in <50% of cells", {
+  # The background is taken over the cells that DETECT the gene, not all cells,
+  # so the guard still bites when a marker is expressed in a minority of cells
+  # (an all-cells median would be 0 there and disable the guard).
+  set.seed(21)
+  nE <- 50; nO <- 150
+  genes <- c("CD8A", paste0("BG", 1:200))
+  cells <- c(paste0("E", 1:nE), paste0("O", 1:nO))
+  m <- matrix(rpois(length(genes) * length(cells), 0.4), length(genes), length(cells),
+              dimnames = list(genes, cells))
+  for (hk in paste0("BG", 1:6)) m[hk, ] <- rpois(ncol(m), 25)
+  E <- 1:nE; O <- (nE + 1):(nE + nO)
+  m["CD8A", ] <- 0L                                   # control CD8A detection exactly
+  m["CD8A", E] <- rpois(nE, 10)                       # genuine expressers (a minority of cells)
+  amb <- sample(O, round(nO * 0.25))
+  m["CD8A", amb] <- rpois(length(amb), 2)             # sparse ambient elsewhere
+
+  expect_lt(mean(m["CD8A", ] > 0), 0.5)               # detection < 50%
+  reo <- calc_REO_matrix(m, lr_genes = "CD8A", gene_background = "quantile", verbose = FALSE)
+  a <- as.numeric(reo["CD8A", ])
+  expect_lt(mean(a[O]), 0.15)    # ambient in non-expressers is largely removed
+  expect_gt(mean(a[E]), 0.6)     # genuine expressers are preserved
+})
+

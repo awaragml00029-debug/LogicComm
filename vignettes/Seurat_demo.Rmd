@@ -331,10 +331,11 @@ reo_pbmc
 leaks into non-CD8 cells as ambient RNA (a few counts, above the cell's low
 median) is wrongly called active — producing biologically impossible axes such
 as `HLA-B -> CD8A` with a Treg receiver. The `gene_background = "quantile"`
-guard additionally requires each gene to exceed its own across-cell background,
-which removes ambient activity (it needs no cell-type labels). For rigorous
-ambient removal, run SoupX, DecontX, or CellBender upstream and then build the
-REO matrix on the corrected counts.
+guard additionally requires each gene to exceed its own background, taken over
+the cells that *detect* it (nonzero counts) so it stays effective even for
+markers expressed in a minority of cells; this removes ambient activity (it
+needs no cell-type labels). For rigorous ambient removal, run SoupX, DecontX, or
+CellBender upstream and then build the REO matrix on the corrected counts.
 
 Important notes:
 

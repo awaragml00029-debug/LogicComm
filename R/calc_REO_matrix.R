@@ -46,14 +46,17 @@
 #'   subset are less comparable across databases or studies.
 #' @param gene_background Cell-type-free ambient guard. \code{"none"} (default)
 #'   keeps the original within-cell REO rule. \code{"quantile"} additionally
-#'   requires each gene's count to exceed its own across-cell background (the
-#'   \code{gene_background_quantile} quantile of that gene over all cells), which
-#'   removes ambient/dropout counts that clear the within-cell anchor but are low
-#'   for the gene itself (for example ambient \code{CD8A} in non-CD8 cells). It
-#'   needs no cell-type annotation. For rigorous ambient removal, prefer an
-#'   upstream tool such as SoupX, DecontX, or CellBender.
-#' @param gene_background_quantile Across-cell quantile used as each gene's
-#'   background when \code{gene_background = "quantile"}. Default: \code{0.5}.
+#'   requires each gene's count to exceed its own background, taken as the
+#'   \code{gene_background_quantile} quantile of that gene over the cells that
+#'   detect it (nonzero counts). This removes ambient/dropout counts that clear
+#'   the within-cell anchor but are low for the gene itself (for example ambient
+#'   \code{CD8A} in non-CD8 cells), and stays effective even when the gene is
+#'   detected in fewer than half of cells. It needs no cell-type annotation. For
+#'   rigorous ambient removal, prefer an upstream tool such as SoupX, DecontX, or
+#'   CellBender.
+#' @param gene_background_quantile Quantile of each gene's detected (nonzero)
+#'   counts used as its background when \code{gene_background = "quantile"}.
+#'   Default: \code{0.5} (the median detected count).
 #' @param verbose Print progress messages. Default: \code{TRUE}.
 #'
 #' @return By default, a sparse \code{dgCMatrix}-like matrix (genes x cells) where
@@ -210,7 +213,14 @@ calc_REO_matrix <- function(expr_mat,
   n_cells <- ncol(mat_full)
   idx <- if (n_cells > max_cells) unique(round(seq(1, n_cells, length.out = max_cells))) else seq_len(n_cells)
   sub <- as.matrix(mat_full[output_genes, idx, drop = FALSE])
-  bg <- apply(sub, 1, stats::quantile, probs = prob, names = FALSE, type = 7)
+  # Threshold from the cells that DETECT the gene (nonzero), not all cells:
+  # a median over all cells collapses to 0 whenever a gene is detected in fewer
+  # than half of cells (the common case), which would disable the guard.
+  bg <- apply(sub, 1, function(x) {
+    nz <- x[x > 0]
+    if (!length(nz)) return(0)
+    as.numeric(stats::quantile(nz, probs = prob, names = FALSE, type = 7))
+  })
   bg <- as.numeric(bg)
   bg[!is.finite(bg)] <- 0
   bg
