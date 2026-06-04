@@ -45,6 +45,17 @@ jobs:
           # Use the top (most recent) section of NEWS.md as the release body.
           awk '/^# /{n++} n==2{exit} n>=1{print}' NEWS.md > RELEASE_NOTES.md
 
+      # When re-running a release for a version (e.g. dispatching from a branch
+      # after a fix), any pre-existing release/tag may point at a stale commit.
+      # Delete it so the tag is recreated at the exact commit this tarball was
+      # built from, keeping `install_github("...@vX.Y.Z")` consistent with the
+      # published asset.
+      - name: Reset any stale release/tag for this version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete "v${{ steps.meta.outputs.version }}" --cleanup-tag --yes || true
+
       - name: Publish release with the source tarball
         uses: softprops/action-gh-release@v2
         with:
