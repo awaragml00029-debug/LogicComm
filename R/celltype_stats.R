@@ -104,7 +104,8 @@ permute_celltype_communication <- function(ct_comm = NULL,
   inherited_params <- intersect(
     names(ct_comm$params),
     c("mode", "graph_symmetrize", "edge_weight_mode", "remove_self_edges",
-      "include_self", "lcs_threshold", "min_edges", "min_active_edges")
+      "include_self", "lcs_threshold", "min_edges", "min_active_edges",
+      "min_expr_frac")
   )
   for (param in inherited_params) {
     if (is.null(dots[[param]])) {

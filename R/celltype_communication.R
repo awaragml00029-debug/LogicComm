@@ -31,6 +31,12 @@
 #' @param lcs_threshold Minimum cell-type LCS.
 #' @param min_edges Minimum local/global opportunities required for active calls.
 #' @param min_active_edges Minimum active local/global support required.
+#' @param min_expr_frac Minimum fraction of sender cells that must express the
+#'   ligand and of receiver cells that must express the receptor for a
+#'   sender-receiver L-R axis to be called active. Prevents a few high-degree
+#'   (hub) cells from making an axis active when the gene is expressed in a
+#'   negligible fraction of the cell type. Default: \code{0.1}; set \code{0} to
+#'   disable.
 #' @param mode Scoring mode.
 #' @param remove_self_edges Remove diagonal cell-level self-loops before local
 #'   graph scoring. This does not remove same-cell-type communication.
@@ -54,6 +60,7 @@ summarize_celltype_communication <- function(reo_mat,
                                              lcs_threshold = 0.01,
                                              min_edges = 20,
                                              min_active_edges = 1,
+                                             min_expr_frac = 0.1,
                                              mode = c("auto", "neighborhood", "global"),
                                              remove_self_edges = TRUE,
                                              graph_symmetrize = c("none", "or", "max"),
@@ -66,6 +73,8 @@ summarize_celltype_communication <- function(reo_mat,
   mode <- match.arg(mode)
   graph_symmetrize <- match.arg(graph_symmetrize)
   edge_weight_mode <- match.arg(edge_weight_mode)
+  stopifnot(is.numeric(min_expr_frac), length(min_expr_frac) == 1,
+            min_expr_frac >= 0, min_expr_frac <= 1)
   .validate_lr_db_for_celltype(lr_db)
 
   labels <- .resolve_celltype_labels(cell_labels, seurat_obj, label_col, colnames(reo_mat))
@@ -192,11 +201,21 @@ summarize_celltype_communication <- function(reo_mat,
     lcs_global <- n_active_global / pmax(n_global_possible_by_group, 1)
     if (mode == "global") lcs_unweighted <- lcs_global
 
+    # Cell-type expressing-fraction gate: the ligand must be active in at least
+    # min_expr_frac of sender cells and the receptor in at least min_expr_frac of
+    # receiver cells. This prevents a handful of high-degree (hub) cells from
+    # making an axis "active" when the gene is expressed in a negligible fraction
+    # of the cell type (e.g. ambient CD8A in a few Treg cells that are KNN hubs).
+    expr_ok <- ligand_active_frac_sender >= min_expr_frac &
+               receptor_active_frac_receiver >= min_expr_frac
+
     local_denominator_ok <- mode == "neighborhood" & !is.na(lcs_neighborhood) & n_edges_by_group >= min_edges
-    local_active <- local_denominator_ok & lcs_neighborhood >= lcs_threshold & n_active_neighborhood >= min_active_edges
+    local_active <- local_denominator_ok & lcs_neighborhood >= lcs_threshold &
+                    n_active_neighborhood >= min_active_edges & expr_ok
 
     global_denominator_ok <- n_global_possible_by_group >= min_edges
-    global_candidate_active <- global_denominator_ok & !is.na(lcs_global) & lcs_global >= lcs_threshold & n_active_global >= min_active_edges
+    global_candidate_active <- global_denominator_ok & !is.na(lcs_global) & lcs_global >= lcs_threshold &
+                               n_active_global >= min_active_edges & expr_ok
 
     distal_candidate <- mode == "neighborhood" & global_candidate_active & !local_active
     candidate_active <- local_active | global_candidate_active
@@ -289,6 +308,7 @@ summarize_celltype_communication <- function(reo_mat,
       lcs_threshold = lcs_threshold,
       min_edges = min_edges,
       min_active_edges = min_active_edges,
+      min_expr_frac = min_expr_frac,
       n_cells = length(labels),
       n_cell_types = length(cell_types),
       n_lr_pairs = nrow(lr_db)

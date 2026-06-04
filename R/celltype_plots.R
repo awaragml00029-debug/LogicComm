@@ -1,5 +1,48 @@
 # R/celltype_plots.R
 
+# Filter an lr_table to requested sender/receiver cell types, erroring with the
+# list of valid values when a requested type is not present at all. This turns a
+# silent empty plot (a common cause of "the plot is broken" reports when a
+# cell-type name is mistyped) into an actionable message.
+.filter_celltype_axis <- function(df, senders = NULL, receivers = NULL) {
+  if (!is.null(senders)) {
+    bad <- setdiff(senders, unique(df$sender_type))
+    if (length(bad) == length(senders)) {
+      stop("None of the requested sender(s) are cell types in this object: ",
+           paste(bad, collapse = ", "), ".\nAvailable sender types: ",
+           paste(sort(unique(df$sender_type)), collapse = ", "), call. = FALSE)
+    }
+    df <- df[df$sender_type %in% senders, , drop = FALSE]
+  }
+  if (!is.null(receivers)) {
+    bad <- setdiff(receivers, unique(df$receiver_type))
+    if (length(bad) == length(receivers)) {
+      stop("None of the requested receiver(s) are cell types in this object: ",
+           paste(bad, collapse = ", "), ".\nAvailable receiver types: ",
+           paste(sort(unique(df$receiver_type)), collapse = ", "), call. = FALSE)
+    }
+    df <- df[df$receiver_type %in% receivers, , drop = FALSE]
+  }
+  df
+}
+
+# Build an informative message when a cell-type axis exists but carries no active
+# events, so users can tell "no signal here" apart from "you mistyped a name".
+.no_active_events_message <- function(ct_comm, senders = NULL, receivers = NULL) {
+  scope <- c(
+    if (!is.null(senders)) paste0("sender(s) ", paste(senders, collapse = ", ")),
+    if (!is.null(receivers)) paste0("receiver(s) ", paste(receivers, collapse = ", "))
+  )
+  scope_txt <- if (length(scope)) paste0(" for ", paste(scope, collapse = " and ")) else ""
+  paste0(
+    "No active L-R events to plot", scope_txt, ".\n",
+    "The requested cell type(s) exist but have no events passing the active-call ",
+    "gates (lcs_threshold, min_active_edges, min_expr_frac). Try a different ",
+    "sender/receiver, lower min_expr_frac/lcs_threshold in ",
+    "summarize_celltype_communication(), or inspect ct_comm$lr_table directly."
+  )
+}
+
 #' Plot Cell-Type-Level Communication Network
 #'
 #' @param ct_comm Output from \code{summarize_celltype_communication()}.
@@ -163,10 +206,11 @@ plot_communication_range_summary <- function(ct_comm) {
 plot_lr_bubble_advanced <- function(ct_comm, senders = NULL, receivers = NULL, top_n_per_pair = 5) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   df <- ct_comm$lr_table
-  if (!is.null(senders)) df <- df[df$sender_type %in% senders, , drop = FALSE]
-  if (!is.null(receivers)) df <- df[df$receiver_type %in% receivers, , drop = FALSE]
+  df <- .filter_celltype_axis(df, senders, receivers)
   df <- df[df$active %in% TRUE & is.finite(df$lcs), , drop = FALSE]
-  if (nrow(df) == 0) stop("No active events to plot.")
+  if (nrow(df) == 0) {
+    stop(.no_active_events_message(ct_comm, senders, receivers), call. = FALSE)
+  }
   keys <- paste(df$sender_type, df$receiver_type, sep = "|||")
   keep <- unlist(lapply(split(seq_len(nrow(df)), keys), function(ii) ii[order(df$lcs[ii], decreasing = TRUE)][seq_len(min(top_n_per_pair, length(ii)))]), use.names = FALSE)
   df <- df[keep, , drop = FALSE]
@@ -204,11 +248,10 @@ plot_lr_bubble_by_celltype <- function(ct_comm,
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   color_by <- match.arg(color_by)
   df <- ct_comm$lr_table
-  if (!is.null(sender)) df <- df[df$sender_type %in% sender, , drop = FALSE]
-  if (!is.null(receiver)) df <- df[df$receiver_type %in% receiver, , drop = FALSE]
+  df <- .filter_celltype_axis(df, sender, receiver)
   if (isTRUE(active_only)) df <- df[df$active %in% TRUE, , drop = FALSE]
   df <- df[is.finite(df$lcs), , drop = FALSE]
-  if (nrow(df) == 0) stop("No L-R rows to plot.")
+  if (nrow(df) == 0) stop(.no_active_events_message(ct_comm, sender, receiver), call. = FALSE)
   df <- df[order(df$lcs, decreasing = TRUE), , drop = FALSE]
   df <- utils::head(df, top_n)
   df$axis_label <- paste(df$sender_type, df$receiver_type, sep = " -> ")
@@ -325,11 +368,10 @@ explain_celltype_interaction <- function(ct_comm, sender, receiver, lr_pair,
 plot_lr_activity_balance <- function(ct_comm, sender = NULL, receiver = NULL, active_only = TRUE, top_n = 100, title = NULL) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   df <- ct_comm$lr_table
-  if (!is.null(sender)) df <- df[df$sender_type %in% sender, , drop = FALSE]
-  if (!is.null(receiver)) df <- df[df$receiver_type %in% receiver, , drop = FALSE]
+  df <- .filter_celltype_axis(df, sender, receiver)
   if (isTRUE(active_only)) df <- df[df$active %in% TRUE, , drop = FALSE]
   df <- df[is.finite(df$lcs), , drop = FALSE]
-  if (nrow(df) == 0) stop("No L-R rows to plot.")
+  if (nrow(df) == 0) stop(.no_active_events_message(ct_comm, sender, receiver), call. = FALSE)
   df <- utils::head(df[order(df$lcs, decreasing = TRUE), , drop = FALSE], top_n)
   if (is.null(title)) title <- "Ligand and receptor logic activity balance"
   ggplot2::ggplot(df, ggplot2::aes(x = ligand_active_frac_sender, y = receptor_active_frac_receiver)) +

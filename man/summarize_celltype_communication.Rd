@@ -15,6 +15,7 @@ summarize_celltype_communication(
   lcs_threshold = 0.01,
   min_edges = 20,
   min_active_edges = 1,
+  min_expr_frac = 0.1,
   mode = c("auto", "neighborhood", "global"),
   remove_self_edges = TRUE,
   graph_symmetrize = c("none", "or", "max"),
@@ -45,6 +46,13 @@ summarize_celltype_communication(
 \item{min_edges}{Minimum local/global opportunities required for active calls.}
 
 \item{min_active_edges}{Minimum active local/global support required.}
+
+\item{min_expr_frac}{Minimum fraction of sender cells that must express the
+ligand and of receiver cells that must express the receptor for a
+sender-receiver L-R axis to be called active. Prevents a few high-degree
+(hub) cells from making an axis active when the gene is expressed in a
+negligible fraction of the cell type. Default: \code{0.1}; set \code{0} to
+disable.}
 
 \item{mode}{Scoring mode.}
 

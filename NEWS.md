@@ -1,3 +1,41 @@
+# LogicComm 0.9.2
+
+## Cell-type expressing-fraction gate removes hub-inflated phantom axes
+
+Neighborhood LCS is an *edge* fraction, so a handful of high-degree (hub)
+receiver cells carrying residual ambient receptor signal could make an entire
+sender -> receiver L-R axis look active even when the receptor is expressed in a
+negligible fraction of that cell type. This is why, even after the 0.9.1 ambient
+guard cut `CD8A` activity in Treg to ~0.4% of cells, a `... -> Treg` `CD8A` axis
+could still surface with a high `lcs_neighborhood` (~0.5) and a Tier 2
+`discovery_score` -- the few contaminated Treg cells happened to be KNN hubs.
+
+* `summarize_celltype_communication()` gains `min_expr_frac` (default `0.1`): an
+  L-R axis is called active only if the ligand is logic-active in at least this
+  fraction of **sender** cells *and* the receptor in at least this fraction of
+  **receiver** cells. This is a graph-independent, cell-type-free gate (the same
+  expressing-fraction guard used by CellChat/CellPhoneDB), so it is immune to the
+  hub effect. Set `min_expr_frac = 0` to restore the previous behaviour.
+* Because the gate flips the `active` flag, the phantom axes now disappear from
+  every downstream consumer that filters on active rows -- `rank_communication_axes()`
+  (no `discovery_score`/`evidence_tier`), `score_communication_specificity()`,
+  the differential workflow, and the bubble/heatmap plots -- rather than merely
+  having a lower LCS. In the hub reproduction the spurious `CD8T -> Treg` and
+  `Treg -> Treg` `CD8A` axes drop out of the discovery ranking entirely while the
+  genuine CD8 T signal (receptor frac ~0.45) is preserved.
+* `permute_celltype_communication()` inherits `min_expr_frac` from the observed
+  object so the null permutations score with the same definition.
+* Added regression tests reproducing the KNN-hub artifact end to end.
+
+## Actionable errors for cell-type-filtered plots
+
+`plot_lr_bubble_advanced()`, `plot_lr_bubble_by_celltype()`, and
+`plot_lr_activity_balance()` previously failed with a blunt
+`"No active events to plot."` when a `senders`/`receivers` name was mistyped or
+carried no signal. They now distinguish the two cases: a name that matches no
+cell type lists the available types, while a valid type with no active events
+explains which gates removed them and what to adjust.
+
 # LogicComm 0.9.1
 
 ## Make the ambient guard effective for minority-expressed genes
