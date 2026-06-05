@@ -233,8 +233,8 @@ plot_celltype_participation <- function(participation,
     ggplot2::geom_col(position = if (length(cols) > 1) ggplot2::position_dodge(width = 0.7) else "stack",
                       width = 0.7) +
     ggplot2::scale_x_continuous(labels = scales::percent_format(), limits = c(0, 1), name = "Fraction of cells") +
-    ggplot2::scale_fill_manual(values = c("Sender-active" = "#d6604d", "Receiver-active" = "#4393c3",
-                                          "Communicating" = "#5aae61"), name = NULL) +
+    ggplot2::scale_fill_manual(values = c("Sender-active" = "#D1495B", "Receiver-active" = "#1F6F78",
+                                          "Communicating" = "#E8A33D"), name = NULL) +
     ggplot2::labs(title = title, y = NULL) +
     theme_logiccomm()
 }
@@ -288,10 +288,14 @@ plot_celltype_pathway_composition <- function(participation,
     title <- sprintf("%s communication composition by %s",
                      dir_label, if (level == "pathway") "pathway" else "L-R pair")
   }
+  fill_keys <- setdiff(levels(tab$grp_key), "Other")
+  fill_pal <- stats::setNames(rep(unname(.logiccomm_palettes$qualitative), length.out = length(fill_keys)), fill_keys)
+  if ("Other" %in% levels(tab$grp_key)) fill_pal["Other"] <- "grey80"
   ggplot2::ggplot(tab, ggplot2::aes(x = share, y = cell_type, fill = grp_key)) +
     ggplot2::geom_col(width = 0.8) +
     ggplot2::scale_x_continuous(labels = scales::percent_format(), name = "Share of communication strength") +
-    ggplot2::labs(title = title, y = NULL, fill = if (level == "pathway") "Pathway" else "L-R pair") +
+    ggplot2::scale_fill_manual(values = fill_pal, name = if (level == "pathway") "Pathway" else "L-R pair") +
+    ggplot2::labs(title = title, y = NULL) +
     theme_logiccomm()
 }
 
@@ -330,7 +334,7 @@ plot_celltype_communication_profile <- function(participation, cell_type, top_n 
     ggplot2::geom_col(width = 0.7) +
     ggplot2::facet_wrap(~ direction, scales = "free_y") +
     ggplot2::scale_x_continuous(labels = scales::percent_format(), name = "Share of communication strength") +
-    ggplot2::labs(title = paste("Communication profile:", cell_type), subtitle = subtitle,
-                  y = NULL, fill = "Pathway") +
+    scale_fill_logiccomm_d(name = "Pathway") +
+    ggplot2::labs(title = paste("Communication profile:", cell_type), subtitle = subtitle, y = NULL) +
     theme_logiccomm()
 }

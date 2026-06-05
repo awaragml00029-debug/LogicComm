@@ -403,10 +403,10 @@ plot_communication_dynamics <- function(dynamics,
     ggplot2::geom_line(linewidth = 0.7) +
     ggplot2::geom_point(size = 2) +
     ggplot2::scale_x_continuous(breaks = bin_map$bin_order, labels = as.character(bin_map$bin)) +
-    ggplot2::labs(title = title, x = "Pseudotime/time bin", y = metric, color = "Feature") +
+    scale_color_logiccomm_d(name = "Feature") +
+    ggplot2::labs(title = title, x = "Pseudotime/time bin", y = metric) +
     theme_logiccomm() +
-    ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"),
-                   axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
 }
 
 #' Fit Sample-Level Binomial/Quasibinomial Models for Cell-Type Communication
@@ -703,13 +703,13 @@ plot_communication_qc <- function(ct_comm, title = NULL) {
   df <- ct_comm$pair_summary
   if (is.null(title)) title <- "Communication evidence and support QC"
   ggplot2::ggplot(df, ggplot2::aes(x = n_edges, y = sum_lcs)) +
-    ggplot2::geom_point(ggplot2::aes(size = n_active_lr, color = mean_edge_support_fraction_active), alpha = 0.8) +
+    ggplot2::geom_point(ggplot2::aes(size = n_active_lr, fill = mean_edge_support_fraction_active),
+                        shape = 21, colour = "white", stroke = 0.3, alpha = 0.9) +
     ggplot2::scale_x_continuous(trans = "log10") +
     ggplot2::scale_size_continuous(name = "Active LR events") +
-    scale_color_logiccomm_c(name = "Mean support", na.value = "grey80") +
+    scale_fill_logiccomm_c(name = "Mean support", na.value = "grey80") +
     ggplot2::labs(title = title, x = "Cell-type-pair edge opportunities (log10)", y = "Summed active LCS") +
-    theme_logiccomm() +
-    ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
+    theme_logiccomm()
 }
 
 #' Plot Cell-Type Role Confidence
@@ -725,10 +725,10 @@ plot_role_confidence <- function(ct_comm, title = NULL) {
   df$cell_type <- factor(df$cell_type, levels = rev(df$cell_type))
   if (is.null(title)) title <- "Cell-type communication role reliability"
   ggplot2::ggplot(df, ggplot2::aes(x = role_confidence, y = cell_type, fill = dominant_role)) +
-    ggplot2::geom_col(width = 0.7) +
-    ggplot2::labs(title = title, x = "Role reliability score", y = "Cell type", fill = "Dominant role") +
-    theme_logiccomm() +
-    ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
+    ggplot2::geom_col(width = 0.72) +
+    ggplot2::scale_fill_manual(values = .logiccomm_palettes$roles, na.value = "grey70", name = "Dominant role") +
+    ggplot2::labs(title = title, x = "Role reliability score", y = "Cell type") +
+    theme_logiccomm(grid = "x")
 }
 
 # Print helpers ---------------------------------------------------------------

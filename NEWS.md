@@ -1,3 +1,17 @@
+# LogicComm 0.10.3
+
+## Figure polish (round 4 -- remaining figures)
+
+* `plot_celltype_roles()` fills points by the brand role palette, adds a
+  diagonal-orientation subtitle and a `subtitle` argument, and uses
+  white-stroked points (it previously used default ggplot hues).
+* `plot_role_confidence()`, `plot_celltype_pathway_composition()`,
+  `plot_celltype_communication_profile()`, and `plot_communication_dynamics()`
+  now use the brand role / qualitative palettes instead of default ggplot hues;
+  `plot_celltype_participation()` uses the brand sender/receiver/communicating
+  colours.
+* `plot_communication_qc()` uses a white-stroked, brand-filled point style.
+
 # LogicComm 0.10.2
 
 ## Figure polish (round 3)

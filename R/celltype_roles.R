@@ -146,26 +146,32 @@
 #' @param ct_comm Output from \code{summarize_celltype_communication()}.
 #' @param label Logical; label cell types. Default: \code{TRUE}.
 #' @param title Optional plot title.
+#' @param subtitle Optional plot subtitle.
 #' @return A ggplot2 object.
 #' @export
-plot_celltype_roles <- function(ct_comm, label = TRUE, title = NULL) {
+plot_celltype_roles <- function(ct_comm, label = TRUE,
+                                title = "Cell-type communication role positioning",
+                                subtitle = "Above the diagonal = receiver-leaning; below = sender-leaning") {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   df <- ct_comm$role_summary
   df$node_label <- .short_label(as.character(df$cell_type), 20L)
-  if (is.null(title)) title <- "Cell-type communication role positioning"
 
   p <- ggplot2::ggplot(df, ggplot2::aes(x = sender_role_score, y = receiver_role_score)) +
-    ggplot2::geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey65") +
-    ggplot2::geom_point(ggplot2::aes(size = hub_score, color = dominant_role), alpha = 0.85) +
-    ggplot2::labs(title = title,
-                  x = "Outgoing strength score",
-                  y = "Incoming strength score",
-                  color = "Dominant role",
-                  size = "Hub score") +
+    ggplot2::geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey65") +
+    ggplot2::geom_point(ggplot2::aes(size = hub_score, fill = dominant_role),
+                        shape = 21, colour = "white", stroke = 0.4, alpha = 0.95) +
+    ggplot2::scale_fill_manual(values = .logiccomm_palettes$roles, na.value = "grey70",
+                               name = "Dominant role") +
+    ggplot2::scale_size_continuous(range = c(2.5, 9), name = "Hub score") +
+    ggplot2::labs(title = title, subtitle = subtitle,
+                  x = "Outgoing strength score", y = "Incoming strength score") +
+    ggplot2::guides(fill = ggplot2::guide_legend(override.aes = list(size = 4))) +
     theme_logiccomm()
 
   if (isTRUE(label)) {
-    p <- p + ggrepel::geom_text_repel(ggplot2::aes(label = node_label), size = 3.4, max.overlaps = 20)
+    p <- p + ggrepel::geom_text_repel(ggplot2::aes(label = node_label), size = 3.2, max.overlaps = 20,
+                                      colour = logiccomm_brand$ink, box.padding = 0.4,
+                                      segment.colour = "grey70", segment.size = 0.3, seed = 1)
   }
   p
 }

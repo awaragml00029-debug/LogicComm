@@ -4,7 +4,12 @@
 \alias{plot_celltype_roles}
 \title{Plot Sender-Receiver Role Positioning}
 \usage{
-plot_celltype_roles(ct_comm, label = TRUE, title = NULL)
+plot_celltype_roles(
+  ct_comm,
+  label = TRUE,
+  title = "Cell-type communication role positioning",
+  subtitle = "Above the diagonal = receiver-leaning; below = sender-leaning"
+)
 }
 \arguments{
 \item{ct_comm}{Output from \code{summarize_celltype_communication()}.}
@@ -12,6 +17,8 @@ plot_celltype_roles(ct_comm, label = TRUE, title = NULL)
 \item{label}{Logical; label cell types. Default: \code{TRUE}.}
 
 \item{title}{Optional plot title.}
+
+\item{subtitle}{Optional plot subtitle.}
 }
 \value{
 A ggplot2 object.
