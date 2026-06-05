@@ -58,7 +58,12 @@ install.packages("igraph")
 ### Install LogicComm from a local source tarball
 
 ```r
-install.packages("LogicComm_0.9.1.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.10.4.tar.gz", repos = NULL, type = "source")
+
+# Or install a published release directly from GitHub:
+# install.packages(
+#   "https://github.com/awaragml00029-debug/LogicComm/releases/download/v0.10.4/LogicComm_0.10.4.tar.gz",
+#   repos = NULL, type = "source")
 ```
 
 If installing from the unpacked source directory during development:
@@ -254,6 +259,14 @@ plot_lcs_heatmap(
 
 
 ---
+
+**Publication figure system.** Every `plot_*` function shares one colorblind-safe,
+print-safe theme (`theme_logiccomm()`) and brand palette. Restyle custom layers with
+the brand scales (`scale_color/fill_logiccomm_c()`, `_diverging()`, `_d()`,
+`scale_*_tier()`) and `logiccomm_brand` colours, and export at journal column widths
+(single 89 mm / double 183 mm; vector PDF via cairo) with `save_logiccomm_figure()`.
+Compose multi-panel figures with `patchwork`. See the Seurat tutorial's
+"Publication figures" section for the full reference.
 
 ## Biology-Oriented Cell-Type Communication Visualization
 

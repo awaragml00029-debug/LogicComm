@@ -1285,33 +1285,61 @@ clean_manual <- subset(ranked_axes,
 > (2016) lists (override via `s_genes` / `g2m_genes`); genes absent from `expr`
 > are dropped, and z-scored hub flags need several cell types to be meaningful.
 
-### 9.12 Figure styling and export (publication)
+### 9.12 Publication figures: styling, controls, and export
 
-Every `plot_*` function uses the shared LogicComm theme and a colorblind-safe
-brand palette, so figures are consistent by default. To match custom layers to
-the package style, reuse `logiccomm_brand` colours and the brand scales
-(`scale_color_logiccomm_c()`, `scale_fill_tier()`, `theme_logiccomm()`, ...).
-Export at journal column widths with `save_logiccomm_figure()` (vector PDF/SVG
-recommended), and compose multi-panel figures with `patchwork`.
+Every `plot_*` function shares one colorblind-safe, print-safe LogicComm theme
+and brand palette, so the whole figure suite is consistent by default. You can
+restyle custom layers, tune the key figures, and export at journal widths.
 
-```{r figure_export, eval=FALSE}
-# title = NULL drops the in-plot title for a caption-driven journal layout.
+**Brand scales for custom ggplot layers:**
+
+- `theme_logiccomm(grid = "xy"/"x"/"y"/"none")` — the shared theme
+- `scale_color/fill_logiccomm_c()` — sequential (brand "mako" ramp)
+- `scale_color/fill_logiccomm_diverging(midpoint = 0)` — diverging (teal–amber)
+- `scale_color/fill_logiccomm_d()` — qualitative (categorical)
+- `scale_color/fill_tier()` — the ordered `evidence_tier` scale
+- `logiccomm_brand$primary/secondary/accent/highlight/ink` — brand hex colours
+
+**Key per-figure publication controls** (added in the 0.10.x figure overhaul):
+
+| Figure | Useful arguments |
+|---|---|
+| `plot_communication_discovery()` | `title = NULL`, `subtitle`, `top_n_label` |
+| `plot_differential_celltype_volcano()` | `fdr_cutoff`, `lfc_threshold`, `x_lab` |
+| `plot_celltype_glm_volcano()` | `fdr_cutoff`, `effect_threshold` |
+| `plot_celltype_network()` / `plot_celltype_network_publication()` | `layout = "auto"/"fr"/"circle"` |
+| `plot_lr_bubble_advanced()` | `top_n_pathways` (caps the pathway facets) |
+| `plot_pathway_heatmap()` | `cluster_rows`, `cluster_cols` (default `TRUE`) |
+| `plot_celltype_roles()`, `plot_communication_discovery()` | `subtitle` |
+
+```{r figure_publication, eval=FALSE}
+# Tune key figures
+vol <- plot_differential_celltype_volcano(ct_comparison, fdr_cutoff = 0.05, lfc_threshold = 1)
+net <- plot_celltype_network_publication(ct_comm, layout = "fr")
+bub <- plot_lr_bubble_advanced(ct_comm, top_n_pathways = 9)
+
+# Drop the in-plot title for a caption-driven journal layout
 disc <- plot_communication_discovery(ranked_axes, title = NULL)
-save_logiccomm_figure(disc, "discovery.pdf", width = "single")                 # 89 mm vector
-save_logiccomm_figure(disc, "discovery.png", width = "double", height_mm = 120, dpi = 600)
 
-# Multi-panel figure (a/b/c) with patchwork:
+# Export at journal column widths. Vector PDF/SVG is recommended; PDF uses
+# cairo_pdf so the arrow/ellipsis glyphs in axis labels embed cleanly.
+save_logiccomm_figure(disc, "discovery.pdf", width = "single")                 # 89 mm
+save_logiccomm_figure(net,  "network.png",  width = "double", height_mm = 120, dpi = 600)
+
+# Multi-panel figure (a/b/c) with patchwork
 library(patchwork)
-fig <- plot_communication_discovery(ranked_axes) +
-       plot_celltype_network_publication(ct_comm) +
+fig <- plot_communication_discovery(ranked_axes) + net +
        patchwork::plot_annotation(tag_levels = "a")
 save_logiccomm_figure(fig, "figure2.pdf", width = "double", height_mm = 120)
 ```
 
-**中文说明。** 所有 `plot_*` 默认套用统一的 LogicComm 主题与色盲安全品牌配色；自定义
-图层可复用 `logiccomm_brand` 与品牌色阶保持风格一致。用 `save_logiccomm_figure()` 按
-期刊栏宽（单栏 89 mm / 双栏 183 mm）导出矢量图，用 `patchwork` 拼多面板（a/b/c）。
-`title = NULL` 可去掉图内标题，改用图注。
+**中文说明。** 所有 `plot_*` 默认套用统一的色盲安全品牌主题与配色，整套图风格一致。
+自定义图层可复用上面的品牌色阶与 `logiccomm_brand` 颜色；关键图各自暴露了发表常用参数
+（volcano 的 `fdr_cutoff` / `lfc_threshold`、network 的 `layout`、bubble 的
+`top_n_pathways`、discovery/roles 的 `subtitle`、heatmap 的聚类等）。用
+`save_logiccomm_figure()` 按期刊栏宽（单栏 89 mm / 双栏 183 mm）导出矢量图（PDF 默认走
+cairo，箭头/省略号等字形可正确嵌入），用 `patchwork` 拼多面板（a/b/c）；`title = NULL`
+去掉图内标题改用图注。
 
 ## Step 10: Optional Cell-Type-Level Case vs Control Comparison
 

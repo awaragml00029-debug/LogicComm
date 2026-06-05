@@ -1,3 +1,14 @@
+# LogicComm 0.10.4
+
+## Documentation
+
+* Expanded the Seurat tutorial's publication-figures section (9.12) with the
+  brand scale reference and the per-figure publication controls added across
+  0.10.x (volcano `fdr_cutoff` / `lfc_threshold`, network `layout`, bubble
+  `top_n_pathways`, discovery/roles `subtitle`, heatmap clustering).
+* README documents the figure system and `save_logiccomm_figure()`; refreshed
+  stale install-version strings in the README and intro vignette.
+
 # LogicComm 0.10.3
 
 ## Figure polish (round 4 -- remaining figures)
