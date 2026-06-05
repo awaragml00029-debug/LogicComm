@@ -27,7 +27,7 @@ Imports: Matrix (>= 1.5.0), methods, stats, utils, grDevices, grid, parallel,
     dplyr (>= 1.0.0), ggplot2 (>= 3.4.0), ggrepel (>= 0.9.0),
     scales, Rcpp (>= 1.0.0)
 Suggests: knitr, rmarkdown, testthat (>= 3.0.0), pheatmap, Seurat,
-    SeuratObject, BPCells, igraph
+    SeuratObject, BPCells, igraph, patchwork
 LinkingTo: Rcpp
 VignetteBuilder: knitr
 Config/testthat/edition: 3

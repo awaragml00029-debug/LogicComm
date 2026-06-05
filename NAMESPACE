@@ -40,6 +40,19 @@ export(summarize_lr_modulators)
 export(summarize_celltype_communication)
 export(celltype_comm_to_lcs)
 
+# Visual system
+export(theme_logiccomm)
+export(logiccomm_brand)
+export(scale_color_logiccomm_d)
+export(scale_fill_logiccomm_d)
+export(scale_color_logiccomm_c)
+export(scale_fill_logiccomm_c)
+export(scale_color_logiccomm_diverging)
+export(scale_fill_logiccomm_diverging)
+export(scale_color_tier)
+export(scale_fill_tier)
+export(save_logiccomm_figure)
+
 # Plot functions
 export(plot_lcs_bubble)
 export(plot_lcs_heatmap)
