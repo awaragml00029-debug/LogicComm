@@ -47,7 +47,8 @@
 #'
 #' @param ct_comm Output from \code{summarize_celltype_communication()}.
 #' @param metric Metric for edge weights.
-#' @param layout Network layout. Currently \code{"circle"} and \code{"nicely"} use a circular layout.
+#' @param layout Node layout: "auto" (force-directed via igraph when available,
+#'   otherwise a circle), "fr", or "circle".
 #' @param min_weight Filter edges below this threshold.
 #' @param arrow_size Size of edge arrows.
 #' @param show_labels Show cell-type names.
@@ -56,13 +57,14 @@
 #' @export
 plot_celltype_network <- function(ct_comm,
                                   metric = c("sum_lcs", "n_active_lr"),
-                                  layout = "circle",
+                                  layout = c("auto", "fr", "circle"),
                                   min_weight = 0.05,
                                   arrow_size = 0.2,
                                   show_labels = TRUE,
                                   color_edges_by = c("top_pathway", "range")) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   metric <- match.arg(metric)
+  layout <- match.arg(layout)
   color_edges_by <- match.arg(color_edges_by)
   pair_sum <- ct_comm$pair_summary
   if (!metric %in% names(pair_sum)) stop("metric not found in pair_summary: ", metric)
@@ -70,10 +72,9 @@ plot_celltype_network <- function(ct_comm,
   if (nrow(pair_sum) == 0) stop("No edges above min_weight.")
 
   nodes <- ct_comm$role_summary
-  n <- nrow(nodes)
-  theta <- seq(0, 2 * pi, length.out = n + 1L)[seq_len(n)]
-  nodes$x <- cos(theta)
-  nodes$y <- sin(theta)
+  coords <- .celltype_graph_layout(nodes$cell_type, pair_sum, layout = layout)
+  nodes$x <- coords$x[match(nodes$cell_type, coords$cell_type)]
+  nodes$y <- coords$y[match(nodes$cell_type, coords$cell_type)]
   nodes$node_label <- .short_label(as.character(nodes$cell_type), 18L)
   edges <- merge(pair_sum, nodes[, c("cell_type", "x", "y", "hub_score", "sender_receiver_balance")],
                  by.x = "sender_type", by.y = "cell_type", all.x = TRUE)
@@ -122,7 +123,7 @@ plot_celltype_network <- function(ct_comm,
                         lineend = "round") +
     ggplot2::geom_point(data = nodes,
                         ggplot2::aes(x = x, y = y, fill = sender_receiver_balance, size = hub_score),
-                        shape = 21, color = "black", stroke = 0.5) +
+                        shape = 21, color = "white", stroke = 0.6) +
     ggplot2::scale_linewidth_continuous(range = c(0.3, 2.5), name = metric) +
     scale_fill_logiccomm_diverging(midpoint = 0, name = "S-R Balance") +
     ggplot2::scale_size_continuous(range = c(3, 12), name = "Hub score") +
@@ -132,12 +133,16 @@ plot_celltype_network <- function(ct_comm,
     ggplot2::labs(title = "Cell-type communication network", color = if (color_edges_by == "range") "Range" else "Top pathway",
                   caption = "Faded dashed edges are global-only distal candidates without local active edge support.") +
     ggplot2::theme_void(base_size = 12) +
-    ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"), legend.position = "right")
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(face = "bold", size = ggplot2::rel(1.25), colour = logiccomm_brand$ink),
+      plot.caption = ggplot2::element_text(colour = "grey45", size = ggplot2::rel(0.78), hjust = 0),
+      legend.title = ggplot2::element_text(face = "bold", size = ggplot2::rel(0.9)),
+      legend.position = "right")
 
   if (color_edges_by == "range") {
     p <- p + ggplot2::scale_color_manual(values = .logiccomm_palettes$range, na.value = "grey70")
   } else {
-    p <- p + ggplot2::scale_color_discrete(na.translate = FALSE)
+    p <- p + scale_color_logiccomm_d(na.value = "grey75")
   }
   if (show_labels) {
     p <- p + ggrepel::geom_text_repel(data = nodes, ggplot2::aes(x = x, y = y, label = node_label),
@@ -284,8 +289,8 @@ plot_pathway_heatmap <- function(ct_comm,
                                  receiver = NULL,
                                  top_n_pathways = 30,
                                  title = NULL,
-                                 cluster_rows = FALSE,
-                                 cluster_cols = FALSE) {
+                                 cluster_rows = TRUE,
+                                 cluster_cols = TRUE) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   metric <- match.arg(metric)
   df <- ct_comm$pathway_summary
@@ -308,10 +313,12 @@ plot_pathway_heatmap <- function(ct_comm,
     )
     mat <- stats::xtabs(x ~ pathway + celltype_pair, data = cluster_df)
     if (isTRUE(cluster_rows) && nrow(mat) > 1) {
-      df$pathway <- factor(df$pathway, levels = rownames(mat)[stats::hclust(stats::dist(mat))$order])
+      ord <- tryCatch(stats::hclust(stats::dist(mat))$order, error = function(e) seq_len(nrow(mat)))
+      df$pathway <- factor(df$pathway, levels = rownames(mat)[ord])
     }
     if (isTRUE(cluster_cols) && ncol(mat) > 1) {
-      df$celltype_pair <- factor(df$celltype_pair, levels = colnames(mat)[stats::hclust(stats::dist(t(mat)))$order])
+      ord <- tryCatch(stats::hclust(stats::dist(t(mat)))$order, error = function(e) seq_len(ncol(mat)))
+      df$celltype_pair <- factor(df$celltype_pair, levels = colnames(mat)[ord])
     }
   }
   if (is.null(title)) title <- paste("Pathway communication:", metric)

@@ -229,13 +229,16 @@ plot_celltype_role_radar <- function(ct_comm, cell_types = NULL, scaled = TRUE, 
     stringsAsFactors = FALSE
   )
   if (is.null(title)) title <- "Cell-type role radar profile"
+  plot_df$role <- factor(plot_df$role, levels = c("Sender", "Receiver", "Mediator", "Influencer"))
   ggplot2::ggplot(plot_df, ggplot2::aes(x = role, y = value, fill = role)) +
-    ggplot2::geom_col(width = 0.8, alpha = 0.8) +
+    ggplot2::geom_col(width = 1, alpha = 0.9, colour = "white", linewidth = 0.25) +
     ggplot2::coord_polar() +
     ggplot2::facet_wrap(~cell_type) +
+    ggplot2::scale_fill_manual(values = .logiccomm_palettes$roles, name = "Role") +
     ggplot2::labs(title = title, x = NULL, y = if (scaled) "Rescaled score" else "Score") +
     theme_logiccomm() +
-    ggplot2::theme(legend.position = "bottom")
+    ggplot2::theme(legend.position = "bottom",
+                   axis.text.x = ggplot2::element_text(size = ggplot2::rel(0.7)))
 }
 
 .zscore_safe <- function(x) {

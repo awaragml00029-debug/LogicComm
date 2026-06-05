@@ -7,7 +7,7 @@
 plot_celltype_network(
   ct_comm,
   metric = c("sum_lcs", "n_active_lr"),
-  layout = "circle",
+  layout = c("auto", "fr", "circle"),
   min_weight = 0.05,
   arrow_size = 0.2,
   show_labels = TRUE,
@@ -19,7 +19,8 @@ plot_celltype_network(
 
 \item{metric}{Metric for edge weights.}
 
-\item{layout}{Network layout. Currently \code{"circle"} and \code{"nicely"} use a circular layout.}
+\item{layout}{Node layout: "auto" (force-directed via igraph when available,
+otherwise a circle), "fr", or "circle".}
 
 \item{min_weight}{Filter edges below this threshold.}
 

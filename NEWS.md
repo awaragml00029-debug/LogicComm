@@ -1,3 +1,19 @@
+# LogicComm 0.10.1
+
+## Figure polish (round 2)
+
+* `plot_celltype_network()` now uses the same force-directed igraph layout as
+  `plot_celltype_network_publication()` (with a circle fallback) and gains a
+  `layout` argument; edge pathways use the brand qualitative palette (the basic
+  network previously fell back to default ggplot hues).
+* `plot_celltype_role_radar()` uses the brand role palette
+  (Sender / Receiver / Mediator / Influencer) instead of default hues.
+* `plot_pathway_heatmap()` clusters rows and columns by default (with a safe
+  fallback to the original order) so related pathways and cell-type pairs form
+  readable blocks.
+* `plot_lcs_heatmap()` uses brand colours for the heatmap ramp and the
+  Case/Ctrl annotation.
+
 # LogicComm 0.10.0
 
 ## Publication-grade figure system

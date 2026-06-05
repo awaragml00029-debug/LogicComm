@@ -151,13 +151,13 @@ plot_lcs_heatmap <- function(result,
   col_ann <- data.frame(Group = group_info[colnames(mat)], row.names = colnames(mat))
 
   ann_colors <- list(Group = c(
-    setNames("firebrick", case_l),
-    setNames("steelblue", ctrl_l)
+    setNames("#D1495B", case_l),
+    setNames("#2E86AB", ctrl_l)
   ))
 
   if (is.null(color_palette)) {
     color_palette <- grDevices::colorRampPalette(
-      c("steelblue","white","firebrick"))(100)
+      c(logiccomm_brand$primary, "#F4F4F2", logiccomm_brand$accent))(100)
   }
 
   pheatmap::pheatmap(mat,

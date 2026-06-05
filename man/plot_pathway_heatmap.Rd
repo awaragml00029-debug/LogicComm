@@ -11,8 +11,8 @@ plot_pathway_heatmap(
   receiver = NULL,
   top_n_pathways = 30,
   title = NULL,
-  cluster_rows = FALSE,
-  cluster_cols = FALSE
+  cluster_rows = TRUE,
+  cluster_cols = TRUE
 )
 }
 \arguments{
