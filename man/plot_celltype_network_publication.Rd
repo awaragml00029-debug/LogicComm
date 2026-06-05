@@ -10,6 +10,7 @@ plot_celltype_network_publication(
   top_n_edges = 20,
   min_value = 0,
   edge_label = c("top_pathway", "none", "n_active_lr"),
+  layout = c("auto", "fr", "circle"),
   show_self = FALSE,
   title = NULL
 )
@@ -24,6 +25,9 @@ plot_celltype_network_publication(
 \item{min_value}{Minimum edge value.}
 
 \item{edge_label}{"none", "top_pathway", or "n_active_lr".}
+
+\item{layout}{Node layout: "auto" (force-directed via igraph when available,
+otherwise a circle), "fr", or "circle".}
 
 \item{show_self}{Whether to show self-loops.}
 

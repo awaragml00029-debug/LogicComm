@@ -2,18 +2,27 @@
 % Please edit documentation in R/utils_viz.R
 \name{theme_logiccomm}
 \alias{theme_logiccomm}
-\title{Premium LogicComm Visual Theme}
+\title{LogicComm Publication Theme}
 \usage{
-theme_logiccomm(base_size = 11, base_family = "")
+theme_logiccomm(
+  base_size = 12,
+  base_family = "",
+  grid = c("xy", "x", "y", "none"),
+  legend = "right"
+)
 }
 \arguments{
-\item{base_size}{Base font size.}
+\item{base_size}{Base font size in points (default 12).}
 
-\item{base_family}{Base font family.}
+\item{base_family}{Base font family ("" uses the device default).}
+
+\item{grid}{Which major gridlines to keep: "xy", "x", "y", or "none".}
+
+\item{legend}{Legend position passed to \code{ggplot2::theme()}.}
 }
 \value{
 A ggplot2 theme object.
 }
 \description{
-Premium LogicComm Visual Theme
+A clean, export-ready ggplot2 theme used by every LogicComm figure.
 }

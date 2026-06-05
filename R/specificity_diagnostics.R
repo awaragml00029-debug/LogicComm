@@ -442,7 +442,9 @@ communication_discovery_view <- function(ranked,
 #' @param title Optional plot title.
 #' @return A ggplot2 object.
 #' @export
-plot_communication_discovery <- function(ranked, top_n_label = 15, title = NULL) {
+plot_communication_discovery <- function(ranked, top_n_label = 15,
+                                          title = "Communication discovery landscape",
+                                          subtitle = "Upper-right = strong and cell-type-pair specific") {
   stopifnot(is.data.frame(ranked))
   needed <- c("strength_score", "specificity_score", "discovery_score",
               "sender_type", "receiver_type", "lr_pair")
@@ -450,24 +452,34 @@ plot_communication_discovery <- function(ranked, top_n_label = 15, title = NULL)
     stop("ranked must be the output of rank_communication_axes().")
   }
   if (!nrow(ranked)) stop("No active communication axes to plot.")
-  df <- ranked
+  df <- ranked[order(-ranked$discovery_score), , drop = FALSE]
   df$axis <- .compact_feature_label(paste(df$sender_type, df$receiver_type, df$lr_pair, sep = "|"))
-  df$tier <- if ("evidence_tier" %in% names(df)) df$evidence_tier else "Unranked"
+  df$tier <- .tier_factor(if ("evidence_tier" %in% names(df)) df$evidence_tier else "Unranked")
   use_support <- "null_support" %in% names(df) && any(is.finite(df$null_support))
   size_raw <- if (use_support) df$null_support else df$discovery_score
   df$disc_size <- ifelse(is.finite(size_raw), size_raw, 0)
   df$to_label <- FALSE
   df$to_label[seq_len(min(top_n_label, nrow(df)))] <- TRUE
-  if (is.null(title)) title <- "Communication discovery landscape"
+
   ggplot2::ggplot(df, ggplot2::aes(x = strength_score, y = specificity_score)) +
-    ggplot2::geom_point(ggplot2::aes(size = disc_size, color = tier), alpha = 0.8) +
+    ggplot2::annotate("rect", xmin = 0.5, xmax = Inf, ymin = 0.5, ymax = Inf,
+                      fill = logiccomm_brand$primary, alpha = 0.05) +
+    ggplot2::geom_point(ggplot2::aes(size = disc_size, fill = tier),
+                        shape = 21, colour = "white", stroke = 0.3, alpha = 0.95) +
     ggrepel::geom_text_repel(data = df[df$to_label, , drop = FALSE],
-                             ggplot2::aes(label = axis), size = 3, max.overlaps = 12,
-                             min.segment.length = 0) +
-    ggplot2::scale_size_continuous(range = c(2, 7),
+                             ggplot2::aes(label = axis), size = 2.9, colour = logiccomm_brand$ink,
+                             max.overlaps = 20, box.padding = 0.4, point.padding = 0.2,
+                             min.segment.length = 0, segment.colour = "grey70",
+                             segment.size = 0.3, seed = 1) +
+    scale_fill_tier() +
+    ggplot2::scale_size_continuous(range = c(2.5, 8),
                                    name = if (use_support) "Null support" else "Discovery score") +
-    ggplot2::labs(title = title, x = "Communication strength (scaled)",
-                  y = "Pair specificity (scaled)", color = "Evidence tier") +
+    ggplot2::scale_x_continuous(limits = c(0, 1), expand = ggplot2::expansion(mult = c(0.02, 0.08))) +
+    ggplot2::scale_y_continuous(limits = c(0, 1), expand = ggplot2::expansion(mult = c(0.02, 0.05))) +
+    ggplot2::labs(title = title, subtitle = subtitle,
+                  x = "Communication strength (scaled)",
+                  y = "Cell-type-pair specificity (scaled)") +
+    ggplot2::guides(fill = ggplot2::guide_legend(override.aes = list(size = 4))) +
     theme_logiccomm()
 }
 

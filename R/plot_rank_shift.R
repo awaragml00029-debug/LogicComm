@@ -58,18 +58,18 @@ plot_rank_shift <- function(rs_result,
     # Simplify: use sig_cat for color (role shown by shape/size if needed)
     df$color_var <- df$sig_cat
     simple_colors <- c(
-      setNames("#E53935", paste0("Up in ", case_l)),
-      setNames("#1E88E5", paste0("Up in ", ctrl_l)),
-      "ns" = "grey80"
+      setNames("#D1495B", paste0("Up in ", case_l)),
+      setNames("#2E86AB", paste0("Up in ", ctrl_l)),
+      "ns" = "grey78"
     )
     df$point_size_var <- ifelse(df$sig_cat == "ns", point_size * 0.7, point_size * 1.2)
     df$alpha_var <- ifelse(df$sig_cat == "ns", 0.4, 0.85)
   } else {
     df$color_var <- df$sig_cat
     simple_colors <- c(
-      setNames("#E53935", paste0("Up in ", case_l)),
-      setNames("#1E88E5", paste0("Up in ", ctrl_l)),
-      "ns" = "grey80"
+      setNames("#D1495B", paste0("Up in ", case_l)),
+      setNames("#2E86AB", paste0("Up in ", ctrl_l)),
+      "ns" = "grey78"
     )
     df$point_size_var <- point_size
     df$alpha_var <- 0.7
@@ -125,7 +125,7 @@ plot_rank_shift <- function(rs_result,
       y        = "-log10(FDR)",
       caption  = sprintf("FDR cutoff = %.2f | |shift| threshold = %.2f",
                          fdr_cutoff, min_shift_label)) +
-    ggplot2::theme_bw(base_size = 12) +
+    theme_logiccomm() +
     ggplot2::theme(
       plot.title    = ggplot2::element_text(face = "bold"),
       plot.subtitle = ggplot2::element_text(color = "grey50", size = 10),
@@ -199,13 +199,13 @@ plot_shift_lcs_combined <- function(rs_result,
                           linewidth = 0.6, color = "grey60") +
     ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey40") +
     ggplot2::scale_color_manual(
-      values = c("Ligand shift" = "#E53935", "Receptor shift" = "#1E88E5"),
+      values = c("Ligand shift" = "#D1495B", "Receptor shift" = "#2E86AB"),
       name = "") +
     ggplot2::labs(
       title = sprintf("Rank Shift + LCS: Top %d Pairs in %s", top_n, case_l),
       x     = "Rank Shift Score (-> more dominant in Case)",
       y     = NULL) +
-    ggplot2::theme_bw(base_size = 11) +
+    theme_logiccomm(base_size = 11) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold"),
       legend.position = "top",

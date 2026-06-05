@@ -176,18 +176,28 @@ scale_fill_tier <- function(..., name = "Evidence tier") {
 #' widths in millimetres (single-column 89 mm, double-column 183 mm), high DPI,
 #' and a white background. Use a \code{.pdf} or \code{.svg} file for vector output.
 #'
+#' For \code{.pdf} output the \code{cairo_pdf} device is used by default (when
+#' available) so the Unicode glyphs in axis labels -- the arrow in
+#' "Sender \\u2192 receiver" and the ellipsis in truncated names -- embed cleanly.
+#' The base \code{pdf()} device drops those glyphs with a "conversion failure"
+#' warning, so prefer this helper (or pass \code{device = grDevices::cairo_pdf})
+#' for vector export.
+#'
 #' @param plot A ggplot (or patchwork) object.
 #' @param file Output path; the extension selects the device (pdf/svg/png/tiff).
 #' @param width One of "single" (89 mm), "double" (183 mm), or "custom".
 #' @param width_mm Custom width in mm (required when \code{width = "custom"}).
 #' @param height_mm Figure height in mm.
 #' @param dpi Resolution for raster devices.
+#' @param device Optional device override passed to \code{ggsave()}; defaults to
+#'   \code{cairo_pdf} for \code{.pdf} when cairo is available.
 #' @param ... Passed to \code{ggplot2::ggsave()}.
 #' @return The output path, invisibly.
 #' @export
 save_logiccomm_figure <- function(plot, file,
                                    width = c("single", "double", "custom"),
-                                   width_mm = NULL, height_mm = 110, dpi = 600, ...) {
+                                   width_mm = NULL, height_mm = 110, dpi = 600,
+                                   device = NULL, ...) {
   if (is.character(width)) {
     width <- match.arg(width)
     width_mm <- switch(width, single = 89, double = 183, custom = width_mm)
@@ -195,7 +205,13 @@ save_logiccomm_figure <- function(plot, file,
   if (is.null(width_mm) || !is.finite(width_mm)) {
     stop("Provide a finite 'width_mm' when width = 'custom'.")
   }
+  # Unicode-safe vector PDF: the base pdf() device cannot render the arrow/ellipsis
+  # glyphs LogicComm uses in labels, so default to cairo_pdf when exporting a PDF.
+  if (is.null(device) && identical(tolower(tools::file_ext(file)), "pdf") &&
+      isTRUE(capabilities("cairo"))) {
+    device <- grDevices::cairo_pdf
+  }
   ggplot2::ggsave(filename = file, plot = plot, width = width_mm, height = height_mm,
-                  units = "mm", dpi = dpi, bg = logiccomm_brand$paper, ...)
+                  units = "mm", dpi = dpi, bg = logiccomm_brand$paper, device = device, ...)
   invisible(file)
 }

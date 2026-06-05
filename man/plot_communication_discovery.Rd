@@ -4,7 +4,12 @@
 \alias{plot_communication_discovery}
 \title{Plot the Communication Discovery Landscape}
 \usage{
-plot_communication_discovery(ranked, top_n_label = 15, title = NULL)
+plot_communication_discovery(
+  ranked,
+  top_n_label = 15,
+  title = "Communication discovery landscape",
+  subtitle = "Upper-right = strong and cell-type-pair specific"
+)
 }
 \arguments{
 \item{ranked}{Output of \code{\link{rank_communication_axes}}.}

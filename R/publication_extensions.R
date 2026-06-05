@@ -268,7 +268,7 @@ plot_spatial_logic <- function(reo_mat,
     ggplot2::geom_point(size = pt_size, alpha = 0.85) +
     ggplot2::coord_equal() +
     ggplot2::labs(title = title, x = "spatial x", y = "spatial y", color = "Logic state") +
-    ggplot2::theme_classic(base_size = 12) +
+    theme_logiccomm() +
     ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
 }
 
@@ -404,7 +404,7 @@ plot_communication_dynamics <- function(dynamics,
     ggplot2::geom_point(size = 2) +
     ggplot2::scale_x_continuous(breaks = bin_map$bin_order, labels = as.character(bin_map$bin)) +
     ggplot2::labs(title = title, x = "Pseudotime/time bin", y = metric, color = "Feature") +
-    ggplot2::theme_bw(base_size = 12) +
+    theme_logiccomm() +
     ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"),
                    axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
 }
@@ -553,7 +553,7 @@ plot_celltype_glm_volcano <- function(glm_result,
                              ggplot2::aes(label = label), size = 3, max.overlaps = 12,
                              min.segment.length = 0) +
     ggplot2::labs(title = title, x = "GLM coefficient (log odds)", y = "-log10(FDR)", color = "Sender") +
-    ggplot2::theme_bw(base_size = 12) +
+    theme_logiccomm() +
     ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
 }
 
@@ -687,9 +687,9 @@ plot_communication_qc <- function(ct_comm, title = NULL) {
     ggplot2::geom_point(ggplot2::aes(size = n_active_lr, color = mean_edge_support_fraction_active), alpha = 0.8) +
     ggplot2::scale_x_continuous(trans = "log10") +
     ggplot2::scale_size_continuous(name = "Active LR events") +
-    ggplot2::scale_color_gradient(low = "grey80", high = "firebrick", na.value = "grey80", name = "Mean support") +
+    scale_color_logiccomm_c(name = "Mean support", na.value = "grey80") +
     ggplot2::labs(title = title, x = "Cell-type-pair edge opportunities (log10)", y = "Summed active LCS") +
-    ggplot2::theme_bw(base_size = 12) +
+    theme_logiccomm() +
     ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
 }
 
@@ -708,7 +708,7 @@ plot_role_confidence <- function(ct_comm, title = NULL) {
   ggplot2::ggplot(df, ggplot2::aes(x = role_confidence, y = cell_type, fill = dominant_role)) +
     ggplot2::geom_col(width = 0.7) +
     ggplot2::labs(title = title, x = "Role reliability score", y = "Cell type", fill = "Dominant role") +
-    ggplot2::theme_bw(base_size = 12) +
+    theme_logiccomm() +
     ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
 }
 

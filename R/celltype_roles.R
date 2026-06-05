@@ -199,8 +199,8 @@ plot_celltype_role_heatmap <- function(ct_comm,
   if (is.null(title)) title <- if (scaled) "Cell-type role scores (z-scored)" else "Cell-type role scores"
   ggplot2::ggplot(plot_df, ggplot2::aes(x = role, y = cell_type, fill = value)) +
     ggplot2::geom_tile(color = "white", linewidth = 0.2) +
-    ggplot2::scale_fill_gradient2(low = "steelblue", mid = "white", high = "firebrick", midpoint = 0,
-                                  name = if (scaled) "z-score" else "score") +
+    scale_fill_logiccomm_diverging(midpoint = 0,
+                                   name = if (scaled) "z-score" else "score") +
     ggplot2::labs(title = title, x = "Role score", y = "Cell type") +
     theme_logiccomm() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))

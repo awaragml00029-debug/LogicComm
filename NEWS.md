@@ -1,3 +1,33 @@
+# LogicComm 0.10.0
+
+## Publication-grade figure system
+
+All plotting functions now share one visual language designed for journal
+figures: colorblind-safe, perceptually ordered, and consistent across panels.
+
+* New exported visual system: `theme_logiccomm()` (export-ready typography, with
+  `grid`/`legend` controls), the LogicComm brand palette (`logiccomm_brand`), and
+  brand colour/fill scales -- `scale_color/fill_logiccomm_d` (qualitative),
+  `_logiccomm_c` (sequential mako), `_logiccomm_diverging` (teal-amber), and an
+  ordered `scale_color/fill_tier` for `evidence_tier`. Every fixed-meaning palette
+  avoids red/green confusion and differs in luminance for greyscale printing.
+  (`theme_logiccomm()` was previously defined but never actually exported.)
+* `save_logiccomm_figure()` exports at journal column widths (single 89 mm,
+  double 183 mm) to vector (PDF/SVG) or high-DPI raster.
+* Every `plot_*` function was converted to the shared theme and brand scales,
+  replacing ad-hoc per-figure gradients, ColorBrewer Set1 (red/green), and the
+  `turbo` palette.
+* `plot_communication_discovery()` now colours by an *ordered* tier scale
+  (strong = dark, broad/non-specific = amber, weak = grey), adds a strong+specific
+  quadrant cue, and gains a `subtitle` argument.
+* `plot_differential_celltype_volcano()` colours points by significance
+  (up / down / n.s.), draws the FDR and effect-size guide lines, and gains
+  `fdr_cutoff`, `lfc_threshold`, and `x_lab` arguments.
+* `plot_celltype_network_publication()` uses a real force-directed layout
+  (igraph, with a circle fallback) instead of a fixed circle, and gains a
+  `layout` argument; edge pathways use the brand qualitative palette.
+* New Suggests: `igraph` (graph layouts) and `patchwork` (multi-panel figures).
+
 # LogicComm 0.9.4
 
 ## One-call confound-filtered discovery view

@@ -124,7 +124,7 @@ plot_celltype_network <- function(ct_comm,
                         ggplot2::aes(x = x, y = y, fill = sender_receiver_balance, size = hub_score),
                         shape = 21, color = "black", stroke = 0.5) +
     ggplot2::scale_linewidth_continuous(range = c(0.3, 2.5), name = metric) +
-    ggplot2::scale_fill_gradient2(low = "#2166ac", mid = "#f7f7f7", high = "#b2182b", midpoint = 0, name = "S-R Balance") +
+    scale_fill_logiccomm_diverging(midpoint = 0, name = "S-R Balance") +
     ggplot2::scale_size_continuous(range = c(3, 12), name = "Hub score") +
     ggplot2::scale_linetype_manual(values = c("local/mixed" = "solid", "distal/endocrine" = "dashed"), name = "Range style") +
     ggplot2::scale_alpha_identity() +
@@ -167,7 +167,7 @@ plot_celltype_heatmap <- function(ct_comm,
   if (is.null(title)) title <- paste("Cell-type communication:", metric)
   ggplot2::ggplot(df, ggplot2::aes(x = sender_type, y = receiver_type, fill = .data[[metric]])) +
     ggplot2::geom_tile(color = "white", linewidth = 0.25) +
-    ggplot2::scale_fill_gradient(low = "grey95", high = "#7B3294", na.value = "grey90", name = metric) +
+    scale_fill_logiccomm_c(name = metric, na.value = "grey90") +
     ggplot2::labs(title = title, x = "Sender type", y = "Receiver type") +
     theme_logiccomm() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = rotate_x, hjust = 1))
@@ -263,7 +263,7 @@ plot_lr_bubble_by_celltype <- function(ct_comm,
     ggplot2::labs(title = title, x = "Cell-type pair", y = "L-R pair", color = color_by) +
     theme_logiccomm() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
-  if (is.numeric(df[[color_by]])) p + ggplot2::scale_color_gradient(low = "#4393C3", high = "#D6604D") else p
+  if (is.numeric(df[[color_by]])) p + scale_color_logiccomm_c(name = color_by) else p
 }
 
 #' Plot Pathway Heatmap
@@ -317,7 +317,7 @@ plot_pathway_heatmap <- function(ct_comm,
   if (is.null(title)) title <- paste("Pathway communication:", metric)
   ggplot2::ggplot(df, ggplot2::aes(x = celltype_pair, y = pathway, fill = .data[[metric]])) +
     ggplot2::geom_tile(color = "white", linewidth = 0.2) +
-    ggplot2::scale_fill_gradient(low = "grey95", high = "#B2182B", na.value = "grey90", name = metric) +
+    scale_fill_logiccomm_c(name = metric, na.value = "grey90") +
     ggplot2::labs(title = title, x = "Cell-type pair", y = "Pathway") +
     theme_logiccomm() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
@@ -444,7 +444,7 @@ plot_differential_celltype_heatmap <- function(result, metric = "asymmetry", top
   if (is.null(title)) title <- paste("Differential cell-type communication:", metric)
   ggplot2::ggplot(df, ggplot2::aes(x = sender_receiver, y = lr_label, fill = .data[[metric]])) +
     ggplot2::geom_tile(color = "white", linewidth = 0.2) +
-    ggplot2::scale_fill_gradient2(low = "#2166ac", mid = "white", high = "#b2182b", midpoint = 0, name = metric) +
+    scale_fill_logiccomm_diverging(midpoint = 0, name = metric) +
     ggplot2::labs(title = title, x = "Sender \u2192 receiver", y = "L-R pair") +
     theme_logiccomm() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
@@ -459,23 +459,51 @@ plot_differential_celltype_heatmap <- function(result, metric = "asymmetry", top
 #' @param title Optional title.
 #' @return A ggplot2 object.
 #' @export
-plot_differential_celltype_volcano <- function(result, x = "log2fc_lcs", fdr_col = "fdr_fisher", top_n_label = 15, title = NULL) {
+plot_differential_celltype_volcano <- function(result, x = "log2fc_lcs", fdr_col = "fdr_fisher",
+                                                fdr_cutoff = 0.05, lfc_threshold = 0,
+                                                top_n_label = 15,
+                                                title = "Differential cell-type communication",
+                                                x_lab = NULL) {
   df <- as.data.frame(result)
   if (!x %in% names(df)) x <- if ("asymmetry" %in% names(df)) "asymmetry" else stop("x metric not found: ", x)
   if (!fdr_col %in% names(df)) fdr_col <- if ("fdr" %in% names(df)) "fdr" else stop("FDR column not found: ", fdr_col)
   df$neglog10 <- -log10(pmax(df[[fdr_col]], .Machine$double.xmin))
+  xv <- df[[x]]
+  df$significance <- factor(
+    ifelse(df[[fdr_col]] <= fdr_cutoff & xv >  lfc_threshold, "Up",
+    ifelse(df[[fdr_col]] <= fdr_cutoff & xv < -lfc_threshold, "Down", "n.s.")),
+    levels = c("Up", "Down", "n.s."))
   raw_label <- if ("lr_pair" %in% names(df)) as.character(df$lr_pair) else rownames(df)
   df$label <- ifelse(grepl("|", raw_label, fixed = TRUE),
                      .compact_feature_label(raw_label), .short_label(raw_label, 28L))
-  ord <- order(df[[fdr_col]], -abs(df[[x]]), na.last = NA)
-  df$to_label <- FALSE
-  if (length(ord) > 0) df$to_label[ord[seq_len(min(top_n_label, length(ord)))]] <- TRUE
-  if (is.null(title)) title <- "Differential cell-type communication volcano"
-  ggplot2::ggplot(df, ggplot2::aes(x = .data[[x]], y = neglog10)) +
-    ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
-    ggplot2::geom_point(alpha = 0.75) +
-    ggrepel::geom_text_repel(data = df[df$to_label, , drop = FALSE], ggplot2::aes(label = label),
-                             size = 3, max.overlaps = 12, min.segment.length = 0) +
-    ggplot2::labs(title = title, x = x, y = paste0("-log10(", fdr_col, ")")) +
+  sig <- df[df$significance != "n.s.", , drop = FALSE]
+  ord <- order(sig[[fdr_col]], -abs(sig[[x]]), na.last = NA)
+  lab_df <- sig[utils::head(ord, top_n_label), , drop = FALSE]
+  if (is.null(x_lab)) {
+    x_lab <- switch(x, log2fc_lcs = expression(log[2]~"fold-change (LCS)"),
+                    asymmetry = "Case - Ctrl asymmetry", x)
+  }
+  subtitle <- sprintf("Coloured: FDR < %.2g%s", fdr_cutoff,
+                      if (lfc_threshold > 0) sprintf(" & |effect| > %.2g", lfc_threshold) else "")
+
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = .data[[x]], y = neglog10)) +
+    ggplot2::geom_hline(yintercept = -log10(fdr_cutoff), linetype = "dashed",
+                        colour = "grey55", linewidth = 0.4) +
+    ggplot2::geom_vline(xintercept = 0, colour = "grey80", linewidth = 0.4)
+  if (lfc_threshold > 0) {
+    p <- p + ggplot2::geom_vline(xintercept = c(-lfc_threshold, lfc_threshold),
+                                 linetype = "dashed", colour = "grey70", linewidth = 0.35)
+  }
+  p +
+    ggplot2::geom_point(ggplot2::aes(colour = significance), alpha = 0.8, size = 1.9) +
+    ggrepel::geom_text_repel(data = lab_df, ggplot2::aes(label = label), size = 2.8,
+                             max.overlaps = 16, box.padding = 0.4, min.segment.length = 0,
+                             segment.colour = "grey70", segment.size = 0.3,
+                             colour = logiccomm_brand$ink, seed = 1) +
+    ggplot2::scale_colour_manual(values = .logiccomm_palettes$significance, name = NULL,
+                                 drop = FALSE) +
+    ggplot2::labs(title = title, subtitle = subtitle, x = x_lab,
+                  y = expression(-log[10]~"FDR")) +
+    ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size = 3, alpha = 1))) +
     theme_logiccomm()
 }

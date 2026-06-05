@@ -72,9 +72,7 @@ plot_lcs_bubble <- function(result,
       size = label_size, max.overlaps = 40,
       fontface = "bold",
       segment.color = "grey50", segment.size = 0.3) +
-    ggplot2::scale_color_gradient2(
-      low = "#2166ac", mid = "#f7f7f7", high = "#b2182b",
-      midpoint = 0, name = col_label) +
+    scale_color_logiccomm_diverging(midpoint = 0, name = col_label) +
     ggplot2::scale_size_continuous(range = c(1, 8), guide = "none") +
     ggplot2::scale_x_continuous(limits = c(-0.02, 1.05),
                                 labels = scales::percent_format(accuracy = 1)) +
@@ -86,7 +84,7 @@ plot_lcs_bubble <- function(result,
       y     = paste0(case_l, " frequency"),
       caption = sprintf("Bubble size = |asymmetry|; labeled: FDR<%.2f & |asymm|>%.1f",
                         fdr_cutoff, min_asymmetry)) +
-    ggplot2::theme_minimal(base_size = 12) +
+    theme_logiccomm() +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold", size = 14),
       legend.position = "right",
@@ -233,10 +231,10 @@ plot_umap_logic <- function(reo_mat,
     levels = c("Inactive","Sender (Ligand)","Receiver (Receptor)","Sender & Receiver"))
 
   if (is.null(colors)) {
-    colors <- c("Inactive"             = "#f0f0f0",
-                "Sender (Ligand)"      = "#3182bd",
-                "Receiver (Receptor)"  = "#e6550d",
-                "Sender & Receiver"    = "#de2d26")
+    colors <- c("Inactive"             = "grey88",
+                "Sender (Ligand)"      = "#1F6F78",
+                "Receiver (Receptor)"  = "#E8A33D",
+                "Sender & Receiver"    = "#D1495B")
   }
 
   ggplot2::ggplot(plot_df[order(plot_df$status), ],
@@ -246,7 +244,7 @@ plot_umap_logic <- function(reo_mat,
     ggplot2::labs(title = lr_pair,
                   subtitle = paste0("Ligand: ", lr_row$ligand[1],
                                     "  |  Receptor: ", lr_row$receptor[1])) +
-    ggplot2::theme_minimal(base_size = 12) +
+    theme_logiccomm() +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold", size = 14),
       panel.grid = ggplot2::element_blank(),

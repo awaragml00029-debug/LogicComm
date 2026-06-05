@@ -8,8 +8,11 @@ plot_differential_celltype_volcano(
   result,
   x = "log2fc_lcs",
   fdr_col = "fdr_fisher",
+  fdr_cutoff = 0.05,
+  lfc_threshold = 0,
   top_n_label = 15,
-  title = NULL
+  title = "Differential cell-type communication",
+  x_lab = NULL
 )
 }
 \arguments{

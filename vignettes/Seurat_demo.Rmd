@@ -1285,6 +1285,34 @@ clean_manual <- subset(ranked_axes,
 > (2016) lists (override via `s_genes` / `g2m_genes`); genes absent from `expr`
 > are dropped, and z-scored hub flags need several cell types to be meaningful.
 
+### 9.12 Figure styling and export (publication)
+
+Every `plot_*` function uses the shared LogicComm theme and a colorblind-safe
+brand palette, so figures are consistent by default. To match custom layers to
+the package style, reuse `logiccomm_brand` colours and the brand scales
+(`scale_color_logiccomm_c()`, `scale_fill_tier()`, `theme_logiccomm()`, ...).
+Export at journal column widths with `save_logiccomm_figure()` (vector PDF/SVG
+recommended), and compose multi-panel figures with `patchwork`.
+
+```{r figure_export, eval=FALSE}
+# title = NULL drops the in-plot title for a caption-driven journal layout.
+disc <- plot_communication_discovery(ranked_axes, title = NULL)
+save_logiccomm_figure(disc, "discovery.pdf", width = "single")                 # 89 mm vector
+save_logiccomm_figure(disc, "discovery.png", width = "double", height_mm = 120, dpi = 600)
+
+# Multi-panel figure (a/b/c) with patchwork:
+library(patchwork)
+fig <- plot_communication_discovery(ranked_axes) +
+       plot_celltype_network_publication(ct_comm) +
+       patchwork::plot_annotation(tag_levels = "a")
+save_logiccomm_figure(fig, "figure2.pdf", width = "double", height_mm = 120)
+```
+
+**中文说明。** 所有 `plot_*` 默认套用统一的 LogicComm 主题与色盲安全品牌配色；自定义
+图层可复用 `logiccomm_brand` 与品牌色阶保持风格一致。用 `save_logiccomm_figure()` 按
+期刊栏宽（单栏 89 mm / 双栏 183 mm）导出矢量图，用 `patchwork` 拼多面板（a/b/c）。
+`title = NULL` 可去掉图内标题，改用图注。
+
 ## Step 10: Optional Cell-Type-Level Case vs Control Comparison
 
 For multi-sample studies, compute cell-type-resolved communication inside each

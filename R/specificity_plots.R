@@ -1,5 +1,34 @@
 # R/specificity_plots.R
 
+# Compute 2D node coordinates for a cell-type communication network. Uses an
+# igraph force-directed (Fruchterman-Reingold) layout when igraph is available
+# (better node separation for many cell types) and otherwise falls back to an
+# evenly spaced circle. The user's RNG state is preserved. Returns a
+# data.frame(cell_type, x, y) with coordinates normalised to [-1, 1].
+.celltype_graph_layout <- function(cell_types, edges, layout = c("auto", "fr", "circle")) {
+  layout <- match.arg(layout)
+  cell_types <- unique(as.character(cell_types))
+  n <- length(cell_types)
+  circle <- function() {
+    theta <- seq(0, 2 * pi, length.out = n + 1L)[seq_len(n)]
+    data.frame(cell_type = cell_types, x = cos(theta), y = sin(theta), stringsAsFactors = FALSE)
+  }
+  use_fr <- (layout %in% c("auto", "fr")) && requireNamespace("igraph", quietly = TRUE) &&
+            n > 2 && !is.null(edges) && nrow(edges) > 0
+  if (layout == "circle" || !use_fr) return(circle())
+  g <- igraph::graph_from_data_frame(
+    data.frame(from = as.character(edges$sender_type),
+               to = as.character(edges$receiver_type), stringsAsFactors = FALSE),
+    directed = TRUE, vertices = data.frame(name = cell_types, stringsAsFactors = FALSE))
+  old_seed <- if (exists(".Random.seed", envir = .GlobalEnv)) get(".Random.seed", envir = .GlobalEnv) else NULL
+  set.seed(1)
+  lay <- igraph::layout_with_fr(g)
+  if (!is.null(old_seed)) assign(".Random.seed", old_seed, envir = .GlobalEnv)
+  norm <- function(v) { r <- range(v); if (diff(r) == 0) return(rep(0, length(v))); 2 * (v - r[1]) / diff(r) - 1 }
+  data.frame(cell_type = igraph::V(g)$name, x = norm(lay[, 1]), y = norm(lay[, 2]),
+             stringsAsFactors = FALSE)
+}
+
 #' Plot Pathway Dominance
 #'
 #' @param ct_comm Cell-type communication object.
@@ -29,13 +58,9 @@ plot_pathway_dominance <- function(ct_comm,
   ggplot2::ggplot(agg, ggplot2::aes(x = fraction, y = pathway, fill = value)) +
     ggplot2::geom_col(width = 0.75) +
     ggplot2::scale_x_continuous(labels = scales::percent_format(), name = "Fraction of total strength") +
-    ggplot2::scale_fill_viridis_c(option = "magma", direction = -1, name = metric) +
+    scale_fill_logiccomm_c(name = metric) +
     ggplot2::labs(title = title, y = "Pathway") +
-    ggplot2::theme_minimal(base_size = 12) +
-    ggplot2::theme(
-      plot.title = ggplot2::element_text(face = "bold", size = 14),
-      panel.grid.major.y = ggplot2::element_blank()
-    )
+    theme_logiccomm(grid = "x")
 }
 
 #' Plot Cell-Type Role Dotplot
@@ -71,16 +96,11 @@ plot_celltype_role_dotplot <- function(ct_comm,
   
   ggplot2::ggplot(plot_df, ggplot2::aes(x = role, y = cell_type)) +
     ggplot2::geom_point(ggplot2::aes(size = raw_score, color = value, alpha = evidence)) +
-    ggplot2::scale_color_gradient2(low = "#2166ac", mid = "#f7f7f7", high = "#b2182b", midpoint = 0,
-                                   name = if (scaled) "z-score" else "score") +
-    ggplot2::scale_alpha_continuous(range = c(0.3, 1), name = "Evidence") +
+    scale_color_logiccomm_diverging(midpoint = 0, name = if (scaled) "z-score" else "score") +
+    ggplot2::scale_alpha_continuous(range = c(0.35, 1), name = "Evidence") +
     ggplot2::scale_size_continuous(range = c(2, 9), name = "Raw score") +
     ggplot2::labs(title = title, x = "Signaling role", y = "Cell type") +
-    ggplot2::theme_bw(base_size = 12) +
-    ggplot2::theme(
-      plot.title = ggplot2::element_text(face = "bold", size = 14),
-      panel.grid.minor = ggplot2::element_blank()
-    )
+    theme_logiccomm()
 }
 
 #' Plot Specificity-Stability Landscape
@@ -142,13 +162,9 @@ plot_specificity_stability <- function(sens,
   p <- ggplot2::ggplot(st, ggplot2::aes(x = active_fraction, y = pair_specificity)) +
     ggplot2::geom_point(ggplot2::aes(size = total_lcs, color = specificity_class), alpha = 0.7) +
     ggplot2::scale_size_continuous(range = c(2, 8), name = "Total LCS") +
-    ggplot2::scale_color_brewer(palette = "Set1", name = "Specificity class", na.value = "grey70") +
+    scale_color_logiccomm_d(name = "Specificity class", na.value = "grey70") +
     ggplot2::labs(title = title, x = "REO-threshold stability", y = "Cell-type-pair specificity") +
-    ggplot2::theme_minimal(base_size = 12) +
-    ggplot2::theme(
-      plot.title = ggplot2::element_text(face = "bold", size = 14),
-      panel.grid.minor = ggplot2::element_blank()
-    )
+    theme_logiccomm()
   if (any(st$to_label)) {
     p <- p + ggrepel::geom_text_repel(
       data = st[st$to_label, , drop = FALSE], ggplot2::aes(label = label),
@@ -165,6 +181,8 @@ plot_specificity_stability <- function(sens,
 #' @param top_n_edges Number of strongest non-self edges to show.
 #' @param min_value Minimum edge value.
 #' @param edge_label "none", "top_pathway", or "n_active_lr".
+#' @param layout Node layout: "auto" (force-directed via igraph when available,
+#'   otherwise a circle), "fr", or "circle".
 #' @param show_self Whether to show self-loops.
 #' @param title Optional title.
 #' @return ggplot2 object.
@@ -174,10 +192,12 @@ plot_celltype_network_publication <- function(ct_comm,
                                               top_n_edges = 20,
                                               min_value = 0,
                                               edge_label = c("top_pathway", "none", "n_active_lr"),
+                                              layout = c("auto", "fr", "circle"),
                                               show_self = FALSE,
                                               title = NULL) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   edge_label <- match.arg(edge_label)
+  layout <- match.arg(layout)
   edges <- ct_comm$pair_summary
   if (!metric %in% names(edges)) stop("metric not found in pair_summary: ", metric)
   edges$value <- edges[[metric]]
@@ -185,49 +205,56 @@ plot_celltype_network_publication <- function(ct_comm,
   if (!isTRUE(show_self)) edges <- edges[edges$sender_type != edges$receiver_type, , drop = FALSE]
   edges <- edges[order(edges$value, decreasing = TRUE), , drop = FALSE]
   edges <- utils::head(edges, top_n_edges)
-  
+
   nodes <- ct_comm$role_summary
-  n <- nrow(nodes)
-  theta <- seq(0, 2 * pi, length.out = n + 1L)[seq_len(n)]
-  nodes$x <- cos(theta); nodes$y <- sin(theta)
   nodes$node_label <- .short_label(as.character(nodes$cell_type), 18L)
-  
+  coords <- .celltype_graph_layout(nodes$cell_type, edges, layout = layout)
+  nodes$x <- coords$x[match(nodes$cell_type, coords$cell_type)]
+  nodes$y <- coords$y[match(nodes$cell_type, coords$cell_type)]
+
   edge_df <- merge(edges, nodes[, c("cell_type", "x", "y")], by.x = "sender_type", by.y = "cell_type", all.x = TRUE)
   edge_df <- merge(edge_df, nodes[, c("cell_type", "x", "y")], by.x = "receiver_type", by.y = "cell_type", all.x = TRUE, suffixes = c("", "end"))
   edge_df$edge_text <- if (edge_label == "top_pathway") edge_df$top_pathway else if (edge_label == "n_active_lr") as.character(edge_df$n_active_lr) else ""
-  
+
   if (is.null(title)) title <- paste("Cell-type communication network:", metric)
-  
-  p <- ggplot2::ggplot() + 
-    ggplot2::theme_void(base_size = 12) +
-    ggplot2::labs(title = title, subtitle = "Strongest sender -> receiver relationships") +
-    ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14))
-    
+
+  p <- ggplot2::ggplot() +
+    ggplot2::labs(title = title, subtitle = "Strongest sender -> receiver relationships")
+
   if (nrow(edge_df)) {
     p <- p + ggplot2::geom_curve(data = edge_df,
                                  ggplot2::aes(x = x, y = y, xend = xend, yend = yend,
-                                              linewidth = value, color = top_pathway),
+                                              linewidth = value, colour = top_pathway),
                                  curvature = 0.16,
-                                 arrow = grid::arrow(length = grid::unit(0.12, "inches"), type = "closed"),
-                                 lineend = "round", alpha = 0.7) +
+                                 arrow = grid::arrow(length = grid::unit(0.1, "inches"), type = "closed"),
+                                 lineend = "round", alpha = 0.75) +
       ggplot2::scale_linewidth_continuous(range = c(0.4, 3), name = metric) +
-      ggplot2::scale_color_viridis_d(option = "turbo", name = "Top pathway", na.value = "grey70")
+      scale_color_logiccomm_d(name = "Top pathway", na.value = "grey75")
 
     if (edge_label != "none") {
       edge_df$xm <- (edge_df$x + edge_df$xend) / 2
       edge_df$ym <- (edge_df$y + edge_df$yend) / 2
       p <- p + ggrepel::geom_text_repel(data = edge_df, ggplot2::aes(x = xm, y = ym, label = edge_text),
-                                        size = 3, max.overlaps = 15, fontface = "italic")
+                                        size = 3, max.overlaps = 15, fontface = "italic", colour = "grey30")
     }
   }
 
   p + ggplot2::geom_point(data = nodes,
                           ggplot2::aes(x = x, y = y, size = hub_score, fill = sender_receiver_balance),
-                          shape = 21, color = "black", stroke = 0.5) +
+                          shape = 21, colour = "white", stroke = 0.6) +
     ggrepel::geom_text_repel(data = nodes, ggplot2::aes(x = x, y = y, label = node_label),
-                             size = 4, fontface = "bold", max.overlaps = 20) +
-    ggplot2::scale_size_continuous(range = c(4, 12), name = "Hub") +
-    ggplot2::scale_fill_gradient2(low = "#2166ac", mid = "#f7f7f7", high = "#b2182b", midpoint = 0, name = "Balance")
+                             size = 3.4, fontface = "bold", max.overlaps = 30,
+                             colour = logiccomm_brand$ink, seed = 1) +
+    ggplot2::scale_size_continuous(range = c(4, 13), name = "Hub score") +
+    scale_fill_logiccomm_diverging(midpoint = 0, name = "S-R balance") +
+    ggplot2::coord_equal(clip = "off") +
+    ggplot2::theme_void(base_size = 12) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(face = "bold", size = ggplot2::rel(1.25), colour = logiccomm_brand$ink),
+      plot.subtitle = ggplot2::element_text(colour = "grey35", margin = ggplot2::margin(b = 8)),
+      legend.title = ggplot2::element_text(face = "bold", size = ggplot2::rel(0.9)),
+      plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
 }
 
 #' Plot a Pathway-Filtered Cell-Type Network
