@@ -1251,25 +1251,32 @@ top50 <- head(ranked_axes, 50)
 mean(top50$broad_axis_flag %in% TRUE)              # fraction of top-50 that are broad
 mean(top50$proliferation_confound_flag %in% TRUE) # fraction touching a cycling hub
 
-# Recommended publication-level discovery view: drop broad axes AND
-# proliferation-hub axes, then rank by discovery_score.
-clean_axes <- subset(
-  ranked_axes,
-  !broad_axis_flag %in% TRUE &
-  !proliferation_confound_flag %in% TRUE
-)
-head(clean_axes[order(-clean_axes$discovery_score),
-                c("sender_type", "receiver_type", "lr_pair", "lcs",
-                  "discovery_score", "specificity_class", "evidence_tier")], 20)
+# Recommended one call: drop broad + proliferation-hub axes AND re-scale / re-tier
+# the survivors within the kept set, so genuine low-LCS candidates are tiered on
+# their own merits instead of against the noise that was removed.
+clean_axes <- communication_discovery_view(ranked_axes)   # drop_broad + drop_proliferation
+head(clean_axes[, c("sender_type", "receiver_type", "lr_pair", "lcs",
+                    "discovery_score", "specificity_class", "evidence_tier")], 20)
+
+# To also drop canonical identity-recognition axes (e.g. HLA-E -> NKG2A) and keep
+# only novel candidates:
+novel_axes <- communication_discovery_view(ranked_axes, drop_identity = TRUE)
+
+# rescale = FALSE is the plain filter equivalent (keeps the original scores/tiers):
+clean_manual <- subset(ranked_axes,
+                       !broad_axis_flag %in% TRUE &
+                       !proliferation_confound_flag %in% TRUE)
 ```
 
 **中文说明。** 增殖/转录广度中枢（如 `Cycling_*` 簇）会出现在绝大多数顶端轴里，但这
-反映的是转录广度而非特异通讯。`diagnose_proliferation_confound()` 只打标
-`proliferation_confound_flag`、不改打分，由你自己过滤。**推荐的发表级发现视图**：同时
-去掉 `broad_axis_flag` 和 `proliferation_confound_flag`，再按 `discovery_score` 排序。
-去掉这两类混杂后，真正特异的生物学（如 NK 的 `HLA-E -> NKG2A/KLRC`、`CCL5 -> CCR4`、
-`TNFSF9 -> TNFRSF9` 共刺激等）才会浮现 —— 它们的 LCS 往往不高，所以在原始排名里被
-广谱/增殖轴淹没。
+反映的是转录广度而非特异通讯。`communication_discovery_view()` 一步完成推荐的发表级
+发现视图：去掉 `broad_axis_flag` 与 `proliferation_confound_flag`，并在**保留集合内部
+重新缩放 strength/specificity、重判 evidence_tier**。这是必要的——主排名对全表缩放，
+广谱/增殖这些高 LCS 轴把"天花板"抬高，导致真正特异但 LCS 偏低的候选只能落到 Tier 3/4；
+在保留集合内重判后，它们才会按自身证据获得合理的 Tier 1/2。加 `drop_identity = TRUE`
+会进一步去掉 `HLA-E -> NKG2A` 这类经典识别轴，只留下新颖候选（如 `CCL5 -> CCR4`、
+`TNFSF9 -> TNFRSF9` 共刺激、`MIF -> CD74`、`ALCAM-CD6` 等）。`rescale = FALSE` 时则
+等价于上面的手动 `subset()`，只过滤、不重判。
 
 > **Caveat -- cell order.** `diagnose_proliferation_confound()` matches `expr`
 > columns to `ct_comm$cell_labels` by cell name when both are named; otherwise it

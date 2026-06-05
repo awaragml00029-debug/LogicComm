@@ -1,3 +1,25 @@
+# LogicComm 0.9.4
+
+## One-call confound-filtered discovery view
+
+`rank_communication_axes()` scales strength/specificity across the whole active
+set, so after the 0.9.3 broad-axis demotion the genuine but lower-LCS candidates
+still inherited Tier 3/4 -- the high-LCS broad/cycling axes set the ceiling.
+
+* New `communication_discovery_view()` filters a ranked table down to the
+  confound-free candidates -- dropping broad/ubiquitous axes (`broad_axis_flag`)
+  and proliferation-hub axes (`proliferation_confound_flag`), and optionally
+  identity-associated axes (`drop_identity`) -- and, with `rescale = TRUE`
+  (default), recomputes `strength_score`, `specificity_score`,
+  `discovery_score`, and `evidence_tier` *within the kept set* using the same
+  weights and tier rules as the ranker. Surviving candidates are therefore tiered
+  on their own merits instead of against the noise that was removed.
+* The discovery scoring/tiering/demotion logic is refactored into a single shared
+  internal core used by both `rank_communication_axes()` and
+  `communication_discovery_view()`, so the two always agree.
+  `rank_communication_axes()` output is unchanged.
+* Added regression tests for the discovery view.
+
 # LogicComm 0.9.3
 
 ## Broad/ubiquitous axes are down-ranked, not just annotated

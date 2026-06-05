@@ -146,6 +146,72 @@ score_communication_specificity <- function(ct_comm,
   ct_comm
 }
 
+# Shared scoring core for rank_communication_axes() and
+# communication_discovery_view(): turns the five evidence components (each on a
+# [0, 1] scale) into a discovery_score + evidence_tier, applies the broad-axis
+# demotion, and returns the data frame ordered by discovery_score. Keeping it in
+# one place guarantees the discovery view re-scores with exactly the same
+# weights, tier rules, and demotion as the main ranker.
+.finalize_discovery_ranking <- function(df, strength, specificity, stability,
+                                        support, response, demote_broad = TRUE,
+                                        broad_penalty = 0.5, top_n = NULL) {
+  n <- nrow(df)
+  comp <- list(strength = strength, specificity = specificity,
+               stability = stability, support = support, response = response)
+  w0 <- c(strength = 0.35, specificity = 0.25, stability = 0.15, support = 0.15, response = 0.10)
+  avail <- vapply(comp, function(x) any(is.finite(x)), logical(1))
+  w <- w0[avail]
+  w <- w / sum(w)
+  score_mat <- vapply(names(w), function(nm) {
+    v <- comp[[nm]]; v[!is.finite(v)] <- 0; v
+  }, numeric(n))
+  if (is.null(dim(score_mat))) score_mat <- matrix(score_mat, nrow = n)
+  df$discovery_score <- as.numeric(score_mat %*% w)
+  df$strength_score <- strength
+  df$specificity_score <- specificity
+
+  has_stab <- any(is.finite(stability))
+  has_stat <- any(is.finite(support))
+  stab_ok <- if (has_stab) is.finite(stability) & stability >= 0.5 else rep(TRUE, n)
+  stat_ok <- if (has_stat) is.finite(support) & support >= 0.6 else rep(TRUE, n)
+  spec_hi <- specificity >= 0.6
+  str_hi <- strength >= 0.5
+  tier_rank <- ifelse(str_hi & spec_hi & stab_ok & stat_ok, 1L,
+                ifelse(str_hi & (spec_hi | (has_stat & stat_ok)), 2L,
+                ifelse(strength >= 0.25 | spec_hi, 3L, 4L)))
+
+  # Broad/ubiquitous axes (e.g. MHC-I -> CD8A, CD99 - CD99) are by definition not
+  # cell-type-pair specific. score_communication_specificity() flags them
+  # (ubiquitous_interaction_flag / broad_axis_flag). When demote_broad = TRUE we
+  # multiply discovery_score by broad_penalty and cap the tier at 3, so a broad
+  # axis cannot outrank a genuinely pair-specific candidate. Ranking layer only:
+  # the active flag and lcs are untouched; demote_broad = FALSE disables it.
+  broad <- if ("broad_axis_flag" %in% names(df)) {
+    df$broad_axis_flag %in% TRUE
+  } else if ("ubiquitous_interaction_flag" %in% names(df)) {
+    df$ubiquitous_interaction_flag %in% TRUE
+  } else rep(FALSE, n)
+  df$broad_axis_flag <- broad
+  demoted <- isTRUE(demote_broad) & broad & tier_rank < 3L
+  if (isTRUE(demote_broad)) {
+    df$discovery_score <- df$discovery_score * ifelse(broad, broad_penalty, 1)
+    tier_rank[demoted] <- 3L
+  }
+
+  tier_labels <- c("Tier 1: strong, specific, supported",
+                   "Tier 2: strong candidate",
+                   "Tier 3: emerging candidate",
+                   "Tier 4: weak / context-dependent")
+  df$evidence_tier <- tier_labels[tier_rank]
+  df$evidence_tier[demoted] <- "Tier 3: broad / non-specific"
+
+  df$publication_priority_score <- df$discovery_score
+  df <- df[order(df$discovery_score, decreasing = TRUE), , drop = FALSE]
+  rownames(df) <- NULL
+  if (!is.null(top_n)) df <- utils::head(df, top_n)
+  df
+}
+
 #' Rank Communication Axes by Integrated Discovery Evidence
 #'
 #' Produces a single prioritized list of candidate sender -> receiver -> L-R
@@ -238,60 +304,130 @@ rank_communication_axes <- function(ct_comm,
     response <- .rescale01(ifelse(is.na(df[[resp_col[1]]]), 0, df[[resp_col[1]]]))
   }
 
-  comp <- list(strength = strength, specificity = specificity,
-               stability = stability, support = support, response = response)
-  w0 <- c(strength = 0.35, specificity = 0.25, stability = 0.15, support = 0.15, response = 0.10)
-  avail <- vapply(comp, function(x) any(is.finite(x)), logical(1))
-  w <- w0[avail]
-  w <- w / sum(w)
-  score_mat <- vapply(names(w), function(nm) {
-    v <- comp[[nm]]; v[!is.finite(v)] <- 0; v
-  }, numeric(nrow(df)))
-  if (is.null(dim(score_mat))) score_mat <- matrix(score_mat, nrow = nrow(df))
-  df$discovery_score <- as.numeric(score_mat %*% w)
-  df$strength_score <- strength
-  df$specificity_score <- specificity
+  .finalize_discovery_ranking(df, strength, specificity, stability, support, response,
+                              demote_broad = demote_broad, broad_penalty = broad_penalty,
+                              top_n = top_n)
+}
 
-  has_stab <- any(is.finite(stability))
-  has_stat <- any(is.finite(support))
-  stab_ok <- if (has_stab) is.finite(stability) & stability >= 0.5 else rep(TRUE, nrow(df))
-  stat_ok <- if (has_stat) is.finite(support) & support >= 0.6 else rep(TRUE, nrow(df))
-  spec_hi <- specificity >= 0.6
-  str_hi <- strength >= 0.5
-  tier_rank <- ifelse(str_hi & spec_hi & stab_ok & stat_ok, 1L,
-                ifelse(str_hi & (spec_hi | (has_stat & stat_ok)), 2L,
-                ifelse(strength >= 0.25 | spec_hi, 3L, 4L)))
+#' Confound-Filtered Communication Discovery View
+#'
+#' Takes the output of \code{\link{rank_communication_axes}} and returns a
+#' filtered, re-ranked view in which the two confounds that dominate raw
+#' communication rankings are removed: broad/ubiquitous axes (e.g. MHC-I -> CD8A,
+#' CD99 - CD99) and proliferation / transcriptional-breadth hub axes (flagged by
+#' \code{\link{diagnose_proliferation_confound}}). It can optionally also drop
+#' identity-associated axes such as HLA-E -> NKG2A self-recognition.
+#'
+#' @details
+#' \code{rank_communication_axes()} scales \code{strength} and \code{specificity}
+#' across the whole active set, so once the high-LCS broad/cycling axes set the
+#' ceiling the genuine but lower-LCS candidates inherit Tier 3/4 even after the
+#' confounds are filtered out. With \code{rescale = TRUE} (default) this function
+#' recomputes \code{strength_score}, \code{specificity_score},
+#' \code{discovery_score}, and \code{evidence_tier} \emph{within the kept set}
+#' (using the same weights and tier rules as the main ranker), so the surviving
+#' candidates are tiered on their own merits rather than against the noise that
+#' was removed. The recompute uses the raw component columns (\code{lcs},
+#' \code{pair_specificity}, \code{threshold_stability}, \code{null_support}, and
+#' any receiver-response score), so it does not double-penalise broad axes.
+#'
+#' @param ranked Output of \code{\link{rank_communication_axes}}.
+#' @param drop_broad Drop broad/ubiquitous axes (\code{broad_axis_flag} /
+#'   \code{ubiquitous_interaction_flag}). Default \code{TRUE}.
+#' @param drop_proliferation Drop proliferation-hub axes
+#'   (\code{proliferation_confound_flag}); requires
+#'   \code{\link{diagnose_proliferation_confound}} to have been run before
+#'   ranking. Default \code{TRUE}.
+#' @param drop_identity Also drop identity-associated axes
+#'   (\code{identity_associated_flag}, e.g. HLA-E -> NKG2A self-recognition).
+#'   Default \code{FALSE}.
+#' @param rescale Recompute strength / specificity / discovery_score /
+#'   evidence_tier within the kept set so candidates are re-tiered on their own
+#'   merits. Default \code{TRUE}.
+#' @param top_n Optional number of rows to return.
+#' @param verbose Print a one-line summary of what was dropped.
+#' @return The kept rows of \code{ranked}, ordered by \code{discovery_score}. When
+#'   \code{rescale = TRUE} the discovery columns and \code{evidence_tier} are
+#'   recomputed within the kept set; otherwise the original values are kept and
+#'   the rows are only filtered and re-ordered.
+#' @seealso \code{\link{rank_communication_axes}},
+#'   \code{\link{diagnose_proliferation_confound}}
+#' @export
+communication_discovery_view <- function(ranked,
+                                         drop_broad = TRUE,
+                                         drop_proliferation = TRUE,
+                                         drop_identity = FALSE,
+                                         rescale = TRUE,
+                                         top_n = NULL,
+                                         verbose = TRUE) {
+  stopifnot(is.data.frame(ranked))
+  if (!"lcs" %in% names(ranked)) {
+    stop("'ranked' must be the output of rank_communication_axes() (no 'lcs' column found).")
+  }
+  df <- ranked
+  has <- function(col) col %in% names(df)
+  flag <- function(col) if (has(col)) df[[col]] %in% TRUE else rep(FALSE, nrow(df))
 
-  # Broad/ubiquitous axes (e.g. MHC-I -> CD8A, CD99 - CD99) are by definition not
-  # cell-type-pair specific. score_communication_specificity() already flags them
-  # (ubiquitous_interaction_flag), but the flag used to be annotation only, so a
-  # strong, null-supported broad axis still reached Tier 1/2 -- the tier rule
-  # never consulted it. When demote_broad = TRUE we multiply discovery_score by
-  # broad_penalty and cap the tier at 3, so a broad axis cannot outrank a
-  # genuinely pair-specific candidate. Ranking layer only: active and lcs are
-  # untouched, and demote_broad = FALSE restores the previous behaviour.
-  broad <- if ("ubiquitous_interaction_flag" %in% names(df)) {
-    df$ubiquitous_interaction_flag %in% TRUE
-  } else rep(FALSE, nrow(df))
-  df$broad_axis_flag <- broad
-  demoted <- isTRUE(demote_broad) & broad & tier_rank < 3L
-  if (isTRUE(demote_broad)) {
-    df$discovery_score <- df$discovery_score * ifelse(broad, broad_penalty, 1)
-    tier_rank[demoted] <- 3L
+  keep <- rep(TRUE, nrow(df))
+  dropped <- character(0)
+  if (isTRUE(drop_broad)) {
+    if (!(has("broad_axis_flag") || has("ubiquitous_interaction_flag"))) {
+      warning("drop_broad = TRUE but no broad_axis_flag/ubiquitous_interaction_flag column; ",
+              "nothing dropped. Run rank_communication_axes() / score_communication_specificity() first.")
+    }
+    b <- flag("broad_axis_flag") | flag("ubiquitous_interaction_flag")
+    keep <- keep & !b
+    dropped <- c(dropped, sprintf("broad=%d", sum(b)))
+  }
+  if (isTRUE(drop_proliferation)) {
+    if (!has("proliferation_confound_flag")) {
+      warning("drop_proliferation = TRUE but no proliferation_confound_flag column; ",
+              "nothing dropped. Run diagnose_proliferation_confound() before ranking.")
+    }
+    p <- flag("proliferation_confound_flag")
+    keep <- keep & !p
+    dropped <- c(dropped, sprintf("proliferation=%d", sum(p)))
+  }
+  if (isTRUE(drop_identity)) {
+    i <- flag("identity_associated_flag")
+    keep <- keep & !i
+    dropped <- c(dropped, sprintf("identity=%d", sum(i)))
   }
 
-  tier_labels <- c("Tier 1: strong, specific, supported",
-                   "Tier 2: strong candidate",
-                   "Tier 3: emerging candidate",
-                   "Tier 4: weak / context-dependent")
-  df$evidence_tier <- tier_labels[tier_rank]
-  df$evidence_tier[demoted] <- "Tier 3: broad / non-specific"
+  out <- df[keep, , drop = FALSE]
+  if (!nrow(out)) {
+    if (isTRUE(verbose)) message("[DiscoveryView] No axes left after filtering.")
+    rownames(out) <- NULL
+    return(out)
+  }
 
-  df$publication_priority_score <- df$discovery_score
-  df <- df[order(df$discovery_score, decreasing = TRUE), , drop = FALSE]
-  rownames(df) <- NULL
-  if (!is.null(top_n)) df <- utils::head(df, top_n)
-  df
+  if (isTRUE(rescale)) {
+    strength <- .rescale01(out$lcs)
+    spec_in <- if (has("pair_specificity")) out$pair_specificity else rep(NA_real_, nrow(out))
+    specificity <- .rescale01(ifelse(is.na(spec_in), 0, spec_in))
+    stability <- if (has("threshold_stability")) out$threshold_stability else rep(NA_real_, nrow(out))
+    support <- if (has("null_support")) out$null_support else rep(NA_real_, nrow(out))
+    resp_col <- intersect(c("response_integrated_score", "receiver_response_score"), names(out))
+    response <- if (length(resp_col)) {
+      .rescale01(ifelse(is.na(out[[resp_col[1]]]), 0, out[[resp_col[1]]]))
+    } else rep(NA_real_, nrow(out))
+    out <- .finalize_discovery_ranking(out, strength, specificity, stability, support,
+                                       response, demote_broad = TRUE, broad_penalty = 0.5,
+                                       top_n = NULL)
+  } else {
+    ord_col <- if (has("discovery_score")) "discovery_score" else "lcs"
+    out <- out[order(out[[ord_col]], decreasing = TRUE), , drop = FALSE]
+    rownames(out) <- NULL
+  }
+
+  if (isTRUE(verbose)) {
+    message(sprintf("[DiscoveryView] kept %d / %d axes%s. %s",
+                    nrow(out), nrow(ranked),
+                    if (length(dropped)) sprintf(" (dropped %s)", paste(dropped, collapse = ", ")) else "",
+                    if (isTRUE(rescale)) "Re-scaled strength and re-tiered within the kept set." else "Original scores kept."))
+  }
+  if (!is.null(top_n)) out <- utils::head(out, top_n)
+  out
 }
 
 #' Plot the Communication Discovery Landscape
