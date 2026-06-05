@@ -529,32 +529,51 @@ fit_celltype_comm_glm <- function(sample_ct_list,
 #' Plot a GLM Differential Communication Volcano
 #'
 #' @param glm_result Output from fit_celltype_comm_glm().
+#' @param fdr_cutoff FDR threshold for significance colouring and the guide line.
+#' @param effect_threshold Optional minimum |coefficient| for significance.
 #' @param top_n_label Number of top features to label.
 #' @param title Optional plot title.
 #' @return ggplot2 object.
 #' @export
 plot_celltype_glm_volcano <- function(glm_result,
+                                      fdr_cutoff = 0.05,
+                                      effect_threshold = 0,
                                       top_n_label = 15,
-                                      title = NULL) {
+                                      title = "Sample-level GLM differential communication") {
   stopifnot(is.data.frame(glm_result))
   df <- as.data.frame(glm_result)
   if (!all(c("estimate", "fdr") %in% names(df))) stop("glm_result must contain estimate and fdr columns.")
   df$neglog10 <- -log10(pmax(df$fdr, .Machine$double.xmin))
-  if (!"sender_type" %in% names(df)) df$sender_type <- NA_character_
+  e <- df$estimate
+  df$significance <- factor(
+    ifelse(df$fdr <= fdr_cutoff & e >  effect_threshold, "Up",
+    ifelse(df$fdr <= fdr_cutoff & e < -effect_threshold, "Down", "n.s.")),
+    levels = c("Up", "Down", "n.s."))
   df$label <- .compact_feature_label(df$feature)
-  ord <- order(df$fdr, -abs(df$estimate), na.last = NA)
-  df$to_label <- FALSE
-  if (length(ord) > 0 && top_n_label > 0) df$to_label[ord[seq_len(min(top_n_label, length(ord)))]] <- TRUE
-  if (is.null(title)) title <- "Sample-level GLM differential communication"
-  ggplot2::ggplot(df, ggplot2::aes(x = estimate, y = neglog10)) +
-    ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey65") +
-    ggplot2::geom_point(ggplot2::aes(color = sender_type), alpha = 0.8) +
-    ggrepel::geom_text_repel(data = df[df$to_label, , drop = FALSE],
-                             ggplot2::aes(label = label), size = 3, max.overlaps = 12,
-                             min.segment.length = 0) +
-    ggplot2::labs(title = title, x = "GLM coefficient (log odds)", y = "-log10(FDR)", color = "Sender") +
-    theme_logiccomm() +
-    ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
+  sig <- df[df$significance != "n.s.", , drop = FALSE]
+  ord <- order(sig$fdr, -abs(sig$estimate), na.last = NA)
+  lab_df <- sig[utils::head(ord, top_n_label), , drop = FALSE]
+  subtitle <- sprintf("Coloured: FDR < %.2g%s", fdr_cutoff,
+                      if (effect_threshold > 0) sprintf(" & |coef| > %.2g", effect_threshold) else "")
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = estimate, y = neglog10)) +
+    ggplot2::geom_hline(yintercept = -log10(fdr_cutoff), linetype = "dashed",
+                        colour = "grey55", linewidth = 0.4) +
+    ggplot2::geom_vline(xintercept = 0, colour = "grey80", linewidth = 0.4)
+  if (effect_threshold > 0) {
+    p <- p + ggplot2::geom_vline(xintercept = c(-effect_threshold, effect_threshold),
+                                 linetype = "dashed", colour = "grey70", linewidth = 0.35)
+  }
+  p +
+    ggplot2::geom_point(ggplot2::aes(colour = significance), alpha = 0.8, size = 1.9) +
+    ggrepel::geom_text_repel(data = lab_df, ggplot2::aes(label = label), size = 2.8,
+                             max.overlaps = 16, box.padding = 0.4, min.segment.length = 0,
+                             segment.colour = "grey70", segment.size = 0.3,
+                             colour = logiccomm_brand$ink, seed = 1) +
+    ggplot2::scale_colour_manual(values = .logiccomm_palettes$significance, name = NULL, drop = FALSE) +
+    ggplot2::labs(title = title, subtitle = subtitle, x = "GLM coefficient (log-odds)",
+                  y = expression(-log[10]~"FDR")) +
+    ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size = 3, alpha = 1))) +
+    theme_logiccomm()
 }
 
 #' Summarize Publication-Level Communication Findings

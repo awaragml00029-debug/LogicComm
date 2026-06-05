@@ -206,9 +206,11 @@ plot_communication_range_summary <- function(ct_comm) {
 #' @param senders Optional sender filter.
 #' @param receivers Optional receiver filter.
 #' @param top_n_per_pair Number of rows per sender-receiver pair.
+#' @param top_n_pathways Number of pathways (facets) to show, ranked by total LCS.
 #' @return A ggplot2 object.
 #' @export
-plot_lr_bubble_advanced <- function(ct_comm, senders = NULL, receivers = NULL, top_n_per_pair = 5) {
+plot_lr_bubble_advanced <- function(ct_comm, senders = NULL, receivers = NULL,
+                                    top_n_per_pair = 5, top_n_pathways = 12) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   df <- ct_comm$lr_table
   df <- .filter_celltype_axis(df, senders, receivers)
@@ -219,17 +221,21 @@ plot_lr_bubble_advanced <- function(ct_comm, senders = NULL, receivers = NULL, t
   keys <- paste(df$sender_type, df$receiver_type, sep = "|||")
   keep <- unlist(lapply(split(seq_len(nrow(df)), keys), function(ii) ii[order(df$lcs[ii], decreasing = TRUE)][seq_len(min(top_n_per_pair, length(ii)))]), use.names = FALSE)
   df <- df[keep, , drop = FALSE]
-  df$point_alpha <- ifelse(df$communication_range == "distal/endocrine" & df$n_active_neighborhood == 0, 0.45, 0.8)
+  pw_tot <- tapply(df$lcs, df$pathway, sum, na.rm = TRUE)
+  keep_pw <- names(sort(pw_tot, decreasing = TRUE))[seq_len(min(top_n_pathways, length(pw_tot)))]
+  df <- df[df$pathway %in% keep_pw, , drop = FALSE]
+  df$point_alpha <- ifelse(df$communication_range == "distal/endocrine" & df$n_active_neighborhood == 0, 0.45, 0.85)
   ggplot2::ggplot(df, ggplot2::aes(x = sender_type, y = receiver_type, size = lcs, color = communication_range, alpha = point_alpha)) +
     ggplot2::geom_point() +
     ggplot2::facet_wrap(~pathway, scales = "free") +
-    ggplot2::scale_color_manual(values = .logiccomm_palettes$range, na.value = "grey70") +
-    ggplot2::scale_size_continuous(range = c(2, 8)) +
+    ggplot2::scale_color_manual(values = .logiccomm_palettes$range, na.value = "grey70", name = "Range") +
+    ggplot2::scale_size_continuous(range = c(2, 8), name = "LCS") +
     ggplot2::scale_alpha_identity() +
     theme_logiccomm() +
     ggplot2::labs(title = "Cell-type LogicComm hotspots", x = "Sender type", y = "Receiver type",
                   caption = "Faded distal bubbles are global-only candidates without local active edge support.") +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = ggplot2::rel(0.75)),
+                   axis.text.y = ggplot2::element_text(size = ggplot2::rel(0.8)))
 }
 
 #' Plot L-R Bubbles by Cell Type

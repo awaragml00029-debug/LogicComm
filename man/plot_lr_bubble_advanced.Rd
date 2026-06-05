@@ -8,7 +8,8 @@ plot_lr_bubble_advanced(
   ct_comm,
   senders = NULL,
   receivers = NULL,
-  top_n_per_pair = 5
+  top_n_per_pair = 5,
+  top_n_pathways = 12
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ plot_lr_bubble_advanced(
 \item{receivers}{Optional receiver filter.}
 
 \item{top_n_per_pair}{Number of rows per sender-receiver pair.}
+
+\item{top_n_pathways}{Number of pathways (facets) to show, ranked by total LCS.}
 }
 \value{
 A ggplot2 object.

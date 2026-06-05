@@ -4,10 +4,20 @@
 \alias{plot_celltype_glm_volcano}
 \title{Plot a GLM Differential Communication Volcano}
 \usage{
-plot_celltype_glm_volcano(glm_result, top_n_label = 15, title = NULL)
+plot_celltype_glm_volcano(
+  glm_result,
+  fdr_cutoff = 0.05,
+  effect_threshold = 0,
+  top_n_label = 15,
+  title = "Sample-level GLM differential communication"
+)
 }
 \arguments{
 \item{glm_result}{Output from fit_celltype_comm_glm().}
+
+\item{fdr_cutoff}{FDR threshold for significance colouring and the guide line.}
+
+\item{effect_threshold}{Optional minimum |coefficient| for significance.}
 
 \item{top_n_label}{Number of top features to label.}
 

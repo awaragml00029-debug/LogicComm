@@ -1,3 +1,15 @@
+# LogicComm 0.10.2
+
+## Figure polish (round 3)
+
+* `plot_celltype_glm_volcano()` now matches `plot_differential_celltype_volcano()`:
+  points coloured by significance (up / down / n.s.), FDR and effect-size guide
+  lines, readable axis labels, and `fdr_cutoff` / `effect_threshold` arguments
+  (it previously coloured by sender type with default hues and drew no thresholds).
+* `plot_lr_bubble_advanced()` caps the pathway facets via a new `top_n_pathways`
+  argument (default 12, ranked by total LCS) so the figure stays legible instead
+  of fragmenting into many tiny panels.
+
 # LogicComm 0.10.1
 
 ## Figure polish (round 2)
