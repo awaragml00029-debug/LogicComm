@@ -103,8 +103,14 @@ install.packages(c("Seurat", "SeuratObject"))
 # Optional but useful
 install.packages("pheatmap")
 
-# Install LogicComm from local source tarball
-install.packages("LogicComm_0.7.tar.gz", repos = NULL, type = "source")
+# Install LogicComm from a local source tarball (adjust the version number)
+install.packages("LogicComm_0.9.3.tar.gz", repos = NULL, type = "source")
+
+# Or install a published release directly from GitHub:
+# install.packages(
+#   "https://github.com/awaragml00029-debug/LogicComm/releases/download/v0.9.3/LogicComm_0.9.3.tar.gz",
+#   repos = NULL, type = "source"
+# )
 ```
 
 The PBMC3K data are available from SeuratData:
@@ -960,6 +966,14 @@ head(sens$stability, 20)
 
 plot_specificity_stability(sens, ct_comm = ct_comm)
 
+# Flag the proliferation / transcriptional-breadth confound BEFORE ranking, so the
+# hub flags ride along into ranked_axes (diagnostic only; see Section 9.11). expr
+# is a genes x cells matrix aligned to the cells used to build ct_comm.
+expr_pbmc <- Seurat::GetAssayData(pbmc, assay = "RNA", layer = "data") # Seurat v4: slot = "data"
+ct_comm <- diagnose_proliferation_confound(ct_comm, expr_pbmc)
+
+# Since 0.9.3 rank_communication_axes() down-ranks broad/ubiquitous axes by default
+# (demote_broad = TRUE): see Section 9.11 for why and how to read the result.
 ranked_axes <- rank_communication_axes(ct_comm, null_pair = null_pair, sens = sens)
 head(ranked_axes, 20)
 ```
@@ -1185,10 +1199,84 @@ right.
 ```{r discovery_landscape, eval=FALSE}
 head(ranked_axes[, c("sender_type", "receiver_type", "lr_pair",
                      "strength_score", "specificity_score",
-                     "discovery_score", "evidence_tier")], 20)
+                     "discovery_score", "evidence_tier", "broad_axis_flag")], 20)
 
 plot_communication_discovery(ranked_axes)
 ```
+
+### 9.11 Two confounds that dominate raw rankings, and how to remove them
+
+A raw discovery ranking is dominated by two well-understood confounds. LogicComm
+flags both, and acts automatically on the first, so genuinely pair-specific
+biology is not buried under them. **Do not rank by raw `lcs`** -- that re-surfaces
+exactly these confounds; rank by `discovery_score` (the default order) and use the
+flag columns below.
+
+**(a) Broad / ubiquitous and identity axes (handled automatically since 0.9.3).**
+`MHC-I -> CD8A`, `CD99 - CD99`, `B2M`, and similar interactions are expressed by
+almost every cell, so they earn a high LCS everywhere without being
+cell-type-pair specific. `score_communication_specificity()` flags these
+(`ubiquitous_interaction_flag`, `specificity_class`). Since 0.9.3,
+`rank_communication_axes(demote_broad = TRUE)` (the default) multiplies their
+`discovery_score` by `broad_penalty` (default 0.5) and caps their `evidence_tier`
+at `Tier 3: broad / non-specific`, so a broad axis can never outrank a specific
+candidate. This is ranking-only: the `active` flag and LCS are untouched, and
+`demote_broad = FALSE` restores the previous behaviour. The demotion keys on
+*ubiquity*, not identity, so a genuine identity-but-specific axis such as
+`HLA-E -> KLRC1 / NKG2A` (NK self-recognition) is preserved while `HLA -> CD8A`
+is demoted.
+
+**中文说明。** `MHC-I -> CD8A`、`CD99 - CD99`、`B2M` 这类轴几乎所有细胞都表达，LCS
+到处都高但没有细胞类型对特异性。0.9.3 起 `rank_communication_axes()` 默认把
+`ubiquitous` 轴的 `discovery_score` 乘惩罚、`evidence_tier` 封顶到 Tier 3，所以它们
+不会再压过真正特异的候选；但**只针对“广谱”而非“身份”**，因此像 `HLA-E -> NKG2A`
+这种真实的 NK 自我识别轴会被保留，而 `HLA -> CD8A` 会被降级。**不要按原始 `lcs` 排序**，
+那会把这些混杂重新顶到最前；应按 `discovery_score`（默认顺序）排序。
+
+**(b) The proliferation / transcriptional-breadth hub (diagnostic).** Cycling
+cells (high S/G2M, very broad transcriptomes) call many genes logic-active and
+form active edges with almost every partner, so a `Cycling_*` cluster can appear
+in the large majority of top axes. `diagnose_proliferation_confound()` (run in
+Section 9.6) scores S/G2M signatures and transcriptional breadth per cell, flags
+breadth/cycling-outlier cell types, and annotates each axis with
+`proliferation_confound_flag`. It is diagnostic only -- it does not change any
+score -- so you filter it yourself.
+
+```{r confound_clean_view, eval=FALSE}
+# Per-cell-type proliferation/breadth summary (which cell types are hubs).
+ct_comm$proliferation_summary
+
+# How much do the two confounds dominate the top of the raw ranking?
+top50 <- head(ranked_axes, 50)
+mean(top50$broad_axis_flag %in% TRUE)              # fraction of top-50 that are broad
+mean(top50$proliferation_confound_flag %in% TRUE) # fraction touching a cycling hub
+
+# Recommended publication-level discovery view: drop broad axes AND
+# proliferation-hub axes, then rank by discovery_score.
+clean_axes <- subset(
+  ranked_axes,
+  !broad_axis_flag %in% TRUE &
+  !proliferation_confound_flag %in% TRUE
+)
+head(clean_axes[order(-clean_axes$discovery_score),
+                c("sender_type", "receiver_type", "lr_pair", "lcs",
+                  "discovery_score", "specificity_class", "evidence_tier")], 20)
+```
+
+**中文说明。** 增殖/转录广度中枢（如 `Cycling_*` 簇）会出现在绝大多数顶端轴里，但这
+反映的是转录广度而非特异通讯。`diagnose_proliferation_confound()` 只打标
+`proliferation_confound_flag`、不改打分，由你自己过滤。**推荐的发表级发现视图**：同时
+去掉 `broad_axis_flag` 和 `proliferation_confound_flag`，再按 `discovery_score` 排序。
+去掉这两类混杂后，真正特异的生物学（如 NK 的 `HLA-E -> NKG2A/KLRC`、`CCL5 -> CCR4`、
+`TNFSF9 -> TNFRSF9` 共刺激等）才会浮现 —— 它们的 LCS 往往不高，所以在原始排名里被
+广谱/增殖轴淹没。
+
+> **Caveat -- cell order.** `diagnose_proliferation_confound()` matches `expr`
+> columns to `ct_comm$cell_labels` by cell name when both are named; otherwise it
+> requires the same number of cells in the same order. Use the same cells you used
+> to build `reo_mat` / `ct_comm`. The default S/G2M sets are the Tirosh et al.
+> (2016) lists (override via `s_genes` / `g2m_genes`); genes absent from `expr`
+> are dropped, and z-scored hub flags need several cell types to be meaningful.
 
 ## Step 10: Optional Cell-Type-Level Case vs Control Comparison
 
