@@ -166,24 +166,41 @@ score_communication_specificity <- function(ct_comm,
 #' Tier 1 (strong, specific, and supported) to Tier 4 (weak or context
 #' dependent); when stability or permutation evidence is not supplied, the tier
 #' degrades gracefully to strength and specificity. Tiers are an interpretation
-#' aid for hypothesis prioritization, not hypothesis-test p-values.
+#' aid for hypothesis prioritization, not hypothesis-test p-values. Broad or
+#' ubiquitous axes flagged by \code{\link{score_communication_specificity}} are
+#' down-ranked (see \code{demote_broad}) so that cell-type-pair-specific
+#' candidates surface above ubiquitous interactions such as MHC-I -> CD8A.
 #'
 #' @param ct_comm Cell-type communication object.
 #' @param null_pair Optional output from \code{\link{permute_celltype_communication}}.
 #' @param sens Optional output from \code{\link{sensitivity_REO_threshold}}.
 #' @param top_n Number of rows to return.
+#' @param demote_broad If \code{TRUE} (default), broad/ubiquitous axes (those with
+#'   \code{ubiquitous_interaction_flag == TRUE}, e.g. MHC-I -> CD8A or CD99 - CD99)
+#'   are down-ranked: their \code{discovery_score} is multiplied by
+#'   \code{broad_penalty} and their \code{evidence_tier} is capped at Tier 3,
+#'   because by definition they are not cell-type-pair specific. This changes
+#'   ranking only -- the \code{active} flag and LCS are untouched. Set to
+#'   \code{FALSE} to restore the previous behaviour.
+#' @param broad_penalty Multiplicative penalty in \code{[0, 1]} applied to the
+#'   \code{discovery_score} of broad/ubiquitous axes when
+#'   \code{demote_broad = TRUE} (default \code{0.5}).
 #' @return The active \code{lr_table} rows augmented with \code{strength_score},
 #'   \code{specificity_score}, \code{threshold_stability}, \code{null_support},
-#'   \code{discovery_score}, and \code{evidence_tier}, sorted by
-#'   \code{discovery_score}. \code{publication_priority_score} is kept as a
-#'   backward-compatible alias.
+#'   \code{discovery_score}, \code{broad_axis_flag}, and \code{evidence_tier},
+#'   sorted by \code{discovery_score}. \code{publication_priority_score} is kept
+#'   as a backward-compatible alias.
 #' @seealso \code{\link{plot_communication_discovery}}
 #' @export
 rank_communication_axes <- function(ct_comm,
                                     null_pair = NULL,
                                     sens = NULL,
-                                    top_n = NULL) {
+                                    top_n = NULL,
+                                    demote_broad = TRUE,
+                                    broad_penalty = 0.5) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
+  stopifnot(is.numeric(broad_penalty), length(broad_penalty) == 1,
+            broad_penalty >= 0, broad_penalty <= 1)
   if (is.null(ct_comm$specificity_summary)) {
     ct_comm <- score_communication_specificity(ct_comm, verbose = FALSE)
   }
@@ -241,11 +258,34 @@ rank_communication_axes <- function(ct_comm,
   stat_ok <- if (has_stat) is.finite(support) & support >= 0.6 else rep(TRUE, nrow(df))
   spec_hi <- specificity >= 0.6
   str_hi <- strength >= 0.5
-  df$evidence_tier <- ifelse(
-    str_hi & spec_hi & stab_ok & stat_ok, "Tier 1: strong, specific, supported",
-    ifelse(str_hi & (spec_hi | (has_stat & stat_ok)), "Tier 2: strong candidate",
-    ifelse(strength >= 0.25 | spec_hi, "Tier 3: emerging candidate",
-           "Tier 4: weak / context-dependent")))
+  tier_rank <- ifelse(str_hi & spec_hi & stab_ok & stat_ok, 1L,
+                ifelse(str_hi & (spec_hi | (has_stat & stat_ok)), 2L,
+                ifelse(strength >= 0.25 | spec_hi, 3L, 4L)))
+
+  # Broad/ubiquitous axes (e.g. MHC-I -> CD8A, CD99 - CD99) are by definition not
+  # cell-type-pair specific. score_communication_specificity() already flags them
+  # (ubiquitous_interaction_flag), but the flag used to be annotation only, so a
+  # strong, null-supported broad axis still reached Tier 1/2 -- the tier rule
+  # never consulted it. When demote_broad = TRUE we multiply discovery_score by
+  # broad_penalty and cap the tier at 3, so a broad axis cannot outrank a
+  # genuinely pair-specific candidate. Ranking layer only: active and lcs are
+  # untouched, and demote_broad = FALSE restores the previous behaviour.
+  broad <- if ("ubiquitous_interaction_flag" %in% names(df)) {
+    df$ubiquitous_interaction_flag %in% TRUE
+  } else rep(FALSE, nrow(df))
+  df$broad_axis_flag <- broad
+  demoted <- isTRUE(demote_broad) & broad & tier_rank < 3L
+  if (isTRUE(demote_broad)) {
+    df$discovery_score <- df$discovery_score * ifelse(broad, broad_penalty, 1)
+    tier_rank[demoted] <- 3L
+  }
+
+  tier_labels <- c("Tier 1: strong, specific, supported",
+                   "Tier 2: strong candidate",
+                   "Tier 3: emerging candidate",
+                   "Tier 4: weak / context-dependent")
+  df$evidence_tier <- tier_labels[tier_rank]
+  df$evidence_tier[demoted] <- "Tier 3: broad / non-specific"
 
   df$publication_priority_score <- df$discovery_score
   df <- df[order(df$discovery_score, decreasing = TRUE), , drop = FALSE]

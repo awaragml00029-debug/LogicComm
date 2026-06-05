@@ -1,3 +1,46 @@
+# LogicComm 0.9.3
+
+## Broad/ubiquitous axes are down-ranked, not just annotated
+
+`score_communication_specificity()` already detected broad axes (MHC-I -> CD8A,
+CD99 - CD99, and other identity/ubiquitous interactions), but the flag was
+annotation only: a strong, null-supported broad axis still reached Tier 1/2 in
+`rank_communication_axes()` because the tier rule never consulted it. This let
+non-specific interactions dominate the discovery ranking -- including
+identity-associated broad axes where a marker survives the `min_expr_frac` gate
+(e.g. CD8A logic-active in ~26% of an activated Treg cluster from
+ambient/doublet contamination, well above the 10% gate).
+
+* `rank_communication_axes()` gains `demote_broad` (default `TRUE`) and
+  `broad_penalty` (default `0.5`). Axes with `ubiquitous_interaction_flag == TRUE`
+  have their `discovery_score` multiplied by `broad_penalty` and their
+  `evidence_tier` capped at Tier 3 ("broad / non-specific"), so a broad axis can
+  no longer outrank a genuinely cell-type-pair-specific candidate. This is a
+  ranking-layer change only -- the `active` flag and LCS are untouched -- and
+  `demote_broad = FALSE` restores the previous behaviour. A `broad_axis_flag`
+  column is added to the ranked output.
+
+## Proliferation / transcriptional-breadth confound diagnostic
+
+Cycling cells have unusually broad transcriptomes, so they call many genes
+logic-active and form active L-R edges with almost every partner: a proliferation
+"hub" (e.g. a Cycling_Lymphocytes cluster) can appear in the majority of
+top-ranked axes without representing specific biology.
+
+* New `diagnose_proliferation_confound(ct_comm, expr)` scores each cell's S/G2M
+  signatures (Tirosh et al. 2016 sets by default) and transcriptional breadth,
+  aggregates them per cell type, flags proliferation/breadth-outlier cell types,
+  and annotates `lr_table` with `sender_proliferation_hub`,
+  `receiver_proliferation_hub`, `proliferation_confound_flag`, and
+  `proliferation_hub_role`. It is a diagnostic only: it does not change the
+  `active` flag, LCS, or `discovery_score`. Use the flags to filter or
+  down-weight axes, or pass the object straight to `rank_communication_axes()`
+  (the flags ride along). A per-cell-type `proliferation_summary` is stored on
+  the object.
+
+* Added regression tests for the broad-axis demotion and the proliferation
+  diagnostic.
+
 # LogicComm 0.9.2
 
 ## Cell-type expressing-fraction gate removes hub-inflated phantom axes

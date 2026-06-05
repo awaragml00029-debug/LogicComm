@@ -4,7 +4,14 @@
 \alias{rank_communication_axes}
 \title{Rank Communication Axes by Integrated Discovery Evidence}
 \usage{
-rank_communication_axes(ct_comm, null_pair = NULL, sens = NULL, top_n = NULL)
+rank_communication_axes(
+  ct_comm,
+  null_pair = NULL,
+  sens = NULL,
+  top_n = NULL,
+  demote_broad = TRUE,
+  broad_penalty = 0.5
+)
 }
 \arguments{
 \item{ct_comm}{Cell-type communication object.}
@@ -14,13 +21,25 @@ rank_communication_axes(ct_comm, null_pair = NULL, sens = NULL, top_n = NULL)
 \item{sens}{Optional output from \code{\link{sensitivity_REO_threshold}}.}
 
 \item{top_n}{Number of rows to return.}
+
+\item{demote_broad}{If \code{TRUE} (default), broad/ubiquitous axes (those with
+\code{ubiquitous_interaction_flag == TRUE}, e.g. MHC-I -> CD8A or CD99 - CD99)
+are down-ranked: their \code{discovery_score} is multiplied by
+\code{broad_penalty} and their \code{evidence_tier} is capped at Tier 3,
+because by definition they are not cell-type-pair specific. This changes
+ranking only -- the \code{active} flag and LCS are untouched. Set to
+\code{FALSE} to restore the previous behaviour.}
+
+\item{broad_penalty}{Multiplicative penalty in \code{[0, 1]} applied to the
+\code{discovery_score} of broad/ubiquitous axes when
+\code{demote_broad = TRUE} (default \code{0.5}).}
 }
 \value{
 The active \code{lr_table} rows augmented with \code{strength_score},
   \code{specificity_score}, \code{threshold_stability}, \code{null_support},
-  \code{discovery_score}, and \code{evidence_tier}, sorted by
-  \code{discovery_score}. \code{publication_priority_score} is kept as a
-  backward-compatible alias.
+  \code{discovery_score}, \code{broad_axis_flag}, and \code{evidence_tier},
+  sorted by \code{discovery_score}. \code{publication_priority_score} is kept
+  as a backward-compatible alias.
 }
 \description{
 Produces a single prioritized list of candidate sender -> receiver -> L-R
@@ -41,7 +60,10 @@ sender/receiver subgroup. An \code{evidence_tier} summarizes the axes from
 Tier 1 (strong, specific, and supported) to Tier 4 (weak or context
 dependent); when stability or permutation evidence is not supplied, the tier
 degrades gracefully to strength and specificity. Tiers are an interpretation
-aid for hypothesis prioritization, not hypothesis-test p-values.
+aid for hypothesis prioritization, not hypothesis-test p-values. Broad or
+ubiquitous axes flagged by \code{\link{score_communication_specificity}} are
+down-ranked (see \code{demote_broad}) so that cell-type-pair-specific
+candidates surface above ubiquitous interactions such as MHC-I -> CD8A.
 }
 \seealso{
 \code{\link{plot_communication_discovery}}
