@@ -85,24 +85,6 @@ test_that("logic_compare_groups and logic_run expose clear group workflow", {
   expect_s3_class(logic_compare_groups(analysis), "LogicCommResult")
 })
 
-test_that("logic_score_lr validates requested neighborhood mode", {
-  reo <- Matrix::Matrix(
-    matrix(c(1, 0,
-             0, 1), nrow = 2, byrow = TRUE,
-           dimnames = list(c("L", "R"), c("C1", "C2"))),
-    sparse = TRUE
-  )
-  lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
-                      stringsAsFactors = FALSE)
-  lr_db$ligand_genes <- list("L")
-  lr_db$receptor_genes <- list("R")
-
-  expect_error(
-    logic_score_lr(reo, lr_db = lr_db, mode = "neighborhood", verbose = FALSE),
-    "requires seurat_obj or knn_mat"
-  )
-})
-
 test_that("cell-type summaries report missing labels and filter invalid labels clearly", {
   reo <- Matrix::Matrix(
     matrix(c(1, 0,

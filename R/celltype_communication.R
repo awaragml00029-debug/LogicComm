@@ -471,9 +471,9 @@ celltype_comm_to_lcs <- function(ct_comm,
 # expression space, not physical space) has been removed. Legacy neighborhood
 # arguments are accepted via ... so existing scripts do not hard-error, but they
 # are ignored with a warning. This shim is removed once callers are migrated.
-.deprecate_neighborhood_args <- function(dots) {
+.deprecate_neighborhood_args <- function(dots, fn = "summarize_celltype_communication") {
   if (!length(dots)) return(invisible(NULL))
-  legacy <- c("knn_mat", "graph_name", "remove_self_edges",
+  legacy <- c("knn_mat", "seurat_obj", "graph_name", "remove_self_edges",
               "graph_symmetrize", "edge_weight_mode")
   hit <- intersect(names(dots), legacy)
   m <- dots[["mode"]]
@@ -481,10 +481,10 @@ celltype_comm_to_lcs <- function(ct_comm,
     hit <- c("mode", hit)
   }
   if (length(hit)) {
-    warning("summarize_celltype_communication(): argument(s) ",
-            paste(hit, collapse = ", "),
+    warning(fn, "(): argument(s) ", paste(hit, collapse = ", "),
             " are deprecated and ignored. LogicComm now scores communication at ",
-            "the cell-type level (no per-cell neighborhood graph).", call. = FALSE)
+            "the cell-type level / global co-expression (no per-cell neighborhood graph).",
+            call. = FALSE)
   }
   invisible(NULL)
 }

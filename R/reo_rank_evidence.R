@@ -431,6 +431,88 @@ CompareRankLogicGroups <- function(rank_result_list,
   list(logic = logic_mat, rank = rank_mat)
 }
 
+# --- Transitional KNN helpers -------------------------------------------------
+# IdentifyRankLogicConsensus() still offers an optional neighborhood mode and is
+# the last consumer of these graph helpers (relocated here from the now
+# cell-type-only IdentifyLogicConsensus()). This rank-evidence module is itself
+# pending de-neighborhooding in a follow-up; until then the helpers live here so
+# the rest of the package no longer depends on a per-cell graph.
+.validate_and_align_knn <- function(knn_mat, cell_names) {
+  if (is.null(dim(knn_mat)) || nrow(knn_mat) != ncol(knn_mat)) {
+    stop("knn_mat must be a square cells x cells adjacency matrix.")
+  }
+  if (!is.null(rownames(knn_mat)) && !is.null(colnames(knn_mat))) {
+    missing_rows <- setdiff(cell_names, rownames(knn_mat))
+    missing_cols <- setdiff(cell_names, colnames(knn_mat))
+    if (length(missing_rows) > 0 || length(missing_cols) > 0) {
+      stop("knn_mat row/column names must contain all reo_mat column names.")
+    }
+    knn_mat <- knn_mat[cell_names, cell_names, drop = FALSE]
+  } else if (nrow(knn_mat) != length(cell_names)) {
+    stop("knn_mat dimensions must match ncol(reo_mat) when names are absent.")
+  } else {
+    rownames(knn_mat) <- colnames(knn_mat) <- cell_names
+  }
+  if (anyNA(knn_mat)) stop("knn_mat must not contain NA values.")
+  if (!inherits(knn_mat, "sparseMatrix")) {
+    knn_mat <- Matrix::Matrix(knn_mat, sparse = TRUE)
+  }
+  knn_mat
+}
+
+.symmetrize_sparse_graph <- function(knn_mat, mode = c("none", "or", "max")) {
+  mode <- match.arg(mode)
+  if (!inherits(knn_mat, "sparseMatrix")) {
+    knn_mat <- Matrix::Matrix(knn_mat, sparse = TRUE)
+  }
+  if (mode == "none") return(knn_mat)
+  s <- Matrix::summary(knn_mat)
+  if (nrow(s) == 0) return(knn_mat)
+  df <- rbind(
+    data.frame(i = as.integer(s$i), j = as.integer(s$j), x = as.numeric(s$x)),
+    data.frame(i = as.integer(s$j), j = as.integer(s$i), x = as.numeric(s$x))
+  )
+  if (mode == "or") df$x <- 1
+  agg <- stats::aggregate(x ~ i + j, df, max)
+  Matrix::sparseMatrix(
+    i = agg$i, j = agg$j, x = agg$x,
+    dims = dim(knn_mat), dimnames = dimnames(knn_mat)
+  )
+}
+
+.sparse_to_edges <- function(knn_mat, remove_self_edges = TRUE,
+                             edge_weight_mode = c("binary", "weighted")) {
+  edge_weight_mode <- match.arg(edge_weight_mode)
+  if (!inherits(knn_mat, "sparseMatrix")) {
+    knn_mat <- Matrix::Matrix(knn_mat, sparse = TRUE)
+  }
+  if (isTRUE(remove_self_edges) && nrow(knn_mat) > 0) {
+    diag(knn_mat) <- 0
+    knn_mat <- Matrix::drop0(knn_mat)
+  }
+  s <- Matrix::summary(knn_mat)
+  if (nrow(s) == 0) {
+    return(list(i = integer(0), j = integer(0), w = numeric(0)))
+  }
+  w <- if (edge_weight_mode == "weighted") as.numeric(s$x) else rep(1, nrow(s))
+  w[!is.finite(w)] <- 0
+  keep <- w > 0
+  list(i = as.integer(s$i[keep]), j = as.integer(s$j[keep]), w = as.numeric(w[keep]))
+}
+
+.extract_knn <- function(seurat_obj, graph_name) {
+  if (is.null(seurat_obj)) return(NULL)
+  if (is.null(graph_name)) {
+    graph_name <- grep("_nn$", names(seurat_obj@graphs), value = TRUE)[1]
+    if (is.na(graph_name)) graph_name <- grep("snn$", names(seurat_obj@graphs), value = TRUE)[1]
+    if (is.na(graph_name)) graph_name <- names(seurat_obj@graphs)[1]
+  }
+  if (is.null(graph_name) || !graph_name %in% names(seurat_obj@graphs)) {
+    stop("Could not find graph in Seurat object. Please specify graph_name.")
+  }
+  seurat_obj@graphs[[graph_name]]
+}
+
 .resolve_rank_graph <- function(seurat_obj,
                                 knn_mat,
                                 graph_name,

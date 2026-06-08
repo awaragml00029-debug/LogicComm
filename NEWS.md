@@ -24,11 +24,31 @@ juxtacrine/paracrine distance claims.
   ...) are retained as inert transitional stubs and will be removed once readers
   are migrated.
 
-Upcoming stages: strip the vestigial spatial columns/vocabulary; hard-delete the
-standalone per-cell neighborhood functions (`IdentifyLogicConsensus`,
-`IdentifyRankLogicConsensus`, neighborhood `logic_score_lr`); REO rank-weighted
-LCS; axis-level permutation null and per-cell bootstrap; and a benchmark harness
-against CellChat/CellPhoneDB/LIANA.
+### Stage 3: per-cell scoring engines de-neighborhooded
+
+The standalone scoring engines turned out to be dual-mode (neighborhood +
+global), and the flagship multi-sample pipeline `run_multisample()` is built on
+`IdentifyLogicConsensus()`. Rather than hard-deleting and breaking the flagship,
+their KNN/neighborhood paths were stripped and their **global co-expression
+cores retained**:
+
+* `IdentifyLogicConsensus()` is now global co-expression only (LCS = fraction of
+  cells co-expressing the complete ligand and receptor logic). KNN graph
+  resolution, symmetrization, edge construction, and weighted-edge scoring
+  removed.
+* `logic_score_lr()` drops its `mode`/`seurat_obj`/`knn_mat`/graph arguments and
+  scores globally (gate-aware path unchanged).
+* `run_multisample()` computes per-sample LCS by global co-expression; it no
+  longer passes a per-sample KNN graph.
+* Legacy neighborhood arguments remain accepted via `...` and ignored with a
+  warning.
+
+Still pending: `IdentifyRankLogicConsensus()` (the rank-evidence module) retains
+an optional neighborhood mode for now (its graph helpers were relocated into
+`reo_rank_evidence.R`) and will be de-neighborhooded next, followed by removal of
+the vestigial spatial columns/vocabulary; REO rank-weighted LCS; axis-level
+permutation null and per-cell bootstrap; and a benchmark harness against
+CellChat/CellPhoneDB/LIANA.
 
 # LogicComm 0.11.1
 

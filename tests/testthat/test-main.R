@@ -241,40 +241,6 @@ test_that("rank-aware logic gate blocks antagonist rank reversal", {
   expect_equal(summary$antagonist_outranks_receptor_rate, 0.5)
 })
 
-test_that("KNN mode validates and aligns cell names", {
-  reo <- Matrix::Matrix(
-    matrix(c(TRUE, FALSE, TRUE,
-             FALSE, TRUE, TRUE), nrow = 2, byrow = TRUE,
-           dimnames = list(c("L", "R"), c("C1", "C2", "C3"))),
-    sparse = TRUE
-  )
-  lr_db <- data.frame(
-    lr_pair = "L_R",
-    ligand = "L",
-    receptor = "R",
-    pathway = "test",
-    annotation = "test",
-    stringsAsFactors = FALSE
-  )
-  lr_db$ligand_genes <- list("L")
-  lr_db$receptor_genes <- list("R")
-
-  knn <- Matrix::Matrix(0, nrow = 3, ncol = 3, sparse = TRUE)
-  rownames(knn) <- colnames(knn) <- c("C3", "C1", "C2")
-  knn["C1", "C2"] <- 1
-  knn["C3", "C2"] <- 1
-
-  lcs <- IdentifyLogicConsensus(reo, knn_mat = knn, lr_db = lr_db, verbose = FALSE)
-  expect_equal(unname(lcs["L_R"]), 0.5)
-
-  bad_knn <- Matrix::Matrix(0, nrow = 2, ncol = 2, sparse = TRUE)
-  rownames(bad_knn) <- colnames(bad_knn) <- c("C1", "C2")
-  expect_error(
-    IdentifyLogicConsensus(reo, knn_mat = bad_knn, lr_db = lr_db, verbose = FALSE),
-    "contain all reo_mat column names"
-  )
-})
-
 test_that("multimer logic requires all subunits", {
   logic_mat <- Matrix::Matrix(
     matrix(c(1, 1, 1,
@@ -387,30 +353,6 @@ test_that("filter_lcs preserves valid data.frame structure and selected attribut
   expect_equal(attr(out, "case_label"), attr(res, "case_label"))
   expect_equal(attr(out, "lcs_mat"), attr(res, "lcs_mat"))
   expect_null(attr(out, "custom_unused"))
-})
-
-test_that("KNN self loops are removed by default", {
-  reo <- Matrix::Matrix(
-    matrix(c(TRUE, FALSE,
-             TRUE, FALSE), nrow = 2, byrow = TRUE,
-           dimnames = list(c("L", "R"), c("C1", "C2"))),
-    sparse = TRUE
-  )
-  lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
-                      stringsAsFactors = FALSE)
-  lr_db$ligand_genes <- list("L")
-  lr_db$receptor_genes <- list("R")
-  knn <- Matrix::Matrix(0, nrow = 2, ncol = 2, sparse = TRUE)
-  rownames(knn) <- colnames(knn) <- c("C1", "C2")
-  knn["C1", "C1"] <- 1
-  knn["C1", "C2"] <- 1
-
-  lcs_drop <- IdentifyLogicConsensus(reo, knn_mat = knn, lr_db = lr_db,
-                                     remove_self_edges = TRUE, verbose = FALSE)
-  lcs_keep <- IdentifyLogicConsensus(reo, knn_mat = knn, lr_db = lr_db,
-                                     remove_self_edges = FALSE, verbose = FALSE)
-  expect_equal(unname(lcs_drop["L_R"]), 0)
-  expect_equal(unname(lcs_keep["L_R"]), 0.5)
 })
 
 test_that("cell-type communication summaries recover directed A to B LCS and roles", {
@@ -550,29 +492,6 @@ test_that("cell-type plotting helpers return ggplot objects", {
   ex <- explain_celltype_interaction(ct, sender = "A", receiver = "B", lr_pair = "L_R")
   expect_true(is.list(ex))
   expect_true("evidence" %in% names(ex))
-})
-
-test_that("weighted graph LCS uses edge weights", {
-  reo <- Matrix::Matrix(
-    matrix(c(1, 1, 0,
-             0, 1, 1), nrow = 2, byrow = TRUE,
-           dimnames = list(c("L", "R"), c("C1", "C2", "C3"))),
-    sparse = TRUE
-  )
-  lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
-                      stringsAsFactors = FALSE)
-  lr_db$ligand_genes <- list("L")
-  lr_db$receptor_genes <- list("R")
-  knn <- Matrix::Matrix(0, nrow = 3, ncol = 3, sparse = TRUE)
-  rownames(knn) <- colnames(knn) <- c("C1", "C2", "C3")
-  knn["C1", "C2"] <- 9
-  knn["C3", "C2"] <- 1
-  lcs_bin <- IdentifyLogicConsensus(reo, knn_mat = knn, lr_db = lr_db,
-                                    edge_weight_mode = "binary", verbose = FALSE)
-  lcs_w <- IdentifyLogicConsensus(reo, knn_mat = knn, lr_db = lr_db,
-                                  edge_weight_mode = "weighted", verbose = FALSE)
-  expect_equal(unname(lcs_bin["L_R"]), 0.5)
-  expect_equal(unname(lcs_w["L_R"]), 0.9)
 })
 
 test_that("cell-type role summary exposes disambiguated count fields and low communication", {

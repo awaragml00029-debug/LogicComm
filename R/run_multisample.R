@@ -143,17 +143,9 @@ run_multisample <- function(sample_list,
       })
     if (is.null(reo)) return(NULL)
 
-    knn <- if (!is.null(knn_list)) knn_list[[sname]] else NULL
-    seurat_obj <- if (inherits(obj, "Seurat")) obj else NULL
-
     if (verbose) message(sprintf("  [%s] Computing LCS...", sname))
     lcs <- tryCatch(
-      IdentifyLogicConsensus(reo, seurat_obj = seurat_obj, knn_mat = knn,
-                             graph_name = graph_name,
-                             lr_db = lr_db, lcs_threshold = lcs_threshold,
-                             remove_self_edges = remove_self_edges,
-                             graph_symmetrize = graph_symmetrize,
-                             edge_weight_mode = edge_weight_mode,
+      IdentifyLogicConsensus(reo, lr_db = lr_db, lcs_threshold = lcs_threshold,
                              verbose = FALSE),
       error = function(e) {
         warning(sprintf("Sample '%s' LCS failed: %s", sname, conditionMessage(e)))

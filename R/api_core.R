@@ -169,65 +169,37 @@ logic_check_lrdb <- function(lr_db, require_metadata = FALSE, stop_on_error = FA
 
 #' Score ligand-receptor communication logic
 #'
+#' Computes global REO co-expression Logic Consensus Scores. LogicComm scores
+#' communication at the cell-type / co-expression level and no longer aggregates
+#' over a per-cell neighborhood graph.
+#'
 #' @param reo REO matrix or \code{LogicCommREOResult}.
-#' @param seurat_obj Optional Seurat object for graph extraction.
-#' @param knn_mat Optional cells x cells graph.
 #' @param lr_db LogicComm ligand-receptor database.
-#' @param graph_name Optional Seurat graph name.
-#' @param mode \code{"auto"}, \code{"neighborhood"}, or \code{"global"}.
 #' @param gates Use gate-aware LR scoring via \code{IdentifyLogicGateConsensus()}.
 #' @param lcs_threshold LCS activity threshold.
-#' @param remove_self_edges Remove cell-level graph self-loops.
-#' @param graph_symmetrize Optional graph symmetrization mode. If \code{NULL}, the
-#'   scorer default is used.
-#' @param edge_weight_mode Edge weight handling.
 #' @param verbose Print progress messages.
-#' @param ... Additional arguments passed to the underlying scorer.
+#' @param ... For the ordinary scorer, deprecated neighborhood arguments accepted
+#'   for backward compatibility and ignored with a warning; for \code{gates =
+#'   TRUE}, additional arguments passed to \code{IdentifyLogicGateConsensus()}.
 #' @return \code{LCSVector} for ordinary scoring, or \code{LogicGateResult} for
 #'   gate-aware scoring.
 #' @export
 logic_score_lr <- function(reo,
-                           seurat_obj = NULL,
-                           knn_mat = NULL,
                            lr_db = lr_pairs_human,
-                           graph_name = NULL,
-                           mode = c("auto", "neighborhood", "global"),
                            gates = FALSE,
                            lcs_threshold = 0.01,
-                           remove_self_edges = TRUE,
-                           graph_symmetrize = NULL,
-                           edge_weight_mode = c("binary", "weighted"),
                            verbose = TRUE,
                            ...) {
-  mode <- match.arg(mode)
-  edge_weight_mode <- match.arg(edge_weight_mode)
   logic_check_lrdb(lr_db, stop_on_error = TRUE)
 
-  if (mode == "global") {
-    seurat_obj <- NULL
-    knn_mat <- NULL
-    graph_name <- NULL
-  } else if (mode == "neighborhood" && is.null(seurat_obj) && is.null(knn_mat)) {
-    stop("mode = 'neighborhood' requires seurat_obj or knn_mat.")
-  }
-
-  args <- list(
-    reo_mat = if (isTRUE(gates)) reo else if (is.list(reo) && !is.null(reo$logic)) reo$logic else reo,
-    seurat_obj = seurat_obj,
-    knn_mat = knn_mat,
-    lr_db = lr_db,
-    graph_name = graph_name,
-    lcs_threshold = lcs_threshold,
-    remove_self_edges = remove_self_edges,
-    edge_weight_mode = edge_weight_mode,
-    verbose = verbose
-  )
-  if (!is.null(graph_symmetrize)) args$graph_symmetrize <- graph_symmetrize
-  args <- c(args, list(...))
+  reo_mat <- if (isTRUE(gates)) reo else if (is.list(reo) && !is.null(reo$logic)) reo$logic else reo
+  args <- c(list(reo_mat = reo_mat, lr_db = lr_db,
+                 lcs_threshold = lcs_threshold, verbose = verbose), list(...))
 
   if (isTRUE(gates)) {
     return(do.call(IdentifyLogicGateConsensus, args))
   }
+  .deprecate_neighborhood_args(list(...), "logic_score_lr")
   do.call(IdentifyLogicConsensus, args)
 }
 
