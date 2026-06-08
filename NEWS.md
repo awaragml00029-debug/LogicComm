@@ -61,11 +61,25 @@ cores retained**:
   `n_edges` (the product) as the trial size and produced anticonservative,
   far-too-narrow intervals.
 
-Still pending: `IdentifyRankLogicConsensus()` (the rank-evidence module) retains
-an optional neighborhood mode for now (its graph helpers were relocated into
-`reo_rank_evidence.R`) and will be de-neighborhooded next; removal of the
-vestigial spatial columns/vocabulary; REO rank-weighted LCS; and a benchmark
-harness against CellChat/CellPhoneDB/LIANA.
+### Stage 6 (started): benchmark harness vs. baselines
+
+* New `inst/benchmark/benchmark_vs_baselines.R`: a sandbox-runnable harness that
+  simulates data with a known ground truth (cell-type-specific axes, ubiquitous
+  housekeeping confounds, and null pairs), scores every sender -> receiver -> L-R
+  axis with LogicComm and with re-implemented baselines (CellPhoneDB/CellChat-style
+  mean-expression product; naive co-detection), and reports AUROC/AUPRC (ties
+  broken at random; averaged over simulations). Adapter stubs are included for the
+  real CellChat / CellPhoneDB / LIANA packages to run where installed.
+* First result (mean over 5 sims, 900 axes, 10 true positives): LogicComm's
+  specificity-aware discovery score reaches AUROC/AUPRC = 1.0, while the
+  mean-expression-product and naive baselines collapse to AUPRC ~0.07 because
+  ubiquitous housekeeping pairs saturate their scores. Raw LCS alone (without the
+  specificity/broad-demotion layer) also sits at ~0.07 -- i.e. the win is
+  attributable to the specificity layer, not to LCS per se.
+
+Still pending: REO rank-weighted LCS; `IdentifyRankLogicConsensus()`
+de-neighborhooding; removal of the vestigial spatial columns/vocabulary; and
+real-package + real-data benchmark runs.
 
 # LogicComm 0.11.1
 
