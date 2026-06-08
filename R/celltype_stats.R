@@ -100,15 +100,14 @@ permute_celltype_communication <- function(ct_comm = NULL,
   if (is.null(ct_comm)) {
     ct_comm <- do.call(
       summarize_celltype_communication,
-      c(list(reo_mat = reo_mat, cell_labels = cell_labels, knn_mat = knn_mat,
+      c(list(reo_mat = reo_mat, cell_labels = cell_labels,
              lr_db = lr_db, verbose = FALSE), dots)
     )
   }
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   inherited_params <- intersect(
     names(ct_comm$params),
-    c("mode", "graph_symmetrize", "edge_weight_mode", "remove_self_edges",
-      "include_self", "lcs_threshold", "min_edges", "min_active_edges",
+    c("include_self", "lcs_threshold", "min_edges", "min_active_edges",
       "min_expr_frac")
   )
   for (param in inherited_params) {
@@ -165,15 +164,6 @@ permute_celltype_communication <- function(ct_comm = NULL,
     cell_labels <- cell_labels[!invalid_labels]
     reo_mat <- reo_mat[, names(cell_labels), drop = FALSE]
   }
-  if (!is.null(knn_mat) && !is.null(rownames(knn_mat)) && !is.null(colnames(knn_mat)) &&
-      all(names(cell_labels) %in% rownames(knn_mat)) && all(names(cell_labels) %in% colnames(knn_mat))) {
-    knn_mat <- knn_mat[names(cell_labels), names(cell_labels), drop = FALSE]
-  }
-  mode_used <- if (!is.null(dots$mode)) dots$mode else "neighborhood"
-  if (is.null(knn_mat) && is.null(dots$seurat_obj) && identical(mode_used, "neighborhood")) {
-    stop("knn_mat is required for neighborhood-mode permutation: pass the same graph you ",
-         "used to build ct_comm (ct_comm does not store the cell-level KNN).", call. = FALSE)
-  }
   if (is.null(lr_db)) lr_db <- ct_comm$lr_db
   observed <- ct_comm$pair_summary
   if (!metric %in% names(observed)) stop("metric not found in pair_summary: ", metric)
@@ -185,7 +175,7 @@ permute_celltype_communication <- function(ct_comm = NULL,
     names(perm_labels) <- names(cell_labels)
     perm <- do.call(
       summarize_celltype_communication,
-      c(list(reo_mat = reo_mat, cell_labels = perm_labels, knn_mat = knn_mat,
+      c(list(reo_mat = reo_mat, cell_labels = perm_labels,
              lr_db = lr_db, verbose = FALSE), dots)
     )
     key_perm <- paste(perm$pair_summary$sender_type, perm$pair_summary$receiver_type, sep = "|")
@@ -374,7 +364,7 @@ sensitivity_REO_threshold <- function(expr_mat,
     thr <- rank_threshold_grid[i]
     if (isTRUE(verbose)) message(sprintf("[Sensitivity] rank_threshold=%.3f", thr))
     reo <- calc_REO_matrix(expr_mat, lr_genes = lr_genes, rank_threshold = thr, layer = layer, verbose = FALSE)
-    ct <- summarize_celltype_communication(reo, cell_labels = cell_labels, knn_mat = knn_mat,
+    ct <- summarize_celltype_communication(reo, cell_labels = cell_labels,
                                            lr_db = lr_db, verbose = FALSE, ...)
     results[[i]] <- ct
     vecs[[i]] <- celltype_comm_to_lcs(ct, level = level, metric = metric, active_only = FALSE)

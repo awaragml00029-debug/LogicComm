@@ -3,50 +3,48 @@
 #' Summarize Cell-Type-Resolved Logic Communication
 #'
 #' Aggregates ligand-receptor Logic Consensus Scores (LCS) by directed
-#' sender-cell-type to receiver-cell-type relationships. When a graph is supplied,
-#' the result reports both local graph-supported evidence and global cell-type
-#' communication potential so distal candidates are not discarded solely because
-#' they are absent from a Seurat NN/SNN graph.
+#' sender-cell-type to receiver-cell-type relationships. Communication is scored
+#' at the cell-type level from REO co-expression: for each sender -> receiver
+#' cell-type pair, the LCS is the fraction of the pair's opportunity universe
+#' (the sender x receiver cell-count product) in which the ligand is active in
+#' the sender cell and the receptor is active in the receiver cell.
 #'
 #' @details
-#' Self-loops and same-cell-type communication are intentionally separated.
-#' With the default \code{remove_self_edges = TRUE}, diagonal graph entries
-#' such as cell A -> cell A are removed before neighborhood scoring, which avoids
-#' treating within-cell ligand/receptor co-expression as direct intercellular
-#' communication evidence. With the default \code{include_self = TRUE}, sender
-#' and receiver cell types are still allowed to be identical, so rows such as
-#' Tumor -> Tumor or Macrophage -> Macrophage are retained and should be
-#' interpreted as autocrine-like, homotypic, or within-cell-type signaling
-#' potential. Global candidate scores provide complementary cell-type-level
-#' potential, including signals that may be distal or not represented in the
-#' local KNN/SNN graph.
+#' LogicComm scores communication at the cell-type level and does not aggregate
+#' over a per-cell KNN/SNN neighborhood graph. For dissociated scRNA-seq that
+#' graph lives in expression space rather than physical space, so it cannot
+#' license spatial juxtacrine/paracrine distance claims; cell-type co-expression
+#' is the honest, comparable unit. With the default \code{include_self = TRUE},
+#' sender and receiver cell types are allowed to be identical, so rows such as
+#' Tumor -> Tumor or Macrophage -> Macrophage are retained and interpreted as
+#' autocrine-like or homotypic signaling potential.
+#'
+#' Legacy neighborhood arguments (\code{knn_mat}, \code{graph_name},
+#' \code{mode}, \code{remove_self_edges}, \code{graph_symmetrize},
+#' \code{edge_weight_mode}) are accepted via \code{...} for backward
+#' compatibility but are deprecated and ignored with a warning.
 #'
 #' @param reo_mat Binary REO matrix (genes x cells).
 #' @param cell_labels Named character/factor vector mapping cells to cell types.
-#' @param seurat_obj Optional Seurat object.
+#' @param seurat_obj Optional Seurat object (used only to resolve cell labels).
 #' @param label_col Optional Seurat metadata column for labels.
-#' @param knn_mat Optional KNN adjacency matrix.
 #' @param lr_db LogicComm LR database.
-#' @param graph_name Optional Seurat graph name.
-#' @param lcs_threshold Minimum cell-type LCS.
-#' @param min_edges Minimum local/global opportunities required for active calls.
-#' @param min_active_edges Minimum active local/global support required.
+#' @param lcs_threshold Minimum cell-type LCS for an axis to be called active.
+#' @param min_edges Minimum opportunity universe (sender x receiver cell-count
+#'   product) required for an active call.
+#' @param min_active_edges Minimum co-expressing support required for an active call.
 #' @param min_expr_frac Minimum fraction of sender cells that must express the
 #'   ligand and of receiver cells that must express the receptor for a
-#'   sender-receiver L-R axis to be called active. Prevents a few high-degree
-#'   (hub) cells from making an axis active when the gene is expressed in a
-#'   negligible fraction of the cell type. Default: \code{0.1}; set \code{0} to
-#'   disable.
-#' @param mode Scoring mode.
-#' @param remove_self_edges Remove diagonal cell-level self-loops before local
-#'   graph scoring. This does not remove same-cell-type communication.
-#' @param graph_symmetrize Graph symmetrization.
-#' @param edge_weight_mode Edge weighting.
+#'   sender-receiver L-R axis to be called active. Prevents a few high-expressing
+#'   cells from calling an axis active when the gene is detected in a negligible
+#'   fraction of the cell type. Default: \code{0.1}; set \code{0} to disable.
 #' @param min_role_hub_quantile Hub score quantile.
 #' @param min_role_event_count Minimum event count.
 #' @param include_self Include same-cell-type sender/receiver pairs, interpreted
 #'   as autocrine-like or homotypic signaling potential.
 #' @param verbose Print progress.
+#' @param ... Deprecated neighborhood arguments, accepted for backward
+#'   compatibility and ignored with a warning.
 #'
 #' @return A list of class \code{LogicCommCellTypeComm}.
 #' @export
@@ -54,25 +52,18 @@ summarize_celltype_communication <- function(reo_mat,
                                              cell_labels = NULL,
                                              seurat_obj = NULL,
                                              label_col = NULL,
-                                             knn_mat = NULL,
                                              lr_db = lr_pairs_human,
-                                             graph_name = NULL,
                                              lcs_threshold = 0.01,
                                              min_edges = 20,
                                              min_active_edges = 1,
                                              min_expr_frac = 0.1,
-                                             mode = c("auto", "neighborhood", "global"),
-                                             remove_self_edges = TRUE,
-                                             graph_symmetrize = c("none", "or", "max"),
-                                             edge_weight_mode = c("binary", "weighted"),
                                              min_role_hub_quantile = 0.2,
                                              min_role_event_count = 5,
                                              include_self = TRUE,
-                                             verbose = TRUE) {
+                                             verbose = TRUE,
+                                             ...) {
   if (is.list(reo_mat) && !is.null(reo_mat$logic)) reo_mat <- reo_mat$logic
-  mode <- match.arg(mode)
-  graph_symmetrize <- match.arg(graph_symmetrize)
-  edge_weight_mode <- match.arg(edge_weight_mode)
+  .deprecate_neighborhood_args(list(...))
   stopifnot(is.numeric(min_expr_frac), length(min_expr_frac) == 1,
             min_expr_frac >= 0, min_expr_frac <= 1)
   .validate_lr_db_for_celltype(lr_db)
@@ -102,10 +93,6 @@ summarize_celltype_communication <- function(reo_mat,
   n_by_type <- table(factor(labels, levels = cell_types))
   celltype_sizes <- data.frame(cell_type = names(n_by_type), n_cells = as.integer(n_by_type), stringsAsFactors = FALSE)
 
-  if (identical(mode, "auto")) {
-    mode <- if (!is.null(knn_mat) || !is.null(seurat_obj)) "neighborhood" else "global"
-  }
-
   group_defs <- expand.grid(sender_type = cell_types, receiver_type = cell_types, stringsAsFactors = FALSE)
   if (!include_self) group_defs <- group_defs[group_defs$sender_type != group_defs$receiver_type, , drop = FALSE]
   group_defs$key <- paste(group_defs$sender_type, group_defs$receiver_type, sep = "|||")
@@ -115,44 +102,14 @@ summarize_celltype_communication <- function(reo_mat,
   receiver_n <- as.numeric(n_by_type[group_defs$receiver_type])
   n_global_possible_by_group <- sender_n * receiver_n
 
-  edge_i <- edge_j <- integer(0)
-  edge_w <- numeric(0)
-  edge_group_id <- integer(0)
-  n_edges_by_group <- rep(0L, n_groups)
-  edge_weight_sum_by_group <- rep(0, n_groups)
-
-  if (mode == "neighborhood") {
-    if (is.null(knn_mat)) knn_mat <- .extract_knn(seurat_obj, graph_name)
-    knn_mat <- .celltype_validate_and_align_knn(knn_mat, colnames(reo_mat))
-    knn_mat <- .celltype_symmetrize_sparse_graph(knn_mat, graph_symmetrize)
-    knn_edges <- .celltype_sparse_to_edges(knn_mat, remove_self_edges, edge_weight_mode)
-
-    edge_i <- knn_edges$i
-    edge_j <- knn_edges$j
-    edge_w <- knn_edges$w
-
-    if (!include_self && length(edge_i) > 0) {
-      keep <- labels[edge_i] != labels[edge_j]
-      edge_i <- edge_i[keep]
-      edge_j <- edge_j[keep]
-      edge_w <- edge_w[keep]
-    }
-
-    if (length(edge_i) > 0) {
-      edge_keys <- paste(labels[edge_i], labels[edge_j], sep = "|||")
-      edge_group_id <- match(edge_keys, group_defs$key)
-      valid_edge <- !is.na(edge_group_id)
-      edge_group_id <- edge_group_id[valid_edge]
-      edge_i <- edge_i[valid_edge]
-      edge_j <- edge_j[valid_edge]
-      edge_w <- edge_w[valid_edge]
-      n_edges_by_group <- tabulate(edge_group_id, nbins = n_groups)
-      edge_weight_sum_by_group <- .sum_by_group(edge_w, edge_group_id, n_groups)
-    }
-  } else {
-    n_edges_by_group <- as.integer(n_global_possible_by_group)
-    edge_weight_sum_by_group <- as.numeric(n_global_possible_by_group)
-  }
+  # Cell-type co-expression scoring. The LCS denominator is the cell-type-pair
+  # opportunity (sender x receiver cell-count product). LogicComm scores
+  # communication at the cell-type level and no longer aggregates over a
+  # per-cell KNN/SNN neighborhood graph: for dissociated scRNA-seq that graph
+  # lives in expression space, not physical space, so it cannot license spatial
+  # juxtacrine/paracrine distance claims.
+  n_edges_by_group <- as.integer(n_global_possible_by_group)
+  edge_weight_sum_by_group <- as.numeric(n_global_possible_by_group)
 
   if (verbose) message("[CellTypeComm] Resolving unique complex logic...")
   unique_complexes <- unique(c(lr_db$ligand_genes, lr_db$receptor_genes))
@@ -171,26 +128,6 @@ summarize_celltype_communication <- function(reo_mat,
 
     lig_key <- .complex_key(lig_genes)
     rec_key <- .complex_key(rec_genes)
-    lig_logic <- complex_logic_map[[lig_key]]
-    rec_logic <- complex_logic_map[[rec_key]]
-
-    lcs_neighborhood <- rep(NA_real_, n_groups)
-    lcs_unweighted <- rep(NA_real_, n_groups)
-    n_active_neighborhood <- rep(0L, n_groups)
-    active_edge_weight_sum <- rep(0, n_groups)
-
-    if (mode == "neighborhood" && length(edge_i) > 0) {
-      active_events <- lig_logic[edge_i] & rec_logic[edge_j]
-      if (any(active_events)) {
-        n_active_neighborhood <- tabulate(edge_group_id[active_events], nbins = n_groups)
-        active_edge_weight_sum <- .sum_by_group(edge_w[active_events], edge_group_id[active_events], n_groups)
-      }
-      lcs_unweighted <- ifelse(n_edges_by_group > 0, n_active_neighborhood / n_edges_by_group, NA_real_)
-      denom_nb <- if (edge_weight_mode == "weighted") edge_weight_sum_by_group else n_edges_by_group
-      num_nb <- if (edge_weight_mode == "weighted") active_edge_weight_sum else n_active_neighborhood
-      lcs_neighborhood <- ifelse(denom_nb > 0, num_nb / denom_nb, NA_real_)
-    }
-
     lig_sum <- complex_type_sums[[lig_key]]
     rec_sum <- complex_type_sums[[rec_key]]
     ligand_active_n_sender <- as.numeric(lig_sum[group_defs$sender_type])
@@ -199,39 +136,34 @@ summarize_celltype_communication <- function(reo_mat,
     receptor_active_frac_receiver <- receptor_active_n_receiver / pmax(receiver_n, 1)
     n_active_global <- ligand_active_n_sender * receptor_active_n_receiver
     lcs_global <- n_active_global / pmax(n_global_possible_by_group, 1)
-    if (mode == "global") lcs_unweighted <- lcs_global
 
     # Cell-type expressing-fraction gate: the ligand must be active in at least
     # min_expr_frac of sender cells and the receptor in at least min_expr_frac of
-    # receiver cells. This prevents a handful of high-degree (hub) cells from
-    # making an axis "active" when the gene is expressed in a negligible fraction
-    # of the cell type (e.g. ambient CD8A in a few Treg cells that are KNN hubs).
+    # receiver cells. This prevents a few high-expressing cells from calling an
+    # axis "active" when the gene is detected in a negligible fraction of the
+    # cell type (e.g. ambient CD8A in a few Treg cells).
     expr_ok <- ligand_active_frac_sender >= min_expr_frac &
                receptor_active_frac_receiver >= min_expr_frac
 
-    local_denominator_ok <- mode == "neighborhood" & !is.na(lcs_neighborhood) & n_edges_by_group >= min_edges
-    local_active <- local_denominator_ok & lcs_neighborhood >= lcs_threshold &
-                    n_active_neighborhood >= min_active_edges & expr_ok
+    active <- n_global_possible_by_group >= min_edges & !is.na(lcs_global) &
+              lcs_global >= lcs_threshold & n_active_global >= min_active_edges & expr_ok
 
-    global_denominator_ok <- n_global_possible_by_group >= min_edges
-    global_candidate_active <- global_denominator_ok & !is.na(lcs_global) & lcs_global >= lcs_threshold &
-                               n_active_global >= min_active_edges & expr_ok
-
-    distal_candidate <- mode == "neighborhood" & global_candidate_active & !local_active
-    candidate_active <- local_active | global_candidate_active
-
-    lcs_final <- ifelse(local_active, lcs_neighborhood,
-                        ifelse(global_candidate_active, lcs_global,
-                               if (mode == "neighborhood") lcs_neighborhood else lcs_global))
-    lcs_primary_mode <- ifelse(local_active, "local",
-                               ifelse(distal_candidate, "distal_global",
-                                      ifelse(global_candidate_active, "global", "unscored")))
-    comm_range <- ifelse(local_active & global_candidate_active, "paracrine",
-                         ifelse(local_active & !global_candidate_active, "juxtacrine",
-                                ifelse(global_candidate_active & !local_active, "distal/endocrine", "inactive")))
-
-    n_active_edges <- ifelse(local_active, n_active_neighborhood,
-                             ifelse(global_candidate_active, n_active_global, n_active_neighborhood))
+    # Transitional back-compatible fields. LogicComm now scores communication at
+    # the cell-type level only; the former neighborhood / local / distal / range
+    # fields are retained as inert stubs so existing readers keep working, and
+    # are removed in a later cleanup step.
+    lcs_final <- lcs_global
+    lcs_unweighted <- lcs_global
+    lcs_neighborhood <- rep(NA_real_, n_groups)
+    n_active_neighborhood <- rep(0L, n_groups)
+    active_edge_weight_sum <- rep(0, n_groups)
+    n_active_edges <- n_active_global
+    local_active <- rep(FALSE, n_groups)
+    global_candidate_active <- active
+    distal_candidate <- rep(FALSE, n_groups)
+    candidate_active <- active
+    lcs_primary_mode <- ifelse(active, "cell_type", "unscored")
+    comm_range <- ifelse(active, "cell_type", "inactive")
 
     data.frame(
       sender_type = group_defs$sender_type,
@@ -299,11 +231,7 @@ summarize_celltype_communication <- function(reo_mat,
     cell_labels = labels,
     lr_db = lr_db,
     params = list(
-      mode = mode,
-      graph_name = graph_name,
-      graph_symmetrize = graph_symmetrize,
-      edge_weight_mode = edge_weight_mode,
-      remove_self_edges = remove_self_edges,
+      mode = "celltype",
       include_self = include_self,
       lcs_threshold = lcs_threshold,
       min_edges = min_edges,
@@ -538,65 +466,27 @@ celltype_comm_to_lcs <- function(ct_comm,
   mat
 }
 
-.extract_knn <- function(seurat_obj, graph_name) {
-  if (is.null(seurat_obj)) return(NULL)
-  if (is.null(graph_name)) {
-    graph_name <- grep("_nn$", names(seurat_obj@graphs), value = TRUE)[1]
-    if (is.na(graph_name)) graph_name <- grep("snn$", names(seurat_obj@graphs), value = TRUE)[1]
-    if (is.na(graph_name)) graph_name <- names(seurat_obj@graphs)[1]
+# Transitional deprecation shim. LogicComm scores communication at the cell-type
+# level; the former per-cell KNN/SNN neighborhood graph (which lives in
+# expression space, not physical space) has been removed. Legacy neighborhood
+# arguments are accepted via ... so existing scripts do not hard-error, but they
+# are ignored with a warning. This shim is removed once callers are migrated.
+.deprecate_neighborhood_args <- function(dots) {
+  if (!length(dots)) return(invisible(NULL))
+  legacy <- c("knn_mat", "graph_name", "remove_self_edges",
+              "graph_symmetrize", "edge_weight_mode")
+  hit <- intersect(names(dots), legacy)
+  m <- dots[["mode"]]
+  if (!is.null(m) && !as.character(m)[1] %in% c("global", "celltype", "auto")) {
+    hit <- c("mode", hit)
   }
-  if (is.null(graph_name) || !graph_name %in% names(seurat_obj@graphs)) stop("Could not find graph in Seurat object. Please specify graph_name.")
-  seurat_obj@graphs[[graph_name]]
-}
-
-.celltype_validate_and_align_knn <- function(knn_mat, cell_names) {
-  if (is.null(knn_mat)) return(NULL)
-  if (is.null(dim(knn_mat)) || nrow(knn_mat) != ncol(knn_mat)) stop("knn_mat must be a square cells x cells adjacency matrix.")
-  if (!is.null(rownames(knn_mat)) && !is.null(colnames(knn_mat))) {
-    if (!all(cell_names %in% rownames(knn_mat)) || !all(cell_names %in% colnames(knn_mat))) stop("KNN matrix is missing cells from REO matrix.")
-    knn_mat <- knn_mat[cell_names, cell_names, drop = FALSE]
-  } else if (nrow(knn_mat) != length(cell_names)) {
-    stop("knn_mat dimensions must match ncol(reo_mat) when names are absent.")
-  } else {
-    rownames(knn_mat) <- colnames(knn_mat) <- cell_names
+  if (length(hit)) {
+    warning("summarize_celltype_communication(): argument(s) ",
+            paste(hit, collapse = ", "),
+            " are deprecated and ignored. LogicComm now scores communication at ",
+            "the cell-type level (no per-cell neighborhood graph).", call. = FALSE)
   }
-  if (!inherits(knn_mat, "sparseMatrix")) knn_mat <- Matrix::Matrix(knn_mat, sparse = TRUE)
-  knn_mat
-}
-
-.celltype_symmetrize_sparse_graph <- function(m, mode) {
-  if (is.null(m) || mode == "none") return(m)
-  if (!inherits(m, "sparseMatrix")) m <- Matrix::Matrix(m, sparse = TRUE)
-  m_t <- Matrix::t(m)
-  if (mode == "or") return((m + m_t) > 0)
-  if (mode == "max") {
-    s1 <- Matrix::summary(m)
-    s2 <- Matrix::summary(m_t)
-    df <- rbind(
-      data.frame(i = s1$i, j = s1$j, x = s1$x),
-      data.frame(i = s2$i, j = s2$j, x = s2$x)
-    )
-    if (!nrow(df)) return(m)
-    agg <- stats::aggregate(x ~ i + j, df, max)
-    return(Matrix::sparseMatrix(i = agg$i, j = agg$j, x = agg$x,
-                                dims = dim(m), dimnames = dimnames(m)))
-  }
-  m
-}
-
-.celltype_sparse_to_edges <- function(m, remove_self, weight_mode) {
-  if (is.null(m)) return(list(i = integer(0), j = integer(0), w = numeric(0)))
-  if (!inherits(m, "sparseMatrix")) m <- Matrix::Matrix(m, sparse = TRUE)
-  if (isTRUE(remove_self) && nrow(m) > 0) {
-    diag(m) <- 0
-    m <- Matrix::drop0(m)
-  }
-  summary_m <- Matrix::summary(m)
-  if (nrow(summary_m) == 0) return(list(i = integer(0), j = integer(0), w = numeric(0)))
-  w <- if (weight_mode == "binary") rep(1, nrow(summary_m)) else as.numeric(summary_m$x)
-  w[!is.finite(w)] <- 0
-  keep <- w > 0
-  list(i = as.integer(summary_m$i[keep]), j = as.integer(summary_m$j[keep]), w = as.numeric(w[keep]))
+  invisible(NULL)
 }
 
 .validate_lr_db_for_celltype <- function(lr_db) {

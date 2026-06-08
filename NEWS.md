@@ -1,3 +1,35 @@
+# LogicComm 0.12.0
+
+## Major change: cell-type co-expression scoring (neighborhood removal, stage 1)
+
+LogicComm is pivoting to a pure cell-type-level cell-cell communication method,
+positioned as an interpretable, sample-comparable alternative to CellChat. The
+per-cell KNN/SNN *neighborhood* scoring is being removed because, for
+dissociated scRNA-seq, that graph lives in expression space (transcriptomic
+similarity), not physical space, and therefore cannot license spatial
+juxtacrine/paracrine distance claims.
+
+* `summarize_celltype_communication()` now scores communication **only** at the
+  cell-type level: for each sender -> receiver pair, the LCS is the fraction of
+  the pair's opportunity universe (sender x receiver cell-count product) in which
+  the ligand is active in the sender and the receptor is active in the receiver.
+  The KNN/SNN neighborhood branch, edge construction, and graph helpers have been
+  removed.
+* The legacy neighborhood arguments (`knn_mat`, `graph_name`, `mode`,
+  `remove_self_edges`, `graph_symmetrize`, `edge_weight_mode`) are accepted via
+  `...` for backward compatibility but are **deprecated and ignored with a
+  warning**. They will be removed in a later release.
+* The former neighborhood/local/distal/range output fields
+  (`lcs_neighborhood`, `local_active`, `distal_candidate`, `communication_range`,
+  ...) are retained as inert transitional stubs and will be removed once readers
+  are migrated.
+
+Upcoming stages: strip the vestigial spatial columns/vocabulary; hard-delete the
+standalone per-cell neighborhood functions (`IdentifyLogicConsensus`,
+`IdentifyRankLogicConsensus`, neighborhood `logic_score_lr`); REO rank-weighted
+LCS; axis-level permutation null and per-cell bootstrap; and a benchmark harness
+against CellChat/CellPhoneDB/LIANA.
+
 # LogicComm 0.11.1
 
 ## Documentation
