@@ -926,18 +926,28 @@ boot_pair <- bootstrap_celltype_communication(
 head(boot_pair)
 ```
 
+The permutation null shuffles cell-type labels to ask whether each
+sender -> receiver pair is stronger than chance. Two practical points:
+
+- **Permutations are independent, so set `n_cores`** to fork the loop (Unix/macOS)
+  for a near-linear speedup that makes a large `n_perm` affordable.
+- **The empirical p-value floor is `1 / (n_perm + 1)`.** With `n_perm = 12` the
+  smallest possible p is 0.083, so nothing reaches p < 0.05 and no axis can earn
+  Tier 1. Use `n_perm >= 200` (floor ~0.005) for single-axis resolution, or
+  `n_perm = 1000` to leave headroom for BH correction across many axes.
+
 ```{r celltype_permutation_null, eval=FALSE}
 null_pair <- permute_celltype_communication(
   ct_comm          = ct_comm,
   reo_mat          = reo_pbmc,
-  knn_mat          = pbmc@graphs$RNA_nn, # Match the graph used to compute ct_comm above.
-  n_perm           = 100,
-  adaptive         = TRUE,
-  adaptive_top_n   = 25,
-  adaptive_n_perm  = 1000,
+  knn_mat          = pbmc@graphs$RNA_nn,  # must match the graph used to build ct_comm
+  n_perm           = 1000,                # p-value floor ~1/1001 (see note above)
+  n_cores          = 8,                   # fork-parallel on Unix/macOS: ~Nx speedup
   metric           = "sum_lcs",
   seed             = 1
 )
+# Lower-compute alternative: n_perm = 100 with adaptive = TRUE, adaptive_top_n = 25,
+# adaptive_n_perm = 1000 refines only the top candidates to 1000 permutations.
 head(null_pair[order(null_pair$fdr), ], 10)
 
 diagnose_permutation_resolution(null_pair)
@@ -1255,6 +1265,8 @@ mean(top50$proliferation_confound_flag %in% TRUE) # fraction touching a cycling 
 # the survivors within the kept set, so genuine low-LCS candidates are tiered on
 # their own merits instead of against the noise that was removed.
 clean_axes <- communication_discovery_view(ranked_axes)   # drop_broad + drop_proliferation
+# Shortcut: communication_discovery_view(ct_comm) also works -- it ranks the axes
+# on the fly (without permutation support; pass a ranked data.frame for null_support).
 head(clean_axes[, c("sender_type", "receiver_type", "lr_pair", "lcs",
                     "discovery_score", "specificity_class", "evidence_tier")], 20)
 

@@ -1,3 +1,12 @@
+# LogicComm 0.11.1
+
+## Documentation
+
+* Seurat tutorial: the permutation-null step now demonstrates `n_cores`
+  (fork-parallel) and explains the `1 / (n_perm + 1)` empirical p-value floor and
+  how to pick `n_perm`; the discovery-view step notes that
+  `communication_discovery_view()` accepts a `ct_comm` object directly.
+
 # LogicComm 0.11.0
 
 ## Faster permutation null + discovery-view ergonomics
