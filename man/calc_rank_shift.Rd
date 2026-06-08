@@ -76,14 +76,26 @@ values.
 }
 }
 \examples{
-\dontrun{
-groups <- c(rep("Case", 10), rep("Ctrl", 10))
-names(groups) <- names(sample_list)
-
-rs <- calc_rank_shift(sample_list, group_info = groups)
-head(rs[rs$shift_score > 0.2, ])  # genes that rose in rank in Case
-plot_rank_shift(rs)
+make_sample <- function(g_values) {
+  matrix(
+    c(g_values,
+      rep(5, length(g_values))),
+    nrow = 2, byrow = TRUE,
+    dimnames = list(c("G", "BG"), paste0("C", seq_along(g_values)))
+  )
 }
+sample_list <- list(
+  Case1 = make_sample(c(10, 10, 10, 10)),
+  Ctrl1 = make_sample(c(1, 1, 1, 1))
+)
+groups <- c(Case1 = "Case", Ctrl1 = "Ctrl")
+lr_db <- data.frame(lr_pair = "G_R", ligand = "G", receptor = "R",
+                    stringsAsFactors = FALSE)
+lr_db$ligand_genes <- list("G")
+lr_db$receptor_genes <- list("R")
+rs <- calc_rank_shift(sample_list, group_info = groups, genes = "G",
+                      lr_db = lr_db, verbose = FALSE)
+head(rs)
 
 }
 \seealso{

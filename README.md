@@ -30,6 +30,12 @@ LogicComm converts single-cell expression matrices into **Relative Expression Or
 
 ## Installation
 
+### Install LogicComm
+
+```r
+install.packages("LogicComm")
+```
+
 ### Core dependencies
 
 ```r
@@ -55,15 +61,15 @@ install.packages("igraph")
 # install.packages("BPCells") or use the official installation method
 ```
 
-### Install LogicComm from a local source tarball
+### Install LogicComm from a source tarball
 
 ```r
-install.packages("LogicComm_0.10.4.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.11.1.tar.gz", repos = NULL, type = "source")
 
-# Or install a published release directly from GitHub:
-# install.packages(
-#   "https://github.com/awaragml00029-debug/LogicComm/releases/download/v0.10.4/LogicComm_0.10.4.tar.gz",
-#   repos = NULL, type = "source")
+install.packages(
+  "https://github.com/awaragml00029-debug/LogicComm/releases/download/v0.11.1/LogicComm_0.11.1.tar.gz",
+  repos = NULL, type = "source"
+)
 ```
 
 If installing from the unpacked source directory during development:

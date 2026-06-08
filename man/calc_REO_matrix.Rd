@@ -94,14 +94,15 @@ receptors/ligands (e.g. TGFBR1+TGFBR2) as active only when *all* subunit genes
 are above anchor (logical AND).
 }
 \examples{
-\dontrun{
-library(LogicComm)
-data(lr_pairs_human)
-lr_genes <- all_lr_genes(lr_pairs_human)
-
-reo <- calc_REO_matrix(my_seurat, lr_genes = lr_genes)
-reo <- calc_REO_matrix(count_matrix, lr_genes = lr_genes, rank_threshold = 0.6)
-}
+expr <- matrix(
+  c(10, 0,
+    0, 10,
+    1, 1),
+  nrow = 3, byrow = TRUE,
+  dimnames = list(c("L", "R", "BG"), c("C1", "C2"))
+)
+reo <- calc_REO_matrix(expr, lr_genes = c("L", "R"), verbose = FALSE)
+reo
 
 }
 \seealso{

@@ -63,12 +63,15 @@ unavailable rather than negative: frequencies and Fisher tables use the number
 of non-missing samples for that pair in each group.
 }
 \examples{
-\dontrun{
-groups <- c(rep("Case", 10), rep("Ctrl", 10))
-names(groups) <- names(lcs_list)
-result <- CompareLogicGroups(lcs_list, group_info = groups)
-subset(result, asymmetry >= 0.6 & fdr_fisher < 0.05)
-}
+lcs_list <- list(
+  Case1 = c(L_R = 0.4),
+  Case2 = c(L_R = 0.3),
+  Ctrl1 = c(L_R = 0.0),
+  Ctrl2 = c(L_R = 0.1)
+)
+groups <- c(Case1 = "Case", Case2 = "Case", Ctrl1 = "Ctrl", Ctrl2 = "Ctrl")
+result <- CompareLogicGroups(lcs_list, group_info = groups, verbose = FALSE)
+subset(result, asymmetry >= 0.1)
 
 }
 \seealso{

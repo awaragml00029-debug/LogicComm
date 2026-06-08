@@ -101,17 +101,27 @@ BPCells \code{IterableMatrix} objects in \code{sample_list}; LogicComm
 will stream them chunk by chunk.
 }
 \examples{
-\dontrun{
-library(LogicComm)
-
-# 6 Seurat objects: 3 Case + 3 Ctrl
-groups <- c(rep("Case", 3), rep("Ctrl", 3))
-names(groups) <- names(sample_list)
-
-result <- run_multisample(sample_list, group_info = groups, mc_cores = 4)
-print(result$comparison)
-plot_lcs_bubble(result$comparison)
+make_sample <- function(l_value, r_value) {
+  matrix(
+    c(l_value, 0,
+      0, r_value,
+      1, 1),
+    nrow = 3, byrow = TRUE,
+    dimnames = list(c("L", "R", "BG"), c("C1", "C2"))
+  )
 }
+samples <- list(
+  Case1 = make_sample(10, 10),
+  Ctrl1 = make_sample(5, 5)
+)
+groups <- c(Case1 = "Case", Ctrl1 = "Ctrl")
+lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
+                    stringsAsFactors = FALSE)
+lr_db$ligand_genes <- list("L")
+lr_db$receptor_genes <- list("R")
+result <- run_multisample(samples, group_info = groups, lr_db = lr_db,
+                          verbose = FALSE)
+print(result$comparison)
 
 }
 \seealso{

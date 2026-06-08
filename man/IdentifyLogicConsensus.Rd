@@ -84,20 +84,18 @@ is realized across the cell population (or its neighborhoods).
 genes to be active (\code{TRUE}) for the receptor to be counted as expressed.
 }
 \examples{
-\dontrun{
-data(lr_pairs_human)
-lr_genes <- all_lr_genes(lr_pairs_human)
-reo <- calc_REO_matrix(my_seurat, lr_genes = lr_genes)
-
-# Neighborhood mode
-lcs <- IdentifyLogicConsensus(reo, seurat_obj = my_seurat)
-
-# Global mode (no KNN)
-lcs <- IdentifyLogicConsensus(reo)
-
-# View top pairs
-sort(lcs, decreasing = TRUE)[1:20]
-}
+reo <- Matrix::Matrix(
+  matrix(c(1, 0,
+           0, 1), nrow = 2, byrow = TRUE,
+         dimnames = list(c("L", "R"), c("C1", "C2"))),
+  sparse = TRUE
+)
+lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
+                    stringsAsFactors = FALSE)
+lr_db$ligand_genes <- list("L")
+lr_db$receptor_genes <- list("R")
+lcs <- IdentifyLogicConsensus(reo, lr_db = lr_db, verbose = FALSE)
+sort(lcs, decreasing = TRUE)
 
 }
 \seealso{

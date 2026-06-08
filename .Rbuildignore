@@ -7,3 +7,5 @@
 ^.*\.tar\.gz$
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^cran-comments\.md$
+^_pkgdown\.yml$

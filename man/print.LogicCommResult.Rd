@@ -13,6 +13,18 @@
 
 \item{...}{Ignored.}
 }
+\value{
+Invisibly returns \code{x}, called for side effects.
+}
 \description{
 Print method for LogicCommResult
+}
+\examples{
+result <- structure(
+  data.frame(lr_pair = "L_R", case_freq = 0.8, ctrl_freq = 0.2,
+             asymmetry = 0.6, log2fc_lcs = 1, fdr_fisher = 0.01),
+  class = c("LogicCommResult", "data.frame"),
+  case_label = "Case", ctrl_label = "Ctrl"
+)
+print(result)
 }

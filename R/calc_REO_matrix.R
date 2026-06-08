@@ -67,14 +67,15 @@
 #' @seealso \code{\link{IdentifyLogicConsensus}}, \code{\link{all_lr_genes}}
 #'
 #' @examples
-#' \dontrun{
-#' library(LogicComm)
-#' data(lr_pairs_human)
-#' lr_genes <- all_lr_genes(lr_pairs_human)
-#'
-#' reo <- calc_REO_matrix(my_seurat, lr_genes = lr_genes)
-#' reo <- calc_REO_matrix(count_matrix, lr_genes = lr_genes, rank_threshold = 0.6)
-#' }
+#' expr <- matrix(
+#'   c(10, 0,
+#'     0, 10,
+#'     1, 1),
+#'   nrow = 3, byrow = TRUE,
+#'   dimnames = list(c("L", "R", "BG"), c("C1", "C2"))
+#' )
+#' reo <- calc_REO_matrix(expr, lr_genes = c("L", "R"), verbose = FALSE)
+#' reo
 #'
 #' @export
 calc_REO_matrix <- function(expr_mat,
@@ -321,6 +322,14 @@ calc_REO_matrix <- function(expr_mat,
 #' Print method for LogicCommREOResult
 #' @param x LogicCommREOResult object.
 #' @param ... Ignored.
+#' @return Invisibly returns \code{x}, called for side effects.
+#' @examples
+#' reo <- structure(
+#'   list(logic = Matrix::Matrix(1, nrow = 1, ncol = 1, sparse = TRUE),
+#'        rank = matrix(0.8, nrow = 1, ncol = 1)),
+#'   class = "LogicCommREOResult"
+#' )
+#' print(reo)
 #' @export
 print.LogicCommREOResult <- function(x, ...) {
   rank_msg <- if (is.null(x$rank)) "rank not returned" else

@@ -54,6 +54,59 @@
 #' @param show_labels Show cell-type names.
 #' @param color_edges_by How to color edges: \code{"top_pathway"} or \code{"range"}.
 #' @return A ggplot2 object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("plot_celltype_network")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 plot_celltype_network <- function(ct_comm,
                                   metric = c("sum_lcs", "n_active_lr"),
@@ -158,6 +211,59 @@ plot_celltype_network <- function(ct_comm,
 #' @param title Optional title.
 #' @param rotate_x Rotation angle for x-axis labels.
 #' @return A ggplot2 object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("plot_celltype_heatmap")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 plot_celltype_heatmap <- function(ct_comm,
                                   metric = c("n_active_lr", "active_lr_event_count", "sum_lcs",
@@ -182,6 +288,59 @@ plot_celltype_heatmap <- function(ct_comm,
 #'
 #' @param ct_comm Output from \code{summarize_celltype_communication()}.
 #' @return A ggplot2 object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("plot_communication_range_summary")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 plot_communication_range_summary <- function(ct_comm) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
@@ -208,6 +367,59 @@ plot_communication_range_summary <- function(ct_comm) {
 #' @param top_n_per_pair Number of rows per sender-receiver pair.
 #' @param top_n_pathways Number of pathways (facets) to show, ranked by total LCS.
 #' @return A ggplot2 object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("plot_lr_bubble_advanced")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 plot_lr_bubble_advanced <- function(ct_comm, senders = NULL, receivers = NULL,
                                     top_n_per_pair = 5, top_n_pathways = 12) {
@@ -248,6 +460,59 @@ plot_lr_bubble_advanced <- function(ct_comm, senders = NULL, receivers = NULL,
 #' @param color_by Field used for color.
 #' @param title Optional title.
 #' @return A ggplot2 object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("plot_lr_bubble_by_celltype")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 plot_lr_bubble_by_celltype <- function(ct_comm,
                                        sender = NULL,
@@ -288,6 +553,59 @@ plot_lr_bubble_by_celltype <- function(ct_comm,
 #' @param cluster_rows Cluster pathway rows using the selected metric across cell-type pairs.
 #' @param cluster_cols Cluster sender-receiver pair columns using the selected metric across pathways.
 #' @return A ggplot2 object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("plot_pathway_heatmap")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 plot_pathway_heatmap <- function(ct_comm,
                                  metric = c("sum_lcs", "n_active_lr", "mean_lcs_active"),
@@ -348,6 +666,59 @@ plot_pathway_heatmap <- function(ct_comm,
 #' @param cell_labels Optional cell labels.
 #' @param pt_size Point size for optional plots.
 #' @return A list with query, evidence, interpretation, and plot.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("explain_celltype_interaction")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 explain_celltype_interaction <- function(ct_comm, sender, receiver, lr_pair,
                                          reo_mat = NULL, seurat_obj = NULL,
@@ -377,6 +748,59 @@ explain_celltype_interaction <- function(ct_comm, sender, receiver, lr_pair,
 #' @param top_n Number of strongest rows to display.
 #' @param title Optional title.
 #' @return A ggplot2 object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("plot_lr_activity_balance")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 plot_lr_activity_balance <- function(ct_comm, sender = NULL, receiver = NULL, active_only = TRUE, top_n = 100, title = NULL) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
@@ -404,6 +828,59 @@ plot_lr_activity_balance <- function(ct_comm, sender = NULL, receiver = NULL, ac
 #' @param lr_pair L-R pair.
 #' @param title Optional title.
 #' @return A ggplot2 object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("plot_lr_evidence")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 plot_lr_evidence <- function(ct_comm, sender, receiver, lr_pair, title = NULL) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
@@ -435,6 +912,59 @@ plot_lr_evidence <- function(ct_comm, sender, receiver, lr_pair, title = NULL) {
 #' @param top_n Number of features.
 #' @param title Optional title.
 #' @return A ggplot2 object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("plot_differential_celltype_heatmap")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 plot_differential_celltype_heatmap <- function(result, metric = "asymmetry", top_n = 30, title = NULL) {
   if (inherits(result, "LogicCommDifferential")) {
@@ -468,9 +998,65 @@ plot_differential_celltype_heatmap <- function(result, metric = "asymmetry", top
 #' @param result Output from \code{CompareLogicGroups()}.
 #' @param x X-axis metric.
 #' @param fdr_col FDR column.
+#' @param fdr_cutoff FDR significance line. Default: \code{0.05}.
+#' @param lfc_threshold Minimum absolute x-axis value for significance colouring.
 #' @param top_n_label Number of labels.
 #' @param title Optional title.
+#' @param x_lab Optional x-axis label. Defaults to \code{x}.
 #' @return A ggplot2 object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("plot_differential_celltype_volcano")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 plot_differential_celltype_volcano <- function(result, x = "log2fc_lcs", fdr_col = "fdr_fisher",
                                                 fdr_cutoff = 0.05, lfc_threshold = 0,

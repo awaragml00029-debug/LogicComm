@@ -53,10 +53,43 @@ scale_fill_tier(..., name = "Evidence tier")
 }
 \value{
 A ggplot2 scale.
+
+A ggplot2 scale.
+
+A ggplot2 scale.
+
+A ggplot2 scale.
+
+A ggplot2 scale.
+
+A ggplot2 scale.
+
+A ggplot2 scale.
+
+A ggplot2 scale.
+
+A ggplot2 scale.
 }
 \description{
 Brand, colorblind-safe scales for LogicComm figures: discrete (\code{_d},
 qualitative brand palette), continuous sequential (\code{_c}, the brand
 "mako" ramp), diverging (teal-amber through near-white), and a fixed ordered
 scale for \code{evidence_tier}.
+}
+\examples{
+df <- data.frame(x = 1:3, y = 1:3, group = c("A", "B", "C"), value = c(-1, 0, 1))
+ggplot2::ggplot(df, ggplot2::aes(x, y, colour = group)) +
+  ggplot2::geom_point() +
+  scale_color_logiccomm_d()
+ggplot2::ggplot(df, ggplot2::aes(x, y, fill = value)) +
+  ggplot2::geom_tile() +
+  scale_fill_logiccomm_diverging()
+scale_color_logiccomm_d()
+scale_fill_logiccomm_d()
+scale_color_logiccomm_c()
+scale_fill_logiccomm_c()
+scale_color_logiccomm_diverging()
+scale_fill_logiccomm_diverging()
+scale_color_tier()
+scale_fill_tier()
 }

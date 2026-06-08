@@ -26,16 +26,22 @@ jobs:
           r-version: 'release'
           use-public-rspm: true
 
-      - name: Install build dependencies
+      - name: Set up Pandoc
+        uses: r-lib/actions/setup-pandoc@v2
+
+      - name: Install package dependencies
         run: |
-          install.packages(c(
-            "Matrix", "Rcpp", "dplyr", "ggplot2", "ggrepel", "scales",
-            "knitr", "rmarkdown", "pheatmap"
-          ))
+          install.packages("remotes")
+          remotes::install_deps(dependencies = TRUE)
         shell: Rscript {0}
 
       - name: Build source tarball
-        run: R CMD build . --no-build-vignettes
+        run: R CMD build .
+
+      - name: Check source tarball
+        run: |
+          tarball=$(ls LogicComm_*.tar.gz)
+          R CMD check "$tarball" --no-manual
 
       - name: Read package version and release notes
         id: meta

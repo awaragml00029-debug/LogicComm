@@ -53,14 +53,26 @@
 #' @seealso \code{\link{plot_rank_shift}}, \code{\link{CompareLogicGroups}}
 #'
 #' @examples
-#' \dontrun{
-#' groups <- c(rep("Case", 10), rep("Ctrl", 10))
-#' names(groups) <- names(sample_list)
-#'
-#' rs <- calc_rank_shift(sample_list, group_info = groups)
-#' head(rs[rs$shift_score > 0.2, ])  # genes that rose in rank in Case
-#' plot_rank_shift(rs)
+#' make_sample <- function(g_values) {
+#'   matrix(
+#'     c(g_values,
+#'       rep(5, length(g_values))),
+#'     nrow = 2, byrow = TRUE,
+#'     dimnames = list(c("G", "BG"), paste0("C", seq_along(g_values)))
+#'   )
 #' }
+#' sample_list <- list(
+#'   Case1 = make_sample(c(10, 10, 10, 10)),
+#'   Ctrl1 = make_sample(c(1, 1, 1, 1))
+#' )
+#' groups <- c(Case1 = "Case", Ctrl1 = "Ctrl")
+#' lr_db <- data.frame(lr_pair = "G_R", ligand = "G", receptor = "R",
+#'                     stringsAsFactors = FALSE)
+#' lr_db$ligand_genes <- list("G")
+#' lr_db$receptor_genes <- list("R")
+#' rs <- calc_rank_shift(sample_list, group_info = groups, genes = "G",
+#'                       lr_db = lr_db, verbose = FALSE)
+#' head(rs)
 #'
 #' @export
 calc_rank_shift <- function(sample_list,
@@ -105,8 +117,10 @@ calc_rank_shift <- function(sample_list,
   })
   names(sample_ranks) <- names(sample_list)
 
-  # Remove NULLs
-  sample_ranks <- sample_ranks[!vapply(sample_ranks, is.null, logical(1))]
+  # Remove samples without any analyzable genes
+  sample_ranks <- sample_ranks[vapply(sample_ranks, function(x) {
+    !is.null(x) && length(x) > 0
+  }, logical(1))]
   if (length(sample_ranks) == 0) {
     stop("No analyzable genes found in any sample. Check genes, rownames, and min_detection_frac.")
   }
@@ -128,7 +142,9 @@ calc_rank_shift <- function(sample_list,
     rank_mat[names(rv), sname] <- rv
   }
 
-  expr_means <- .compute_expr_means(sample_list, all_genes_found, group_info,
+  analyzable_samples <- names(sample_ranks)
+  expr_means <- .compute_expr_means(sample_list[analyzable_samples], all_genes_found,
+                                    group_info[analyzable_samples],
                                     case_label, ctrl_label, layer)
 
   # ── 4. Statistics ─────────────────────────────────────────────────────────
@@ -261,9 +277,18 @@ calc_rank_shift <- function(sample_list,
 }
 
 #' Print method for RankShiftResult
-#' @param x RankShiftResult
+#' @param x RankShiftResult object.
 #' @param n Rows to display. Default: 10.
-#' @param ... ignored
+#' @param ... Ignored.
+#' @return Invisibly returns \code{x}, called for side effects.
+#' @examples
+#' rs <- structure(
+#'   data.frame(gene = "G", role = "ligand", shift_score = 0.2,
+#'              log2fc_expr = 1, fdr_wilcox = 0.01, sig_stars = "*"),
+#'   class = c("RankShiftResult", "data.frame"),
+#'   case_label = "Case", ctrl_label = "Ctrl"
+#' )
+#' print(rs)
 #' @export
 print.RankShiftResult <- function(x, n = 10, ...) {
   case_l <- attr(x, "case_label")

@@ -49,6 +49,59 @@
 #' @param verbose Print progress.
 #'
 #' @return A list of class \code{LogicCommCellTypeComm}.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("summarize_celltype_communication")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 summarize_celltype_communication <- function(reo_mat,
                                              cell_labels = NULL,
@@ -327,6 +380,59 @@ summarize_celltype_communication <- function(reo_mat,
 #' @param metric Numeric metric to extract.
 #' @param active_only Whether to keep active rows for LR-level features.
 #' @return Named numeric vector.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("celltype_comm_to_lcs")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 celltype_comm_to_lcs <- function(ct_comm,
                                  level = c("celltype_lr", "celltype_pair", "pathway_pair"),
@@ -666,6 +772,18 @@ celltype_comm_to_lcs <- function(ct_comm,
   )
 }
 
+#' Print method for LogicCommCellTypeComm
+#' @param x LogicCommCellTypeComm object.
+#' @param ... Ignored.
+#' @return Invisibly returns \code{x}, called for side effects.
+#' @examples
+#' ct <- structure(
+#'   list(cell_labels = c(C1 = "T"),
+#'        role_summary = data.frame(cell_type = "T"),
+#'        lr_table = data.frame(active = TRUE)),
+#'   class = "LogicCommCellTypeComm"
+#' )
+#' print(ct)
 #' @export
 print.LogicCommCellTypeComm <- function(x, ...) {
   cat(sprintf("LogicCommCellTypeComm | %d cells | %d cell types | %d active L-R events\n",

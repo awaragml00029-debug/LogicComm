@@ -49,6 +49,59 @@
 #' @param attach If \code{TRUE}, return the updated \code{ct_comm}; otherwise return
 #'   the validation table.
 #' @return Updated \code{LogicCommCellTypeComm} or validation data frame.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("logic_validate_receiver_response")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 logic_validate_receiver_response <- function(ct_comm,
                                              reo_mat,
@@ -92,6 +145,59 @@ logic_validate_receiver_response <- function(ct_comm,
 #' @param attach If \code{TRUE}, return updated \code{ct_comm}; otherwise return
 #'   the validation table.
 #' @return Updated \code{LogicCommCellTypeComm} or validation data frame.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("logic_validate_targets")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 logic_validate_targets <- function(ct_comm,
                                    target_evidence,
@@ -163,6 +269,59 @@ logic_validate_targets <- function(ct_comm,
 #' @param attach If \code{TRUE}, return updated \code{ct_comm}; otherwise return
 #'   the validation table.
 #' @return Updated \code{LogicCommCellTypeComm} or validation data frame.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("logic_validate_tf_switch")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 logic_validate_tf_switch <- function(ct_comm,
                                      tf_activity,
@@ -241,6 +400,59 @@ logic_validate_tf_switch <- function(ct_comm,
 #' @param attach If \code{TRUE}, return updated \code{ct_comm}; otherwise return
 #'   the validation table.
 #' @return Updated \code{LogicCommCellTypeComm} or validation data frame.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("logic_add_external_evidence")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 logic_add_external_evidence <- function(ct_comm,
                                         evidence_table,
@@ -314,6 +526,59 @@ logic_add_external_evidence <- function(ct_comm,
 #' @param min_active_edges Optional minimum active-edge threshold for caution text.
 #' @return Updated \code{LogicCommCellTypeComm} with evidence-grade columns added
 #'   to \code{lr_table}.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("logic_grade_evidence")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 logic_grade_evidence <- function(ct_comm,
                                  use_validation = TRUE,

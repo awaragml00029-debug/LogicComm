@@ -11,6 +11,19 @@
 
 \item{...}{Ignored.}
 }
+\value{
+Invisibly returns \code{x}, called for side effects.
+}
 \description{
 Print method for LogicCommFindings
+}
+\examples{
+findings <- structure(
+  list(qc = data.frame(metric = "active_lr", value = 1),
+       top_celltype_pairs = data.frame(sender_type = "T", receiver_type = "B",
+                                       sum_lcs = 1, n_active_lr = 1,
+                                       top_pathway = "test")),
+  class = "LogicCommFindings"
+)
+print(findings)
 }

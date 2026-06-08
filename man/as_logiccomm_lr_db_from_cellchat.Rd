@@ -49,11 +49,18 @@ complex names referenced by ligand or receptor are resolved against
 \code{cellchat_db$complex} when present.
 }
 \examples{
-\dontrun{
-data(CellChatDB.human, package = "CellChat")
-lr_db <- as_logiccomm_lr_db_from_cellchat(CellChatDB.human)
+cellchat_like <- list(
+  interaction = data.frame(
+    interaction_name = "L_R",
+    ligand = "L",
+    receptor = "R",
+    pathway_name = "test",
+    annotation = "toy",
+    stringsAsFactors = FALSE
+  )
+)
+lr_db <- as_logiccomm_lr_db_from_cellchat(cellchat_like)
 head(lr_db)
-}
 }
 \seealso{
 \code{\link{all_lr_genes}}

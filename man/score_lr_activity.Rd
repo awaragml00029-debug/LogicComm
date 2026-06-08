@@ -50,13 +50,17 @@ An aggregate \strong{communication score} is computed per cell as the fraction
 of L-R pairs for which the cell is either a sender or a receiver.
 }
 \examples{
-\dontrun{
-data(lr_pairs_human)
-reo <- calc_REO_matrix(my_seurat, lr_genes = all_lr_genes(lr_pairs_human))
-scores <- score_lr_activity(reo)
-
-# Add to Seurat metadata
-my_seurat$comm_score <- scores$comm_score
-}
+reo <- Matrix::Matrix(
+  matrix(c(1, 0,
+           0, 1), nrow = 2, byrow = TRUE,
+         dimnames = list(c("L", "R"), c("C1", "C2"))),
+  sparse = TRUE
+)
+lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
+                    stringsAsFactors = FALSE)
+lr_db$ligand_genes <- list("L")
+lr_db$receptor_genes <- list("R")
+scores <- score_lr_activity(reo, lr_db = lr_db, verbose = FALSE)
+scores$comm_score
 
 }

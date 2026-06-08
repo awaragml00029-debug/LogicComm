@@ -16,6 +16,59 @@
 #' @param anchor_genes Optional anchor gene universe for rank calculation.
 #' @param verbose Whether to print progress messages.
 #' @return Dense numeric matrix of rank percentiles, genes x cells.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("calc_REO_rank_score_matrix")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 calc_REO_rank_score_matrix <- function(expr_mat,
                                        genes = NULL,
@@ -66,6 +119,59 @@ calc_REO_rank_score_matrix <- function(expr_mat,
 #' @param verbose Whether to print progress messages.
 #' @return List with LR-pair x cell sender/receiver rank matrices and optional
 #'   aggregate per-cell rank scores.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("score_lr_rank_activity")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 score_lr_rank_activity <- function(rank_mat,
                                    lr_db = lr_pairs_human,
@@ -159,6 +265,59 @@ score_lr_rank_activity <- function(rank_mat,
 #' @param lcs_threshold Activity threshold used only for evidence-tier labels.
 #' @param verbose Whether to print progress messages.
 #' @return Data frame with one row per LR pair and rank-aware evidence columns.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("IdentifyRankLogicConsensus")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 IdentifyRankLogicConsensus <- function(reo_mat = NULL,
                                        rank_mat = NULL,
@@ -274,6 +433,59 @@ IdentifyRankLogicConsensus <- function(reo_mat = NULL,
 #' @param lr_db Optional LR database for metadata.
 #' @param verbose Whether to print progress messages.
 #' @return Data frame sorted by case-control rank evidence difference.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("CompareRankLogicGroups")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 CompareRankLogicGroups <- function(rank_result_list,
                                    group_info,
@@ -422,7 +634,12 @@ CompareRankLogicGroups <- function(rank_result_list,
     if (!all(colnames(logic_mat) %in% colnames(rank_mat))) {
       stop("rank_mat must contain all reo_mat cells.")
     }
-    rank_mat <- rank_mat[, colnames(logic_mat), drop = FALSE]
+    if (!all(rownames(logic_mat) %in% rownames(rank_mat))) {
+      missing_genes <- setdiff(rownames(logic_mat), rownames(rank_mat))
+      stop("rank_mat must contain all reo_mat genes. Missing: ",
+           paste(utils::head(missing_genes, 10), collapse = ", "))
+    }
+    rank_mat <- rank_mat[rownames(logic_mat), colnames(logic_mat), drop = FALSE]
     if (!inherits(logic_mat, "sparseMatrix")) {
       logic_mat <- Matrix::Matrix(logic_mat, sparse = TRUE)
     }

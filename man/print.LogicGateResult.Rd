@@ -9,8 +9,19 @@
 \arguments{
 \item{x}{LogicGateResult object.}
 
-\item{...}{ignored.}
+\item{...}{Ignored.}
+}
+\value{
+Invisibly returns \code{x}, called for side effects.
 }
 \description{
 Print method for LogicGateResult
+}
+\examples{
+gate <- structure(
+  data.frame(lr_pair = "L_R", base_lcs = 0.4, regulated_lcs = 0.2,
+             delta_lcs = -0.2, block_rate = 0.5),
+  class = c("LogicGateResult", "data.frame")
+)
+print(gate)
 }

@@ -41,12 +41,15 @@
 #'   \code{\link{plot_lcs_heatmap}}
 #'
 #' @examples
-#' \dontrun{
-#' groups <- c(rep("Case", 10), rep("Ctrl", 10))
-#' names(groups) <- names(lcs_list)
-#' result <- CompareLogicGroups(lcs_list, group_info = groups)
-#' subset(result, asymmetry >= 0.6 & fdr_fisher < 0.05)
-#' }
+#' lcs_list <- list(
+#'   Case1 = c(L_R = 0.4),
+#'   Case2 = c(L_R = 0.3),
+#'   Ctrl1 = c(L_R = 0.0),
+#'   Ctrl2 = c(L_R = 0.1)
+#' )
+#' groups <- c(Case1 = "Case", Case2 = "Case", Ctrl1 = "Ctrl", Ctrl2 = "Ctrl")
+#' result <- CompareLogicGroups(lcs_list, group_info = groups, verbose = FALSE)
+#' subset(result, asymmetry >= 0.1)
 #'
 #' @export
 CompareLogicGroups <- function(lcs_list,
@@ -219,6 +222,15 @@ CompareLogicGroups <- function(lcs_list,
 #' @param x LogicCommResult data frame.
 #' @param n Number of rows to print. Default: 10.
 #' @param ... Ignored.
+#' @return Invisibly returns \code{x}, called for side effects.
+#' @examples
+#' result <- structure(
+#'   data.frame(lr_pair = "L_R", case_freq = 0.8, ctrl_freq = 0.2,
+#'              asymmetry = 0.6, log2fc_lcs = 1, fdr_fisher = 0.01),
+#'   class = c("LogicCommResult", "data.frame"),
+#'   case_label = "Case", ctrl_label = "Ctrl"
+#' )
+#' print(result)
 #' @export
 print.LogicCommResult <- function(x, n = 10, ...) {
   case_l <- attr(x, "case_label")
@@ -244,6 +256,59 @@ print.LogicCommResult <- function(x, n = 10, ...) {
 #' @param direction \code{"up"} (Case > Ctrl), \code{"down"} (Ctrl > Case),
 #'   or \code{"both"}. Default: \code{"up"}.
 #' @return Filtered \code{LogicCommResult}.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("filter_lcs")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 filter_lcs <- function(result,
                        min_asymmetry = 0.3,

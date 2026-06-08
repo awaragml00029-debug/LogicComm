@@ -11,6 +11,17 @@
 
 \item{...}{Ignored.}
 }
+\value{
+Invisibly returns \code{x}, called for side effects.
+}
 \description{
 Print method for LogicCommREOResult
+}
+\examples{
+reo <- structure(
+  list(logic = Matrix::Matrix(1, nrow = 1, ncol = 1, sparse = TRUE),
+       rank = matrix(0.8, nrow = 1, ncol = 1)),
+  class = "LogicCommREOResult"
+)
+print(reo)
 }

@@ -7,10 +7,17 @@
 \method{print}{LCSVector}(x, ...)
 }
 \arguments{
-\item{x}{LCSVector}
+\item{x}{LCSVector.}
 
-\item{...}{ignored}
+\item{...}{Ignored.}
+}
+\value{
+Invisibly returns \code{x}, called for side effects.
 }
 \description{
 Print method for LCSVector
+}
+\examples{
+lcs <- structure(c(L_R = 0.25, X_Y = NA_real_), class = "LCSVector")
+print(lcs)
 }

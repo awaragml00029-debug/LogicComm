@@ -11,6 +11,18 @@
 
 \item{...}{Ignored.}
 }
+\value{
+Invisibly returns \code{x}, called for side effects.
+}
 \description{
 Print method for LogicCommGLMResult
+}
+\examples{
+glm_result <- structure(
+  data.frame(feature = "L_R", estimate = 0.5, odds_ratio = 1.6,
+             p_value = 0.05, fdr = 0.1, n_samples = 4),
+  class = c("LogicCommGLMResult", "data.frame"),
+  coef = "conditionCase"
+)
+print(glm_result)
 }

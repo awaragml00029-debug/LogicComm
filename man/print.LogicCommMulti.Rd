@@ -7,10 +7,29 @@
 \method{print}{LogicCommMulti}(x, ...)
 }
 \arguments{
-\item{x}{LogicCommMulti object}
+\item{x}{LogicCommMulti object.}
 
-\item{...}{ignored}
+\item{...}{Ignored.}
+}
+\value{
+Invisibly returns \code{x}, called for side effects.
 }
 \description{
 Print method for LogicCommMulti
+}
+\examples{
+comparison <- structure(
+  data.frame(lr_pair = "L_R", case_freq = 0.8, ctrl_freq = 0.2,
+             asymmetry = 0.6, log2fc_lcs = 1, fdr_fisher = 0.01),
+  class = c("LogicCommResult", "data.frame"),
+  case_label = "Case", ctrl_label = "Ctrl"
+)
+multi <- structure(
+  list(comparison = comparison,
+       params = list(n_samples = 2, n_lr_pairs = 1, case_label = "Case",
+                     ctrl_label = "Ctrl", rank_threshold = 0.5,
+                     lcs_threshold = 0.01)),
+  class = "LogicCommMulti"
+)
+print(multi)
 }

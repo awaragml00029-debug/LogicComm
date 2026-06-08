@@ -50,6 +50,29 @@ test_that("logic_* core API prepares, scores, and summarizes communication", {
   expect_true(all(c("lr_table", "pair_summary", "role_summary") %in% names(ct)))
 })
 
+test_that("logic_check_lrdb rejects duplicate and empty lr_pair values", {
+  lr_db <- data.frame(
+    lr_pair = c("L_R", "L_R", " "),
+    ligand = c("L", "L", "X"),
+    receptor = c("R", "R", "Y"),
+    stringsAsFactors = FALSE
+  )
+  lr_db$ligand_genes <- list("L", "L", "X")
+  lr_db$receptor_genes <- list("R", "R", "Y")
+
+  check <- logic_check_lrdb(lr_db)
+  expect_equal(check$ok, FALSE)
+  expect_equal(check$duplicated_lr_pairs, 1)
+  expect_equal(check$empty_lr_pair_rows, 1)
+  expect_match(paste(check$problems, collapse = "; "), "duplicated lr_pair")
+  expect_match(paste(check$problems, collapse = "; "), "empty lr_pair")
+
+  expect_error(
+    logic_check_lrdb(lr_db, stop_on_error = TRUE),
+    "Invalid LogicComm LR database.*empty lr_pair.*duplicated lr_pair"
+  )
+})
+
 test_that("logic_compare_groups and logic_run expose clear group workflow", {
   lcs_list <- list(
     S1 = setNames(c(0.2, 0.0), c("L_R", "X_Y")),

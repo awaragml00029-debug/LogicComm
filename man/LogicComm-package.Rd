@@ -32,8 +32,15 @@ Visualization helpers include \code{\link{plot_lcs_bubble}},
 \code{\link{plot_specificity_stability}}, \code{\link{plot_celltype_network_publication}},
 \code{\link{plot_communication_qc}}, and \code{\link{plot_celltype_glm_volcano}}.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/awaragml00029-debug/LogicComm}
+}
+
+}
 \author{
-\strong{Maintainer}: LogicComm Developer \email{dev@logiccomm.io}
+\strong{Maintainer}: LogicComm Developer \email{dev@logiccomm.io} [copyright holder]
 
 }
 \keyword{internal}

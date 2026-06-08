@@ -51,11 +51,18 @@ all_lr_genes <- function(lr_db, include_modulators = FALSE) {
 #'   and \code{annotation}.
 #' @export
 #' @examples
-#' \dontrun{
-#' data(CellChatDB.human, package = "CellChat")
-#' lr_db <- as_logiccomm_lr_db_from_cellchat(CellChatDB.human)
+#' cellchat_like <- list(
+#'   interaction = data.frame(
+#'     interaction_name = "L_R",
+#'     ligand = "L",
+#'     receptor = "R",
+#'     pathway_name = "test",
+#'     annotation = "toy",
+#'     stringsAsFactors = FALSE
+#'   )
+#' )
+#' lr_db <- as_logiccomm_lr_db_from_cellchat(cellchat_like)
 #' head(lr_db)
-#' }
 #' @seealso \code{\link{all_lr_genes}}
 as_logiccomm_lr_db_from_cellchat <- function(cellchat_db,
                                              pathway_col = "pathway_name",

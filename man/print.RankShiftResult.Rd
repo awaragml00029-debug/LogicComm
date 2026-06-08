@@ -7,12 +7,24 @@
 \method{print}{RankShiftResult}(x, n = 10, ...)
 }
 \arguments{
-\item{x}{RankShiftResult}
+\item{x}{RankShiftResult object.}
 
 \item{n}{Rows to display. Default: 10.}
 
-\item{...}{ignored}
+\item{...}{Ignored.}
+}
+\value{
+Invisibly returns \code{x}, called for side effects.
 }
 \description{
 Print method for RankShiftResult
+}
+\examples{
+rs <- structure(
+  data.frame(gene = "G", role = "ligand", shift_score = 0.2,
+             log2fc_expr = 1, fdr_wilcox = 0.01, sig_stars = "*"),
+  class = c("RankShiftResult", "data.frame"),
+  case_label = "Case", ctrl_label = "Ctrl"
+)
+print(rs)
 }

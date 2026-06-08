@@ -107,3 +107,33 @@ test_that("calc_REO_rank_score_matrix returns bounded aligned rank percentiles",
   expect_true("rank_dominance_lcs" %in% names(res))
 })
 
+test_that("rank-aware scoring requires rank_mat to cover reo_mat genes", {
+  lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
+                      stringsAsFactors = FALSE)
+  lr_db$ligand_genes <- list("L")
+  lr_db$receptor_genes <- list("R")
+
+  reo <- Matrix::Matrix(
+    matrix(c(1, 1,
+             1, 1), nrow = 2, byrow = TRUE,
+           dimnames = list(c("L", "R"), c("C1", "C2"))),
+    sparse = TRUE
+  )
+  rank_missing <- matrix(0.9, nrow = 1, ncol = 2,
+                         dimnames = list("L", c("C1", "C2")))
+
+  expect_error(
+    IdentifyRankLogicConsensus(reo_mat = reo, rank_mat = rank_missing,
+                               lr_db = lr_db, verbose = FALSE),
+    "rank_mat must contain all reo_mat genes.*R"
+  )
+
+  rank_extra <- matrix(0.9, nrow = 3, ncol = 2,
+                       dimnames = list(c("L", "R", "BG"), c("C1", "C2")))
+  res <- IdentifyRankLogicConsensus(reo_mat = reo, rank_mat = rank_extra,
+                                    lr_db = lr_db, verbose = FALSE)
+
+  expect_s3_class(res, "LogicCommRankEvidence")
+  expect_equal(res$lr_pair, "L_R")
+})
+

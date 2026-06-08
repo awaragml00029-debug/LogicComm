@@ -55,6 +55,59 @@ logiccomm_brand <- list(
 #' @param grid Which major gridlines to keep: "xy", "x", "y", or "none".
 #' @param legend Legend position passed to \code{ggplot2::theme()}.
 #' @return A ggplot2 theme object.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("theme_logiccomm")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 theme_logiccomm <- function(base_size = 12, base_family = "",
                             grid = c("xy", "x", "y", "none"),
@@ -106,22 +159,39 @@ theme_logiccomm <- function(base_size = 12, base_family = "",
 #' @param midpoint Midpoint for the diverging scale.
 #' @param name Legend title.
 #' @return A ggplot2 scale.
+#' @examples
+#' df <- data.frame(x = 1:3, y = 1:3, group = c("A", "B", "C"), value = c(-1, 0, 1))
+#' ggplot2::ggplot(df, ggplot2::aes(x, y, colour = group)) +
+#'   ggplot2::geom_point() +
+#'   scale_color_logiccomm_d()
+#' ggplot2::ggplot(df, ggplot2::aes(x, y, fill = value)) +
+#'   ggplot2::geom_tile() +
+#'   scale_fill_logiccomm_diverging()
 #' @name logiccomm_scales
 NULL
 
 #' @rdname logiccomm_scales
+#' @return A ggplot2 scale.
+#' @examples
+#' scale_color_logiccomm_d()
 #' @export
 scale_color_logiccomm_d <- function(..., na.value = "grey80") {
   ggplot2::scale_color_manual(..., values = unname(.logiccomm_palettes$qualitative),
                               na.value = na.value)
 }
 #' @rdname logiccomm_scales
+#' @return A ggplot2 scale.
+#' @examples
+#' scale_fill_logiccomm_d()
 #' @export
 scale_fill_logiccomm_d <- function(..., na.value = "grey80") {
   ggplot2::scale_fill_manual(..., values = unname(.logiccomm_palettes$qualitative),
                              na.value = na.value)
 }
 #' @rdname logiccomm_scales
+#' @return A ggplot2 scale.
+#' @examples
+#' scale_color_logiccomm_c()
 #' @export
 scale_color_logiccomm_c <- function(..., option = "mako", begin = 0.08, end = 0.94,
                                     direction = -1) {
@@ -129,6 +199,9 @@ scale_color_logiccomm_c <- function(..., option = "mako", begin = 0.08, end = 0.
                                  direction = direction)
 }
 #' @rdname logiccomm_scales
+#' @return A ggplot2 scale.
+#' @examples
+#' scale_fill_logiccomm_c()
 #' @export
 scale_fill_logiccomm_c <- function(..., option = "mako", begin = 0.08, end = 0.94,
                                    direction = -1) {
@@ -136,24 +209,36 @@ scale_fill_logiccomm_c <- function(..., option = "mako", begin = 0.08, end = 0.9
                                 direction = direction)
 }
 #' @rdname logiccomm_scales
+#' @return A ggplot2 scale.
+#' @examples
+#' scale_color_logiccomm_diverging()
 #' @export
 scale_color_logiccomm_diverging <- function(..., midpoint = 0) {
   ggplot2::scale_color_gradient2(..., low = logiccomm_brand$primary, mid = "#F4F4F2",
                                  high = logiccomm_brand$accent, midpoint = midpoint)
 }
 #' @rdname logiccomm_scales
+#' @return A ggplot2 scale.
+#' @examples
+#' scale_fill_logiccomm_diverging()
 #' @export
 scale_fill_logiccomm_diverging <- function(..., midpoint = 0) {
   ggplot2::scale_fill_gradient2(..., low = logiccomm_brand$primary, mid = "#F4F4F2",
                                 high = logiccomm_brand$accent, midpoint = midpoint)
 }
 #' @rdname logiccomm_scales
+#' @return A ggplot2 scale.
+#' @examples
+#' scale_color_tier()
 #' @export
 scale_color_tier <- function(..., name = "Evidence tier") {
   ggplot2::scale_color_manual(..., name = name, values = .logiccomm_palettes$tier,
                               na.value = "grey85")
 }
 #' @rdname logiccomm_scales
+#' @return A ggplot2 scale.
+#' @examples
+#' scale_fill_tier()
 #' @export
 scale_fill_tier <- function(..., name = "Evidence tier") {
   ggplot2::scale_fill_manual(..., name = name, values = .logiccomm_palettes$tier,
@@ -193,6 +278,59 @@ scale_fill_tier <- function(..., name = "Evidence tier") {
 #'   \code{cairo_pdf} for \code{.pdf} when cairo is available.
 #' @param ... Passed to \code{ggplot2::ggsave()}.
 #' @return The output path, invisibly.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("save_logiccomm_figure")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 save_logiccomm_figure <- function(plot, file,
                                    width = c("single", "double", "custom"),

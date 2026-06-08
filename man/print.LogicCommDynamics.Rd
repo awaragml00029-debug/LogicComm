@@ -11,6 +11,19 @@
 
 \item{...}{Ignored.}
 }
+\value{
+Invisibly returns \code{x}, called for side effects.
+}
 \description{
 Print method for LogicCommDynamics
+}
+\examples{
+dynamics <- structure(
+  list(bin_results = list(bin1 = data.frame()),
+       pair_trajectory = data.frame(lr_pair = "L_R"),
+       role_trajectory = data.frame(cell_type = "T"),
+       bins = c("bin1", "bin1")),
+  class = "LogicCommDynamics"
+)
+print(dynamics)
 }

@@ -1,9 +1,9 @@
 Package: LogicComm
 Type: Package
-Title: Logic-Based Cell-Cell Communication Analysis for Multi-Sample scRNA-seq
+Title: Logic-Based Multi-Sample Cell-Cell Communication Analysis
 Version: 0.11.1
 Date: 2026-06-05
-Authors@R: person("LogicComm", "Developer", role = c("aut", "cre"),
+Authors@R: person("LogicComm", "Developer", role = c("aut", "cre", "cph"),
     email = "dev@logiccomm.io")
 Author: LogicComm Developer
 Maintainer: LogicComm Developer <dev@logiccomm.io>
@@ -18,7 +18,8 @@ Description: Identifies cell-cell communication signals by converting single-cel
     modules, sample-level quasibinomial differential modeling, publication-ready
     specificity scoring, permutation-null diagnostics, role-evidence interpretation,
     rank-aware REO evidence, threshold-stability scoring, report helpers,
-    BPCells on-disk matrices, and Rcpp high-performance computation.
+    'BPCells' on-disk matrices, and 'Rcpp' high-performance computation.
+URL: https://github.com/awaragml00029-debug/LogicComm
 License: MIT + file LICENSE
 LazyData: true
 Encoding: UTF-8
@@ -33,4 +34,4 @@ VignetteBuilder: knitr
 Config/testthat/edition: 3
 NeedsCompilation: yes
 Config/roxygen2/version: 8.0.0
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.3

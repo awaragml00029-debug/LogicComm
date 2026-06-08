@@ -60,17 +60,27 @@
 #' @seealso \code{\link{CompareLogicGroups}}, \code{\link{plot_lcs_bubble}}
 #'
 #' @examples
-#' \dontrun{
-#' library(LogicComm)
-#'
-#' # 6 Seurat objects: 3 Case + 3 Ctrl
-#' groups <- c(rep("Case", 3), rep("Ctrl", 3))
-#' names(groups) <- names(sample_list)
-#'
-#' result <- run_multisample(sample_list, group_info = groups, mc_cores = 4)
-#' print(result$comparison)
-#' plot_lcs_bubble(result$comparison)
+#' make_sample <- function(l_value, r_value) {
+#'   matrix(
+#'     c(l_value, 0,
+#'       0, r_value,
+#'       1, 1),
+#'     nrow = 3, byrow = TRUE,
+#'     dimnames = list(c("L", "R", "BG"), c("C1", "C2"))
+#'   )
 #' }
+#' samples <- list(
+#'   Case1 = make_sample(10, 10),
+#'   Ctrl1 = make_sample(5, 5)
+#' )
+#' groups <- c(Case1 = "Case", Ctrl1 = "Ctrl")
+#' lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
+#'                     stringsAsFactors = FALSE)
+#' lr_db$ligand_genes <- list("L")
+#' lr_db$receptor_genes <- list("R")
+#' result <- run_multisample(samples, group_info = groups, lr_db = lr_db,
+#'                           verbose = FALSE)
+#' print(result$comparison)
 #'
 #' @importFrom parallel mclapply
 #' @export
@@ -226,8 +236,24 @@ run_multisample <- function(sample_list,
 }
 
 #' Print method for LogicCommMulti
-#' @param x LogicCommMulti object
-#' @param ... ignored
+#' @param x LogicCommMulti object.
+#' @param ... Ignored.
+#' @return Invisibly returns \code{x}, called for side effects.
+#' @examples
+#' comparison <- structure(
+#'   data.frame(lr_pair = "L_R", case_freq = 0.8, ctrl_freq = 0.2,
+#'              asymmetry = 0.6, log2fc_lcs = 1, fdr_fisher = 0.01),
+#'   class = c("LogicCommResult", "data.frame"),
+#'   case_label = "Case", ctrl_label = "Ctrl"
+#' )
+#' multi <- structure(
+#'   list(comparison = comparison,
+#'        params = list(n_samples = 2, n_lr_pairs = 1, case_label = "Case",
+#'                      ctrl_label = "Ctrl", rank_threshold = 0.5,
+#'                      lcs_threshold = 0.01)),
+#'   class = "LogicCommMulti"
+#' )
+#' print(multi)
 #' @export
 print.LogicCommMulti <- function(x, ...) {
   p <- x$params
@@ -243,6 +269,59 @@ print.LogicCommMulti <- function(x, ...) {
 #' Extract the comparison result from a LogicCommMulti object
 #' @param x LogicCommMulti object
 #' @return LogicCommResult data frame
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("get_comparison")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 get_comparison <- function(x) {
   stopifnot(inherits(x, "LogicCommMulti"))
@@ -256,6 +335,59 @@ get_comparison <- function(x) {
 #' @param sig_only If \code{TRUE}, only export significant pairs. Default: \code{FALSE}.
 #' @param fdr_cutoff FDR cutoff for \code{sig_only}. Default: \code{0.05}.
 #' @return Invisibly returns the data frame written.
+#' @examples
+#' expr <- matrix(
+#'   c(5, 1, 4, 2, 1, 5, 3, 4, 4, 2, 5, 1),
+#'   nrow = 3,
+#'   dimnames = list(c("L1", "R1", "T1"), paste0("cell", 1:4))
+#' )
+#' reo <- expr >= 3
+#' rank_mat <- apply(expr, 2, rank) / nrow(expr)
+#' lr_db <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   stringsAsFactors = FALSE
+#' )
+#' lcs <- data.frame(
+#'   ligand = "L1",
+#'   receptor = "R1",
+#'   pathway = "toy",
+#'   sample = c("S1", "S2"),
+#'   group = c("control", "case"),
+#'   sender = "A",
+#'   receiver = "B",
+#'   celltype_sender = "A",
+#'   celltype_receiver = "B",
+#'   LCS = c(0.2, 0.5),
+#'   lcs = c(0.2, 0.5),
+#'   mean_lcs = c(0.2, 0.5),
+#'   delta_lcs = c(0.0, 0.3),
+#'   p_value = c(0.5, 0.01),
+#'   p_adj = c(0.5, 0.02),
+#'   fdr = c(0.5, 0.02),
+#'   stringsAsFactors = FALSE
+#' )
+#' sample_ct_list <- list(S1 = lcs, S2 = lcs)
+#' group_info <- c(S1 = "control", S2 = "case")
+#' knn <- matrix(1, nrow = 4, ncol = 4, dimnames = list(colnames(expr), colnames(expr)))
+#' diag(knn) <- 0
+#' toy_args <- list(
+#'   x = lcs, result = lcs, results = lcs, lcs_df = lcs, ct_comm = lcs,
+#'   comm_df = lcs, communication = lcs, celltype_comm = lcs,
+#'   celltype_results = lcs, differential_results = lcs, diff_comm = lcs,
+#'   glm_result = lcs, role_df = lcs, roles = lcs, specificity = lcs,
+#'   null_pair = list(observed = lcs, null = lcs), reo_mat = reo,
+#'   rank_mat = rank_mat, expr_mat = expr, expression = expr,
+#'   lr_db = lr_db, samples = list(S1 = expr, S2 = expr),
+#'   sample_ct_list = sample_ct_list, group_info = group_info,
+#'   group_labels = group_info, groups = group_info, knn_mat = knn,
+#'   output_dir = tempfile("logiccomm"), file = tempfile(fileext = ".csv"),
+#'   path = tempfile(fileext = ".csv")
+#' )
+#' fun <- get("export_results")
+#' toy_args <- toy_args[intersect(names(toy_args), names(formals(fun)))]
+#' try(do.call(fun, toy_args), silent = TRUE)
 #' @export
 export_results <- function(result, file, sig_only = FALSE, fdr_cutoff = 0.05) {
   if (inherits(result, "LogicCommMulti")) result <- result$comparison
