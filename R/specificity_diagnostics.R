@@ -331,7 +331,8 @@ rank_communication_axes <- function(ct_comm,
 #' \code{pair_specificity}, \code{threshold_stability}, \code{null_support}, and
 #' any receiver-response score), so it does not double-penalise broad axes.
 #'
-#' @param ranked Output of \code{\link{rank_communication_axes}}.
+#' @param ranked Output of \code{\link{rank_communication_axes}}, or a
+#'   \code{LogicCommCellTypeComm} object (it is ranked on the fly with defaults).
 #' @param drop_broad Drop broad/ubiquitous axes (\code{broad_axis_flag} /
 #'   \code{ubiquitous_interaction_flag}). Default \code{TRUE}.
 #' @param drop_proliferation Drop proliferation-hub axes
@@ -360,7 +361,18 @@ communication_discovery_view <- function(ranked,
                                          rescale = TRUE,
                                          top_n = NULL,
                                          verbose = TRUE) {
-  stopifnot(is.data.frame(ranked))
+  if (inherits(ranked, "LogicCommCellTypeComm")) {
+    if (isTRUE(verbose)) {
+      message("communication_discovery_view: ranking axes from ct_comm. For permutation ",
+              "support, rank first with permute_celltype_communication() and pass the ",
+              "ranked data.frame instead.")
+    }
+    ranked <- rank_communication_axes(ranked)
+  }
+  if (!is.data.frame(ranked)) {
+    stop("'ranked' must be a data.frame from rank_communication_axes() or a ",
+         "LogicCommCellTypeComm object.")
+  }
   if (!"lcs" %in% names(ranked)) {
     stop("'ranked' must be the output of rank_communication_axes() (no 'lcs' column found).")
   }

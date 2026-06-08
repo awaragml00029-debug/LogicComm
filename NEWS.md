@@ -1,3 +1,21 @@
+# LogicComm 0.11.0
+
+## Faster permutation null + discovery-view ergonomics
+
+* `permute_celltype_communication()` gains an `n_cores` argument: the permutation
+  loop now runs on forked workers (Unix/macOS) for a near-linear speedup, so a
+  publication-grade `n_perm` (e.g. 200-1000) is affordable. Results are
+  reproducible across core counts when `seed` is set; the serial path
+  (`n_cores = 1`, default) is unchanged. Note: with too few permutations the
+  empirical p-value floor is `1 / (n_perm + 1)`, which caps `null_support` and
+  prevents any Tier 1 -- use enough permutations to resolve p < 0.05.
+* `permute_celltype_communication()` now fails early with a clear message when
+  `knn_mat` is missing for neighborhood mode (previously a cryptic
+  `.extract_knn` error).
+* `communication_discovery_view()` now accepts a `LogicCommCellTypeComm` object
+  directly (it ranks the axes on the fly), in addition to a ranked data.frame
+  from `rank_communication_axes()`.
+
 # LogicComm 0.10.4
 
 ## Documentation

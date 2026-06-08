@@ -15,7 +15,8 @@ communication_discovery_view(
 )
 }
 \arguments{
-\item{ranked}{Output of \code{\link{rank_communication_axes}}.}
+\item{ranked}{Output of \code{\link{rank_communication_axes}}, or a
+\code{LogicCommCellTypeComm} object (it is ranked on the fly with defaults).}
 
 \item{drop_broad}{Drop broad/ubiquitous axes (\code{broad_axis_flag} /
 \code{ubiquitous_interaction_flag}). Default \code{TRUE}.}

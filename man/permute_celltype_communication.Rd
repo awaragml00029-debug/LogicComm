@@ -11,6 +11,7 @@ permute_celltype_communication(
   knn_mat = NULL,
   lr_db = NULL,
   n_perm = 100,
+  n_cores = 1L,
   metric = "sum_lcs",
   seed = NULL,
   adaptive = FALSE,
@@ -37,6 +38,10 @@ when necessary.}
 \item{lr_db}{LR database. Defaults to \code{ct_comm$lr_db} when available.}
 
 \item{n_perm}{Number of permutations.}
+
+\item{n_cores}{Number of forked worker processes for the permutation loop
+(Unix/macOS). Default 1 (serial). Higher values give a near-linear speedup,
+making a publication-grade \code{n_perm} affordable; ignored on Windows.}
 
 \item{metric}{Pair-level metric to test.}
 

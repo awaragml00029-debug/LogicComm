@@ -63,6 +63,9 @@ bootstrap_celltype_communication <- function(ct_comm,
 #'   when necessary.
 #' @param lr_db LR database. Defaults to \code{ct_comm$lr_db} when available.
 #' @param n_perm Number of permutations.
+#' @param n_cores Number of forked worker processes for the permutation loop
+#'   (Unix/macOS). Default 1 (serial). Higher values give a near-linear speedup,
+#'   making a publication-grade \code{n_perm} affordable; ignored on Windows.
 #' @param metric Pair-level metric to test.
 #' @param seed Optional random seed.
 #' @param adaptive If TRUE, refine top preliminary candidates after the first
@@ -82,6 +85,7 @@ permute_celltype_communication <- function(ct_comm = NULL,
                                            knn_mat = NULL,
                                            lr_db = NULL,
                                            n_perm = 100,
+                                           n_cores = 1L,
                                            metric = "sum_lcs",
                                            seed = NULL,
                                            adaptive = FALSE,
@@ -165,6 +169,11 @@ permute_celltype_communication <- function(ct_comm = NULL,
       all(names(cell_labels) %in% rownames(knn_mat)) && all(names(cell_labels) %in% colnames(knn_mat))) {
     knn_mat <- knn_mat[names(cell_labels), names(cell_labels), drop = FALSE]
   }
+  mode_used <- if (!is.null(dots$mode)) dots$mode else "neighborhood"
+  if (is.null(knn_mat) && is.null(dots$seurat_obj) && identical(mode_used, "neighborhood")) {
+    stop("knn_mat is required for neighborhood-mode permutation: pass the same graph you ",
+         "used to build ct_comm (ct_comm does not store the cell-level KNN).", call. = FALSE)
+  }
   if (is.null(lr_db)) lr_db <- ct_comm$lr_db
   observed <- ct_comm$pair_summary
   if (!metric %in% names(observed)) stop("metric not found in pair_summary: ", metric)
@@ -183,15 +192,40 @@ permute_celltype_communication <- function(ct_comm = NULL,
     vals <- stats::setNames(perm$pair_summary[[metric]], key_perm)
     vals[feature]
   }
-  null_start <- proc.time()[["elapsed"]]
-  null_step <- max(1, floor(n_perm / 10))
-  for (b in seq_len(n_perm)) {
-    null_mat[, b] <- run_perm()
-    if (isTRUE(verbose) && (b == 1 || b %% null_step == 0 || b == n_perm)) {
-      elapsed_min <- (proc.time()[["elapsed"]] - null_start) / 60
-      message(sprintf("[CellTypeComm null] %d/%d permutations | elapsed %.1f min", b, n_perm, elapsed_min))
+  # Fill an n-column null matrix, in parallel (forked workers) when n_cores > 1.
+  # The loop is embarrassingly parallel: each permutation independently reshuffles
+  # labels and re-summarises communication.
+  fill_perms <- function(n, tag) {
+    use_par <- isTRUE(n_cores > 1L) && .Platform$OS.type != "windows" && n > 1L
+    if (use_par) {
+      if (!is.null(seed)) { RNGkind("L'Ecuyer-CMRG"); set.seed(seed) }
+      if (isTRUE(verbose)) {
+        message(sprintf("[CellTypeComm %s] %d permutations across %d cores...", tag, n, n_cores))
+      }
+      res <- parallel::mclapply(seq_len(n), function(i) run_perm(), mc.cores = n_cores)
+      ok <- vapply(res, function(x) is.numeric(x) && length(x) == nrow(observed), logical(1))
+      if (!all(ok)) {
+        stop("Parallel permutation failed in ", sum(!ok), " of ", n,
+             " worker(s). Retry with n_cores = 1 to surface the underlying error.",
+             call. = FALSE)
+      }
+      out <- matrix(unlist(res, use.names = FALSE), nrow = nrow(observed), ncol = n)
+      if (isTRUE(verbose)) message(sprintf("[CellTypeComm %s] done (%d permutations).", tag, n))
+      out
+    } else {
+      out <- matrix(NA_real_, nrow = nrow(observed), ncol = n)
+      start <- proc.time()[["elapsed"]]; step <- max(1, floor(n / 10))
+      for (b in seq_len(n)) {
+        out[, b] <- run_perm()
+        if (isTRUE(verbose) && (b == 1 || b %% step == 0 || b == n)) {
+          message(sprintf("[CellTypeComm %s] %d/%d permutations | elapsed %.1f min",
+                          tag, b, n, (proc.time()[["elapsed"]] - start) / 60))
+        }
+      }
+      out
     }
   }
+  null_mat[] <- fill_perms(n_perm, "null")
   obs <- observed[[metric]]
   if (isTRUE(adaptive) && is.finite(adaptive_n_perm) && adaptive_n_perm > n_perm) {
     prelim_p <- vapply(seq_along(obs), function(i) {
