@@ -43,12 +43,29 @@ cores retained**:
 * Legacy neighborhood arguments remain accepted via `...` and ignored with a
   warning.
 
+### Stage 5: trustworthy statistics for selecting real communications
+
+* **Axis-level permutation null.** `permute_celltype_communication()` now
+  defaults to an axis-level null (`metric = "lcs"`): every sender -> receiver ->
+  L-R axis gets its **own** empirical p-value and BH FDR, instead of one
+  cell-type-pair-level p-value being broadcast onto all of its L-R pairs. The
+  output gains an `lr_pair` column; `rank_communication_axes()` joins the
+  permutation evidence per axis and exposes `permutation_fdr`. Pair-level nulls
+  (`metric = "sum_lcs"`) remain available for backward compatibility. The
+  cell-type co-expression pivot makes per-axis nulls cheap (no graph to rescan).
+* **Per-cell bootstrap.** `bootstrap_celltype_communication()` now resamples on
+  the independent unit (cells) rather than the sender x receiver cell-count
+  *product*. Co-expression LCS = (ligand-active fraction of sender cells) x
+  (receptor-active fraction of receiver cells), so each fraction is bootstrapped
+  as a binomial proportion over its own cell count. The previous approach used
+  `n_edges` (the product) as the trial size and produced anticonservative,
+  far-too-narrow intervals.
+
 Still pending: `IdentifyRankLogicConsensus()` (the rank-evidence module) retains
 an optional neighborhood mode for now (its graph helpers were relocated into
-`reo_rank_evidence.R`) and will be de-neighborhooded next, followed by removal of
-the vestigial spatial columns/vocabulary; REO rank-weighted LCS; axis-level
-permutation null and per-cell bootstrap; and a benchmark harness against
-CellChat/CellPhoneDB/LIANA.
+`reo_rank_evidence.R`) and will be de-neighborhooded next; removal of the
+vestigial spatial columns/vocabulary; REO rank-weighted LCS; and a benchmark
+harness against CellChat/CellPhoneDB/LIANA.
 
 # LogicComm 0.11.1
 

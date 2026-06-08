@@ -287,14 +287,23 @@ rank_communication_axes <- function(ct_comm,
   }
   df$threshold_stability <- stability
 
-  # Permutation support: 1 - empirical_p from the cell-label shuffle null,
-  # joined by sender/receiver subgroup (the null is pair-level).
+  # Permutation support: 1 - empirical_p from the cell-label shuffle null. When
+  # the null is axis-level (default; carries an lr_pair column), each L-R axis is
+  # joined to its OWN empirical p. A legacy pair-level null is broadcast across
+  # the cell-type pair's L-R axes (less specific) for backward compatibility.
   support <- rep(NA_real_, nrow(df))
   if (!is.null(null_pair) && all(c("sender_type", "receiver_type", "empirical_p") %in% names(null_pair))) {
-    nk <- paste(null_pair$sender_type, null_pair$receiver_type)
-    ep <- null_pair$empirical_p[match(paste(df$sender_type, df$receiver_type), nk)]
+    if ("lr_pair" %in% names(null_pair)) {
+      nk <- paste(null_pair$sender_type, null_pair$receiver_type, null_pair$lr_pair)
+      idx <- match(paste(df$sender_type, df$receiver_type, df$lr_pair), nk)
+    } else {
+      nk <- paste(null_pair$sender_type, null_pair$receiver_type)
+      idx <- match(paste(df$sender_type, df$receiver_type), nk)
+    }
+    ep <- null_pair$empirical_p[idx]
     support <- 1 - ep
     df$permutation_empirical_p <- ep
+    if ("fdr" %in% names(null_pair)) df$permutation_fdr <- null_pair$fdr[idx]
   }
   df$null_support <- support
 

@@ -18,10 +18,30 @@ bootstrap_celltype_communication <- function(ct_comm,
   df <- ct_comm$lr_table
   df <- df[!is.na(df$lcs) & df$n_edges > 0, , drop = FALSE]
   if (nrow(df) == 0) stop("No scored L-R rows with positive edge counts.")
-  probs <- pmin(pmax(df$lcs, 0), 1)
-  trials <- pmax(1, as.integer(round(df$n_edges)))
   boot_mat <- matrix(NA_real_, nrow = nrow(df), ncol = n_boot)
-  for (b in seq_len(n_boot)) boot_mat[, b] <- stats::rbinom(nrow(df), size = trials, prob = probs) / trials
+  # Resample on the independent unit (cells), not the sender x receiver cell-count
+  # product. Co-expression LCS = (ligand-active fraction of sender cells) x
+  # (receptor-active fraction of receiver cells); each fraction is a binomial
+  # proportion over its own cell count. Using n_edges (the product) as the trial
+  # size would treat non-independent cell pairings as independent observations and
+  # produce anticonservative (far too narrow) intervals.
+  cell_cols <- c("sender_cell_count", "receiver_cell_count",
+                 "ligand_active_frac_sender", "receptor_active_frac_receiver")
+  if (all(cell_cols %in% names(df))) {
+    ns <- pmax(1L, as.integer(round(df$sender_cell_count)))
+    nr <- pmax(1L, as.integer(round(df$receiver_cell_count)))
+    p_lig <- pmin(pmax(df$ligand_active_frac_sender, 0), 1)
+    p_rec <- pmin(pmax(df$receptor_active_frac_receiver, 0), 1)
+    for (b in seq_len(n_boot)) {
+      lig_b <- stats::rbinom(nrow(df), size = ns, prob = p_lig) / ns
+      rec_b <- stats::rbinom(nrow(df), size = nr, prob = p_rec) / nr
+      boot_mat[, b] <- lig_b * rec_b
+    }
+  } else {
+    probs <- pmin(pmax(df$lcs, 0), 1)
+    trials <- pmax(1, as.integer(round(df$n_edges)))
+    for (b in seq_len(n_boot)) boot_mat[, b] <- stats::rbinom(nrow(df), size = trials, prob = probs) / trials
+  }
   if (level == "celltype_lr") {
     out <- data.frame(
       sender_type = df$sender_type,
@@ -66,7 +86,11 @@ bootstrap_celltype_communication <- function(ct_comm,
 #' @param n_cores Number of forked worker processes for the permutation loop
 #'   (Unix/macOS). Default 1 (serial). Higher values give a near-linear speedup,
 #'   making a publication-grade \code{n_perm} affordable; ignored on Windows.
-#' @param metric Pair-level metric to test.
+#' @param metric Metric to test. The default \code{"lcs"} (a column of
+#'   \code{lr_table}) builds an \strong{axis-level} null: every sender ->
+#'   receiver -> L-R axis gets its own empirical p-value. A metric found in
+#'   \code{pair_summary} (e.g. \code{"sum_lcs"}) builds a legacy cell-type-pair
+#'   null instead.
 #' @param seed Optional random seed.
 #' @param adaptive If TRUE, refine top preliminary candidates after the first
 #'   \code{n_perm} permutations.
@@ -77,7 +101,9 @@ bootstrap_celltype_communication <- function(ct_comm,
 #' @param min_n_perm_publication Recommended minimum permutation count.
 #' @param verbose Print progress, including adaptive-phase elapsed time.
 #' @param ... Passed to \code{summarize_celltype_communication()}.
-#' @return Pair-level null summary with empirical p-values.
+#' @return Axis-level (default) or pair-level null summary with per-test
+#'   empirical p-values and BH-adjusted FDR. Axis-level rows carry an
+#'   \code{lr_pair} column so each L-R axis can be joined to its own p-value.
 #' @export
 permute_celltype_communication <- function(ct_comm = NULL,
                                            reo_mat,
@@ -86,7 +112,7 @@ permute_celltype_communication <- function(ct_comm = NULL,
                                            lr_db = NULL,
                                            n_perm = 100,
                                            n_cores = 1L,
-                                           metric = "sum_lcs",
+                                           metric = "lcs",
                                            seed = NULL,
                                            adaptive = FALSE,
                                            adaptive_top_n = 25,
@@ -165,9 +191,25 @@ permute_celltype_communication <- function(ct_comm = NULL,
     reo_mat <- reo_mat[, names(cell_labels), drop = FALSE]
   }
   if (is.null(lr_db)) lr_db <- ct_comm$lr_db
-  observed <- ct_comm$pair_summary
-  if (!metric %in% names(observed)) stop("metric not found in pair_summary: ", metric)
-  feature <- paste(observed$sender_type, observed$receiver_type, sep = "|")
+
+  # Axis-level null (default): test each sender -> receiver -> L-R axis on its own
+  # cell-type co-expression LCS, so every axis gets its OWN empirical p-value
+  # rather than inheriting a single cell-type-pair-level p shared across all its
+  # L-R pairs. Pair-level metrics (e.g. "sum_lcs") remain supported for backward
+  # compatibility.
+  axis_level <- metric %in% names(ct_comm$lr_table)
+  if (axis_level) {
+    observed <- ct_comm$lr_table
+    keep <- is.finite(observed[[metric]]) & (observed$active %in% TRUE)
+    if (!any(keep)) keep <- is.finite(observed[[metric]])
+    observed <- observed[keep, , drop = FALSE]
+    feature <- paste(observed$sender_type, observed$receiver_type, observed$lr_pair, sep = "|")
+  } else if (metric %in% names(ct_comm$pair_summary)) {
+    observed <- ct_comm$pair_summary
+    feature <- paste(observed$sender_type, observed$receiver_type, sep = "|")
+  } else {
+    stop("metric '", metric, "' not found in lr_table (axis-level) or pair_summary (pair-level).")
+  }
   null_mat <- matrix(NA_real_, nrow = nrow(observed), ncol = n_perm,
                      dimnames = list(feature, paste0("perm", seq_len(n_perm))))
   run_perm <- function() {
@@ -178,8 +220,14 @@ permute_celltype_communication <- function(ct_comm = NULL,
       c(list(reo_mat = reo_mat, cell_labels = perm_labels,
              lr_db = lr_db, verbose = FALSE), dots)
     )
-    key_perm <- paste(perm$pair_summary$sender_type, perm$pair_summary$receiver_type, sep = "|")
-    vals <- stats::setNames(perm$pair_summary[[metric]], key_perm)
+    if (axis_level) {
+      key_perm <- paste(perm$lr_table$sender_type, perm$lr_table$receiver_type,
+                        perm$lr_table$lr_pair, sep = "|")
+      vals <- stats::setNames(perm$lr_table[[metric]], key_perm)
+    } else {
+      key_perm <- paste(perm$pair_summary$sender_type, perm$pair_summary$receiver_type, sep = "|")
+      vals <- stats::setNames(perm$pair_summary[[metric]], key_perm)
+    }
     vals[feature]
   }
   # Fill an n-column null matrix, in parallel (forked workers) when n_cores > 1.
@@ -275,7 +323,7 @@ permute_celltype_communication <- function(ct_comm = NULL,
            "Permutation resolution is adequate for screening-level interpretation.")
   )
 
-  data.frame(sender_type = observed$sender_type,
+  out <- data.frame(sender_type = observed$sender_type,
              receiver_type = observed$receiver_type,
              observed = obs,
              null_mean = null_mean,
@@ -294,6 +342,13 @@ permute_celltype_communication <- function(ct_comm = NULL,
              null_biological_interpretation = null_biological_interpretation,
              metric = metric,
              stringsAsFactors = FALSE)
+  if (axis_level) {
+    out <- cbind(out[c("sender_type", "receiver_type")],
+                 lr_pair = observed$lr_pair,
+                 out[setdiff(names(out), c("sender_type", "receiver_type"))],
+                 stringsAsFactors = FALSE)
+  }
+  out
 }
 
 #' Diagnose Permutation Null Resolution
