@@ -115,9 +115,15 @@ cores retained**:
   confounds saturate their scores. The proliferation filter is the single biggest
   contributor to precision.
 
-Still pending: REO rank-weighted LCS; `IdentifyRankLogicConsensus()`
-de-neighborhooding; removal of the vestigial spatial columns/vocabulary; and
-real-package + real-data benchmark runs.
+Still pending (non-blocking; the package is functional and green without them):
+removal of the inert transitional stub columns (`lcs_neighborhood`,
+`communication_range`, `local_active`, `distal_candidate`, ...) that the
+cell-type path still emits as dead weight -- a cross-cutting refactor of the
+downstream readers; and a possible re-architecture of `IdentifyRankLogicConsensus()`
+to cell-type level (its graph-free mode is autocrine-only, so it keeps an optional
+neighborhood mode for now). The gate-aware consensus and the spatial module retain
+a cell-level graph by design. Also pending: real-package (CellChat/LIANA) and
+real-data benchmark runs.
 
 # LogicComm 0.11.1
 
