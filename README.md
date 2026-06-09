@@ -133,36 +133,19 @@ sort(lcs_global, decreasing = TRUE)[1:20]
 
 ---
 
-## KNN / Neighborhood-Aware LCS
+## What LogicComm scores (v0.12+)
 
-KNN mode is recommended when a cell-cell neighborhood graph is available. The KNN adjacency matrix must be cells x cells.
+LogicComm scores cell-cell communication at the **cell-type level from REO
+co-expression** — it no longer aggregates over a per-cell KNN/SNN neighborhood
+graph. For dissociated scRNA-seq that graph lives in expression space
+(transcriptomic similarity), not physical space, so it cannot license spatial
+juxtacrine/paracrine claims; cell-type co-expression is the honest,
+sample-comparable unit. See the cell-type workflow below, and
+`discover_celltype_communication()` for the recommended one-call pipeline.
 
-```r
-# Option 1: provide a KNN adjacency matrix directly.
-# knn_mat rownames/colnames should be cell names.
-lcs_knn <- IdentifyLogicConsensus(
-  reo,
-  knn_mat = knn_mat,
-  lr_db   = lr_pairs_human,
-  verbose = TRUE
-)
-
-# Option 2: extract KNN graph from a Seurat object.
-lcs_knn <- IdentifyLogicConsensus(
-  reo,
-  seurat_obj = my_seurat,
-  graph_name = NULL,
-  verbose    = TRUE
-)
-```
-
-Important KNN rules:
-
-- `knn_mat` must be square: cells x cells.
-- Diagonal/self-loop entries are removed by default (`remove_self_edges = TRUE`).
-- If `knn_mat` has row/column names, LogicComm aligns it to `colnames(reo)` automatically.
-- If cell names are missing, `nrow(knn_mat)` must equal `ncol(reo)` and the current order is trusted.
-- If KNN cells do not cover all REO cells, the function errors instead of silently producing wrong LCS values.
+Legacy neighborhood arguments (`knn_mat`, `mode`, `graph_name`,
+`remove_self_edges`, `graph_symmetrize`, `edge_weight_mode`) are still accepted
+for backward compatibility but are **deprecated and ignored with a warning**.
 
 ---
 
@@ -270,7 +253,7 @@ Compose multi-panel figures with `patchwork`. See the Seurat tutorial's
 
 ## Biology-Oriented Cell-Type Communication Visualization
 
-Once a KNN/SNN-aware LCS result is available, LogicComm can summarize communication
+Once a cell-type communication result is available, LogicComm can summarize it
 around concrete biological questions:
 
 - **How many active interactions exist between celltypeA and celltypeB?** Use
@@ -291,15 +274,11 @@ around concrete biological questions:
 cell_labels <- SeuratObject::Idents(my_seurat)
 
 ct_comm <- summarize_celltype_communication(
-  reo_mat          = reo,
-  seurat_obj       = my_seurat,
-  cell_labels      = cell_labels,
-  graph_name       = "RNA_snn",       # SNN graph is often useful for cell-type summaries
-  graph_symmetrize = "max",           # use the stronger direction if the graph is asymmetric
-  edge_weight_mode = "weighted",      # use SNN weights rather than binarizing them
-  lr_db            = lr_pairs_human,
-  lcs_threshold    = 0.01,
-  min_edges        = 20
+  reo_mat       = reo,
+  cell_labels   = cell_labels,        # no graph needed: scored from cell-type co-expression
+  lr_db         = lr_pairs_human,
+  lcs_threshold = 0.01,
+  min_edges     = 20                  # min sender x receiver cell-count opportunity
 )
 
 ct_comm$pair_summary[order(ct_comm$pair_summary$sum_lcs, decreasing = TRUE), ][1:10, ]
@@ -428,26 +407,52 @@ ct_comm <- add_receiver_response_score(
 ct_comm$lr_table[order(ct_comm$lr_table$response_integrated_score, decreasing = TRUE), ][1:10, ]
 ```
 
-### Uncertainty, null models, and threshold sensitivity
+### Recommended: one-call discovery (`discover_celltype_communication`)
+
+The footgun-free entry point — cell-type co-expression scoring, specificity +
+proliferation-confound annotation, an **axis-level** permutation null, evidence
+ranking, a confound-filtered view, and an FDR-passing shortlist, in one call:
 
 ```r
-# Approximate edge bootstrap for confidence intervals.
+# REO with the rank matrix (needed only for lcs_weighting = "rank").
+reo <- calc_REO_matrix(count_matrix, lr_genes = lr_genes, return_rank = TRUE)
+
+res <- discover_celltype_communication(
+  reo_mat       = reo,
+  cell_labels   = cell_labels,
+  lr_db         = lr_pairs_human,
+  expr          = count_matrix,   # enables the proliferation/breadth-hub filter
+  lcs_weighting = "rank",         # REO-intensity score (optional; default "binary")
+  n_perm        = 1000,
+  n_cores       = 8,
+  seed          = 1,
+  fdr_cutoff    = 0.1
+)
+res$shortlist   # axes passing permutation_fdr <= 0.1, ranked
+res$view        # confound-filtered discovery view
+res$ranked      # all active axes with per-axis permutation_empirical_p / permutation_fdr
+```
+
+### Uncertainty, null models, and threshold sensitivity
+
+The individual steps that `discover_celltype_communication()` wraps:
+
+```r
+# Per-cell bootstrap for confidence intervals (resamples cells, not the
+# sender x receiver cell-count product).
 boot_lr <- bootstrap_celltype_communication(ct_comm, n_boot = 200, level = "celltype_lr")
 boot_pair <- bootstrap_celltype_communication(ct_comm, n_boot = 200, level = "celltype_pair")
 
-# Cell-label permutation null: preserves REO states and the graph, shuffles labels.
-# Use n_perm >= 1000 for publication-level p-value resolution.
+# Axis-level cell-label permutation null (default metric = "lcs"): every
+# sender -> receiver -> L-R axis gets its OWN empirical p and BH FDR. The
+# co-expression null needs no graph, so a publication-grade n_perm is cheap;
+# n_cores parallelizes on Unix/macOS.
 null_pair <- permute_celltype_communication(
-  ct_comm     = ct_comm,
-  reo_mat     = reo,
-  knn_mat     = my_seurat@graphs$RNA_snn,
-  n_perm      = 100,
-  adaptive    = TRUE,
-  adaptive_top_n = 25,
-  adaptive_n_perm = 1000,
-  metric      = "sum_lcs",
-  graph_symmetrize = "max",
-  edge_weight_mode = "weighted"
+  ct_comm = ct_comm,
+  reo_mat = reo,
+  n_perm  = 1000,
+  n_cores = 8,
+  seed    = 1
 )
 
 diagnose_permutation_resolution(null_pair)
@@ -467,8 +472,7 @@ sens <- sensitivity_REO_threshold(
   my_seurat,
   rank_threshold_grid = c(0.4, 0.5, 0.6, 0.7),
   lr_db       = lr_pairs_human,
-  cell_labels = cell_labels,
-  knn_mat     = my_seurat@graphs$RNA_snn
+  cell_labels = cell_labels
 )
 sens$stability[1:20, ]
 
@@ -494,11 +498,7 @@ ct_lcs_list <- lapply(names(sample_list), function(sname) {
   reo_i <- calc_REO_matrix(sample_list[[sname]], lr_genes = lr_genes, verbose = FALSE)
   ct_i <- summarize_celltype_communication(
     reo_i,
-    seurat_obj       = sample_list[[sname]],
     cell_labels      = sample_cell_labels[[sname]],
-    graph_name       = "RNA_snn",
-    graph_symmetrize = "max",
-    edge_weight_mode = "weighted",
     lr_db            = lr_pairs_human,
     lcs_threshold    = 0.01,
     min_edges        = 20,
@@ -715,51 +715,22 @@ LogicComm 0.7 extends several modules intended for manuscript-grade analyses.
 They do not change the core REO/LCS definition; instead they add stronger
 biological context, statistical modeling, and figure/report scaffolding.
 
-### Spatial neighborhood communication
+### Spatial communication (graph scoring pending in v0.12)
 
-For spatial transcriptomics, use physical spot/cell coordinates to define the
-neighborhood graph. This makes the LCS interpretation closer to local tissue
-communication opportunity.
+> **Status.** With genuine spatial coordinates a physical neighborhood graph *is*
+> a legitimate, non-expression-space basis for juxtacrine/paracrine scoring. But
+> the v0.12 cell-type-co-expression rewrite removed the per-cell graph scorer that
+> `summarize_spatial_communication()` relied on, so spatial **graph scoring is
+> temporarily unavailable**: the function now warns and returns cell-type
+> co-expression (the graph is *not* used). A dedicated spatial edge scorer over
+> physical coordinates is planned. `build_spatial_graph()` and
+> `plot_spatial_logic()` (which visualizes REO states on coordinates) still work.
 
 ```r
-# coords: data frame or matrix with rownames matching cell/spot names.
-# Recognized coordinate columns include x/y, imagecol/imagerow, and
-# pxl_col_in_fullres/pxl_row_in_fullres.
-sp_graph <- build_spatial_graph(
-  coords,
-  mode            = "knn",
-  k               = 6,
-  directed        = FALSE,
-  distance_weight = "gaussian"
-)
-
-ct_spatial <- summarize_celltype_communication(
-  reo,
-  cell_labels      = spatial_cell_labels,
-  knn_mat          = sp_graph,
-  lr_db            = lr_pairs_human,
-  edge_weight_mode = "weighted",
-  min_edges        = 20
-)
-
-# Or use the wrapper:
-ct_spatial <- summarize_spatial_communication(
-  reo_mat       = reo,
-  coords        = coords,
-  cell_labels   = spatial_cell_labels,
-  lr_db         = lr_pairs_human,
-  spatial_mode  = "knn",
-  k             = 6,
-  distance_weight = "gaussian"
-)
-
-plot_spatial_logic(
-  reo,
-  coords,
-  lr_pair     = "VEGFA_KDR",
-  lr_db       = lr_pairs_human,
-  cell_labels = spatial_cell_labels
-)
+# Graph construction and per-spot visualization still work:
+sp_graph <- build_spatial_graph(coords, mode = "knn", k = 6, distance_weight = "gaussian")
+plot_spatial_logic(reo, coords, lr_pair = "VEGFA_KDR",
+                   lr_db = lr_pairs_human, cell_labels = spatial_cell_labels)
 ```
 
 ### Pseudotime or time-course communication dynamics
@@ -773,7 +744,6 @@ dyn <- summarize_communication_dynamics(
   reo_mat      = reo,
   pseudotime   = pseudotime_vector,
   cell_labels  = cell_labels,
-  knn_mat      = knn_mat,
   lr_db        = lr_pairs_human,
   n_bins       = 6,
   bin_method   = "quantile",
@@ -888,20 +858,11 @@ Install missing dependencies first:
 install.packages(c("dplyr", "ggplot2", "ggrepel", "scales", "Rcpp"))
 ```
 
-### Error: `knn_mat row/column names must contain all reo_mat column names`
+### Warning: a `knn_mat` / `mode` / `graph_*` argument is deprecated and ignored
 
-Your KNN graph does not cover all cells in the REO matrix. Recompute KNN on the same cells used for `calc_REO_matrix()`, or subset `reo` and `knn_mat` to the same cell set.
-
-### Wrong or unexpected KNN results
-
-Check that:
-
-```r
-identical(rownames(knn_mat), colnames(reo))
-identical(colnames(knn_mat), colnames(reo))
-```
-
-If names are present, LogicComm will reorder KNN automatically. If names are absent, the function assumes the matrix order is already correct.
+LogicComm scores at the cell-type level from co-expression and no longer uses a
+per-cell graph. Drop these arguments; they are accepted only for backward
+compatibility and have no effect.
 
 ### Heatmap fails
 
@@ -925,10 +886,10 @@ For very large on-disk data, use BPCells input if available.
 
 ## End-to-End Discovery Workflow
 
-Once a KNN/SNN-aware `summarize_celltype_communication()` result (`ct_comm`) is
-available, these steps take you from "the package ran" to "here are the
-prioritized, evidence-backed interactions, who drives them, and what changes
-between conditions".
+Once a `summarize_celltype_communication()` result (`ct_comm`) is available,
+these steps take you from "the package ran" to "here are the prioritized,
+evidence-backed interactions, who drives them, and what changes between
+conditions". (`discover_celltype_communication()` wraps steps 2 below.)
 
 ```r
 # 1. Which cell types communicate, how broadly, and through what?
@@ -940,9 +901,9 @@ plot_celltype_communication_profile(part, "CD14+ Mono")   # one subgroup's profi
 
 # 2. Prioritize effective interactions by integrated evidence.
 ct_comm <- score_communication_specificity(ct_comm)
-null_pair <- permute_celltype_communication(ct_comm, reo_mat = reo, n_perm = 1000)
+null_pair <- permute_celltype_communication(ct_comm, reo_mat = reo, n_perm = 1000, n_cores = 8)
 sens      <- sensitivity_REO_threshold(my_seurat, lr_db = lr_pairs_human,
-                                       cell_labels = cell_labels, knn_mat = knn_mat)
+                                       cell_labels = cell_labels)
 ranked <- rank_communication_axes(ct_comm, null_pair = null_pair, sens = sens)
 ranked[, c("sender_type","receiver_type","lr_pair","discovery_score","evidence_tier")][1:20, ]
 plot_communication_discovery(ranked)            # strength vs specificity, coloured by tier

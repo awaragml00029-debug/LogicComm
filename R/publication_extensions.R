@@ -192,20 +192,19 @@ summarize_spatial_communication <- function(reo_mat,
   spatial_mode <- match.arg(spatial_mode)
   graph_symmetrize <- match.arg(graph_symmetrize)
   if (is.null(edge_weight_mode)) edge_weight_mode <- if (distance_weight == "binary") "binary" else "weighted"
-  graph <- build_spatial_graph(
-    xy, mode = spatial_mode, k = k, radius = radius, directed = directed,
-    distance_weight = distance_weight, sigma = sigma, verbose = verbose
-  )
+  warning("summarize_spatial_communication(): graph-based spatial scoring was ",
+          "removed in the v0.12 cell-type rewrite (summarize_celltype_communication() ",
+          "no longer scores over a per-cell graph) and is pending re-implementation ",
+          "as a dedicated spatial edge scorer. This call now returns CELL-TYPE ",
+          "CO-EXPRESSION; the spatial graph is NOT used and results are not spatially ",
+          "resolved. Use summarize_celltype_communication() directly meanwhile.",
+          call. = FALSE)
   ct <- summarize_celltype_communication(
-    reo_mat = reo_logic, cell_labels = cell_labels, knn_mat = graph, lr_db = lr_db,
-    mode = "neighborhood", graph_symmetrize = graph_symmetrize,
-    edge_weight_mode = edge_weight_mode, verbose = verbose, ...
+    reo_mat = reo_logic, cell_labels = cell_labels, lr_db = lr_db, verbose = verbose, ...
   )
-  ct$spatial_graph <- graph
   ct$spatial_coords <- xy
   ct$params$spatial_mode <- spatial_mode
   ct$params$spatial_distance_weight <- distance_weight
-  class(ct) <- "LogicCommCellTypeComm"
   ct
 }
 
