@@ -61,6 +61,18 @@ cores retained**:
   `n_edges` (the product) as the trial size and produced anticonservative,
   far-too-narrow intervals.
 
+### Standard discovery pipeline (footgun-free)
+
+* New `discover_celltype_communication()` wires the whole workflow in one call
+  with the correct defaults: cell-type co-expression scoring, specificity +
+  proliferation-confound annotation, an **axis-level** permutation null
+  (`metric = "lcs"`, so it is impossible to accidentally request a pair-level
+  null via `metric = "sum_lcs"`), evidence ranking, a confound-filtered
+  discovery view, and an FDR-passing `shortlist`. Pass `expr =` the counts matrix
+  to enable the proliferation/breadth filter (cycling clusters otherwise dominate
+  the ranking). A copy-paste template lives in
+  `inst/workflows/standard_discovery.R`.
+
 ### Stage 6 (started): benchmark harness vs. baselines
 
 * New `inst/benchmark/benchmark_vs_baselines.R`: a sandbox-runnable harness that
