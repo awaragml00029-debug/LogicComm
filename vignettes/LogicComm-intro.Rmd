@@ -140,44 +140,18 @@ matrix and scored. This keeps REO states comparable when you switch LR databases
 ## Step 2: Logic Consensus Score (LCS) per Sample
 
 ```{r lcs}
-# Single sample: global mode (no KNN required)
+# Dataset-level L-R co-expression score (no graph required)
 lcs_demo <- IdentifyLogicConsensus(reo_demo, verbose = FALSE)
 
 # Top 10 active L-R pairs
 sort(lcs_demo, decreasing = TRUE)[1:10]
 ```
 
-### Optional: Neighborhood-aware KNN mode
-
-If you have a cells x cells KNN adjacency matrix, provide it with `knn_mat`:
-
-```{r lcs_knn, eval=FALSE}
-lcs_knn <- IdentifyLogicConsensus(
-  reo_demo,
-  knn_mat = knn_mat,
-  lr_db   = lr_pairs_human,
-  verbose = TRUE
-)
-```
-
-KNN requirements:
-
-- `knn_mat` must be square: cells x cells.
-- Self-loop/diagonal entries are removed by default (`remove_self_edges = TRUE`).
-- If row/column names are present, LogicComm aligns KNN order to `colnames(reo_demo)`.
-- If names are absent, dimensions must match and the current order is trusted.
-- If KNN does not contain all REO cells, LogicComm errors instead of silently computing an invalid LCS.
-
-For Seurat objects, LogicComm can extract a precomputed graph from `seurat_obj@graphs`:
-
-```{r lcs_seurat_knn, eval=FALSE}
-lcs_knn <- IdentifyLogicConsensus(
-  reo_demo,
-  seurat_obj = my_seurat,
-  graph_name = NULL,
-  verbose    = TRUE
-)
-```
+> **v0.12 note.** LogicComm scores communication from REO co-expression and no
+> longer uses a per-cell KNN/SNN neighborhood graph. Legacy neighborhood
+> arguments (`knn_mat`, `mode`, `graph_name`, ...) are accepted but deprecated
+> and ignored with a warning. Cell-type-resolved discovery uses
+> `discover_celltype_communication()` (see below).
 
 ---
 
@@ -279,9 +253,8 @@ cluster_labels <- setNames(
 
 ct_comm <- summarize_celltype_communication(
   reo_demo,
-  cell_labels   = cluster_labels,
+  cell_labels   = cluster_labels,   # scored from cell-type co-expression (no graph)
   lr_db         = lr_pairs_human,
-  mode          = "global",   # use KNN/SNN neighborhood mode when knn_mat is available
   lcs_threshold = 0.01,
   min_edges     = 20
 )
@@ -316,17 +289,18 @@ ct_comm$role_summary[, c("cell_type", "sender_role_score", "receiver_role_score"
 - `dominant_role = "Low-communication"` means the cell type did not pass the
   minimum hub/event filters for confident role assignment.
 
-When a KNN/SNN graph is available, you can use weighted graph scoring:
+For the recommended end-to-end discovery (specificity + proliferation filter +
+axis-level permutation FDR), use the one-call pipeline:
 
-```{r weighted_celltype_intro, eval=FALSE}
-ct_comm <- summarize_celltype_communication(
-  reo_demo,
-  cell_labels      = cluster_labels,
-  knn_mat          = snn_matrix,
-  graph_symmetrize = "max",
-  edge_weight_mode = "weighted",
-  lr_db            = lr_pairs_human
+```{r discover_intro, eval=FALSE}
+reo_rk <- calc_REO_matrix(count_matrix, lr_genes = all_lr_genes(lr_pairs_human),
+                          return_rank = TRUE)
+res <- discover_celltype_communication(
+  reo_mat = reo_rk, cell_labels = cluster_labels, lr_db = lr_pairs_human,
+  expr = count_matrix, lcs_weighting = "rank",
+  n_perm = 1000, n_cores = 8, seed = 1
 )
+res$shortlist   # axes passing permutation_fdr <= 0.1
 ```
 
 For cohort analysis, calculate `ct_comm` inside each sample and convert it to a
@@ -401,24 +375,23 @@ glm_res <- fit_celltype_comm_glm(
 plot_celltype_glm_volcano(glm_res)
 ```
 
-### Spatial and pseudotime modules
+### Pseudotime module
 
 ```{r spatial_pseudotime_intro, eval=FALSE}
-sp_graph <- build_spatial_graph(coords, mode = "knn", k = 6, distance_weight = "gaussian")
-ct_spatial <- summarize_celltype_communication(
-  reo_demo, cell_labels = cell_labels, knn_mat = sp_graph,
-  edge_weight_mode = "weighted"
-)
-
+# Communication along a pseudotime / time-course (binned, cell-type co-expression).
 dyn <- summarize_communication_dynamics(
   reo_demo,
   pseudotime  = pseudotime_vector,
   cell_labels = cell_labels,
-  knn_mat     = knn_mat,
   n_bins      = 5
 )
 plot_communication_dynamics(dyn, level = "pair", metric = "sum_lcs")
 ```
+
+> **Spatial.** Graph-based spatial scoring (`summarize_spatial_communication()`)
+> is pending re-implementation in the v0.12 cell-type rewrite; it currently warns
+> and returns cell-type co-expression. `build_spatial_graph()` and
+> `plot_spatial_logic()` still work.
 
 
 ## Step 11: Filter and Export
@@ -442,7 +415,7 @@ export_results(sig_pairs, file = "LogicComm_significant_pairs.csv")
 |---|---|
 | `asymmetry` | Case_freq − Ctrl_freq. Range [−1, +1]. +0.8 means 80% more Case samples active. |
 | `case_freq` | Fraction of Case samples with LCS ≥ threshold for this pair |
-| `lcs` | Logic Consensus Score: fraction of KNN/all edges with L→R logic complete |
+| `lcs` | Logic Consensus Score: cell-type co-expression (fraction of the sender x receiver opportunity with the L→R logic complete) |
 | `shift_score` | Rank shift > 0: gene climbed in transcriptomic dominance in Case |
 | `log2fc_lcs` | Traditional fold-change in mean LCS (can be misleading alone) |
 | `fdr_fisher` | BH-adjusted p from Fisher's exact test on frequency table |
@@ -467,14 +440,11 @@ export_results(sig_pairs, file = "LogicComm_significant_pairs.csv")
 install.packages(c("dplyr", "ggplot2", "ggrepel", "scales", "Rcpp"))
 ```
 
-### KNN cell mismatch
+### Deprecated neighborhood arguments
 
-If you see an error that KNN names must contain all REO cells, recompute the KNN graph on the same cells or subset both objects to the same cell set.
-
-```{r check_knn_names, eval=FALSE}
-identical(rownames(knn_mat), colnames(reo_demo))
-identical(colnames(knn_mat), colnames(reo_demo))
-```
+If you see a warning that `knn_mat` / `mode` / `graph_*` is deprecated and
+ignored, drop those arguments: LogicComm scores at the cell-type level from
+co-expression and no longer uses a per-cell graph.
 
 ### Heatmap dependency
 

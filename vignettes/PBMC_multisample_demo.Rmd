@@ -133,10 +133,10 @@ plot_lcs_heatmap(
 ```
 
 For a real cohort, use one PBMC object per biological sample rather than splitting
-one sample. Keep the same LR database, REO threshold, layer, and graph definition
-across samples. If Seurat nearest-neighbor graphs are available per sample, pass
-`graph_name = "RNA_nn"` to `run_multisample()`; otherwise LogicComm falls back to
-global LCS mode, which is the mode used by this compact validation script.
+one sample. Keep the same LR database, REO threshold, and layer across samples.
+As of v0.12, `run_multisample()` computes each sample's LCS from REO co-expression
+(no per-cell graph); any legacy `graph_name`/`knn_mat` arguments are deprecated and
+ignored.
 
 ## Interpreting This Demo
 
