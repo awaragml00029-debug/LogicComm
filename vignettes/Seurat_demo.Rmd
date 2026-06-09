@@ -20,6 +20,36 @@ knitr::opts_chunk$set(
 
 ## Overview
 
+> ### ⚠️ v0.12 API update — read first
+>
+> LogicComm v0.12 scores cell-cell communication at the **cell-type level from
+> REO co-expression**; the per-cell **KNN/SNN neighborhood** scoring was removed
+> (for dissociated scRNA-seq that graph is in expression space, not physical
+> space, so it cannot license spatial juxtacrine/paracrine claims). The
+> recommended entry point is now the one-call pipeline:
+>
+> ```r
+> # REO with the rank matrix (only needed for lcs_weighting = "rank").
+> reo <- calc_REO_matrix(GetAssayData(pbmc, layer = "counts"),
+>                        lr_genes = all_lr_genes(lr_pairs_human), return_rank = TRUE)
+> res <- discover_celltype_communication(
+>   reo_mat       = reo,
+>   cell_labels   = Idents(pbmc),
+>   expr          = GetAssayData(pbmc, layer = "counts"),  # enables proliferation filter
+>   lcs_weighting = "rank",      # optional REO-intensity score (default "binary")
+>   n_perm = 1000, n_cores = 8, seed = 1, fdr_cutoff = 0.1
+> )
+> res$shortlist   # axes passing per-axis permutation_fdr <= 0.1
+> res$view        # confound-filtered discovery view
+> ```
+>
+> The sections below still show the legacy per-step / neighborhood API. Old
+> arguments (`knn_mat`, `mode`, `graph_name`, `graph_symmetrize`,
+> `edge_weight_mode`, `remove_self_edges`) are **accepted but deprecated and
+> ignored with a warning**, so the tutorial still runs; results are scored from
+> cell-type co-expression regardless. A full rewrite of the per-step sections to
+> the cell-type API is in progress.
+
 This tutorial shows how to run **LogicComm** on the classic **PBMC3K** dataset
 with a Seurat workflow.
 
@@ -671,18 +701,13 @@ label_col <- if ("seurat_annotations" %in% colnames(pbmc@meta.data)) {
 celltype_labels <- setNames(as.character(pbmc[[label_col]][, 1]), colnames(pbmc))
 
 ct_comm <- summarize_celltype_communication(
-  reo_mat           = reo_pbmc,
-  seurat_obj        = pbmc,
-  cell_labels       = celltype_labels,
-  graph_name        = "RNA_nn",       # Using direct nearest neighbors
-  graph_symmetrize  = "max",
-  edge_weight_mode  = "binary",
-  remove_self_edges = TRUE,           # Remove CellA -> CellA self-loops
-  include_self      = TRUE,           # Keep same-cell-type pairs, e.g. T cell -> T cell
-  lr_db             = lr_pairs_human,
-  lcs_threshold     = 0.01,
-  min_edges         = 20,
-  verbose           = TRUE
+  reo_mat       = reo_pbmc,
+  cell_labels   = celltype_labels,   # no graph: scored from cell-type co-expression
+  include_self  = TRUE,              # keep same-cell-type pairs, e.g. T cell -> T cell
+  lr_db         = lr_pairs_human,
+  lcs_threshold = 0.01,
+  min_edges     = 20,                # min sender x receiver cell-count opportunity
+  verbose       = TRUE
 )
 ```
 
@@ -938,16 +963,15 @@ sender -> receiver pair is stronger than chance. Two practical points:
 
 ```{r celltype_permutation_null, eval=FALSE}
 null_pair <- permute_celltype_communication(
-  ct_comm          = ct_comm,
-  reo_mat          = reo_pbmc,
-  knn_mat          = pbmc@graphs$RNA_nn,  # must match the graph used to build ct_comm
-  n_perm           = 1000,                # p-value floor ~1/1001 (see note above)
-  n_cores          = 8,                   # fork-parallel on Unix/macOS: ~Nx speedup
-  metric           = "sum_lcs",
-  seed             = 1
+  ct_comm = ct_comm,
+  reo_mat = reo_pbmc,
+  n_perm  = 1000,           # axis-level null (default metric = "lcs"); floor ~1/1001
+  n_cores = 8,              # fork-parallel on Unix/macOS: ~Nx speedup
+  seed    = 1
 )
-# Lower-compute alternative: n_perm = 100 with adaptive = TRUE, adaptive_top_n = 25,
-# adaptive_n_perm = 1000 refines only the top candidates to 1000 permutations.
+# Axis-level: every sender -> receiver -> L-R axis gets its OWN empirical p and
+# BH FDR (null_pair has an lr_pair column); rank_communication_axes() joins them
+# per axis and exposes permutation_fdr. The co-expression null needs no graph.
 head(null_pair[order(null_pair$fdr), ], 10)
 
 diagnose_permutation_resolution(null_pair)
