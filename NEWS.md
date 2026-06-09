@@ -1,3 +1,25 @@
+# LogicComm 0.12.1
+
+## Documentation
+
+* All user-facing docs were rewritten to the v0.12 cell-type co-expression API:
+  the README and the `LogicComm-intro`, `Seurat_demo`, and
+  `PBMC_multisample_demo` vignettes. The neighborhood/KNN-as-default workflow is
+  removed, `discover_celltype_communication()` is presented as the recommended
+  one-call entry point, permutation examples use the axis-level null, and the
+  deprecated graph arguments (`knn_mat`, `mode`, `graph_name`,
+  `graph_symmetrize`, `edge_weight_mode`, `remove_self_edges`) are dropped from
+  all examples.
+
+## Fixes
+
+* `summarize_spatial_communication()` no longer silently ignores its spatial
+  graph. The v0.12 rewrite removed the per-cell graph scorer it relied on, so it
+  was returning non-spatial cell-type co-expression without notice; it now warns
+  that graph-based spatial scoring is pending a dedicated re-implementation and
+  returns cell-type co-expression. `build_spatial_graph()` and
+  `plot_spatial_logic()` are unaffected.
+
 # LogicComm 0.12.0
 
 ## Major change: cell-type co-expression scoring (neighborhood removal, stage 1)
