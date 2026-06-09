@@ -76,11 +76,15 @@ cores retained**:
 ### Stage 4: REO rank-weighted LCS (opt-in)
 
 * `summarize_celltype_communication(lcs_weighting = "rank")` scores by REO
-  intensity instead of the binary co-expression fraction: the mean within-cell
-  rank percentile of the ligand among expressing sender cells times the same for
-  the receptor among receiving cells. This restores dynamic range that binarizing
-  discards (a ligand at the 99th within-cell percentile separates from one at the
-  51st), addressing the compressed, near-floor LCS values seen on real data.
+  intensity instead of the binary co-expression fraction: the prevalence-weighted
+  within-cell rank of the ligand in the sender type (fraction expressing times
+  mean rank among expressers) times the same for the receptor. This restores
+  dynamic range that binarizing discards (a ligand at the 99th within-cell
+  percentile separates from one at the 51st) while keeping the prevalence signal
+  that separates specific from ubiquitous axes, addressing the compressed,
+  near-floor LCS values seen on real data. On the benchmark it edges out the
+  binary score (AUPRC/sens@k); averaging rank among expressers only -- an earlier
+  formulation the benchmark flagged -- discards prevalence and hurts precision.
   Requires the rank matrix from `calc_REO_matrix(..., return_rank = TRUE)`. The
   default remains `"binary"`, so existing results are unchanged.
 * The `active` call still uses the binary co-expression fraction, so the active
@@ -93,19 +97,23 @@ cores retained**:
 
 ### Stage 6 (started): benchmark harness vs. baselines
 
-* New `inst/benchmark/benchmark_vs_baselines.R`: a sandbox-runnable harness that
-  simulates data with a known ground truth (cell-type-specific axes, ubiquitous
-  housekeeping confounds, and null pairs), scores every sender -> receiver -> L-R
-  axis with LogicComm and with re-implemented baselines (CellPhoneDB/CellChat-style
-  mean-expression product; naive co-detection), and reports AUROC/AUPRC (ties
-  broken at random; averaged over simulations). Adapter stubs are included for the
-  real CellChat / CellPhoneDB / LIANA packages to run where installed.
-* First result (mean over 5 sims, 900 axes, 10 true positives): LogicComm's
-  specificity-aware discovery score reaches AUROC/AUPRC = 1.0, while the
-  mean-expression-product and naive baselines collapse to AUPRC ~0.07 because
-  ubiquitous housekeeping pairs saturate their scores. Raw LCS alone (without the
-  specificity/broad-demotion layer) also sits at ~0.07 -- i.e. the win is
-  attributable to the specificity layer, not to LCS per se.
+* `inst/benchmark/benchmark_vs_baselines.R`: a sandbox-runnable harness that
+  simulates data with a known ground truth and the confounds that break naive
+  scores -- ubiquitous/housekeeping pairs, a broad moderate-abundance pair, a
+  CYCLING / transcriptional-breadth hub cell type that co-expresses many L-R
+  genes, uneven cell-type sizes incl. a rare type, and true axes at three signal
+  strengths. It scores every sender -> receiver -> L-R axis with LogicComm
+  (binary, rank, and +proliferation-filter) and with re-implemented baselines
+  (CellPhoneDB/CellChat-style mean-expression product; naive co-detection), and
+  reports AUROC / AUPRC / sensitivity-at-k (random tie-breaking, averaged over
+  sims). Real, runnable `score_cellchat()` and `score_liana()` adapters (and a
+  note on CellPhoneDB via LIANA) are included for use where those packages exist.
+* Result (mean over sims; 1188 axes, 12 true positives): LogicComm with the
+  proliferation filter reaches AUROC 0.995 / AUPRC 0.80, LogicComm (rank) 0.97 /
+  0.63 and (binary) 0.99 / 0.58, while the mean-expression-product and naive
+  baselines collapse to AUPRC ~0.04 -- ubiquitous, abundance and cycling-breadth
+  confounds saturate their scores. The proliferation filter is the single biggest
+  contributor to precision.
 
 Still pending: REO rank-weighted LCS; `IdentifyRankLogicConsensus()`
 de-neighborhooding; removal of the vestigial spatial columns/vocabulary; and

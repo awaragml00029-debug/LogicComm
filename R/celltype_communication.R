@@ -44,11 +44,13 @@
 #'   as autocrine-like or homotypic signaling potential.
 #' @param lcs_weighting Communication score. \code{"binary"} (default) is the
 #'   co-expression fraction product (binary REO). \code{"rank"} weights by REO
-#'   intensity -- the mean within-cell rank percentile of the ligand among
-#'   expressing sender cells times the same for the receptor -- to restore dynamic
-#'   range. \code{"rank"} requires the input to carry the rank matrix, i.e. build
-#'   it with \code{calc_REO_matrix(..., return_rank = TRUE)}. The \code{active}
-#'   call is unchanged (binary), so only the reported \code{lcs} differs.
+#'   intensity -- the prevalence-weighted within-cell rank of the ligand in the
+#'   sender type (fraction expressing times mean rank among expressers) times the
+#'   same for the receptor -- which keeps the prevalence signal that separates
+#'   specific from ubiquitous axes while adding dynamic range. \code{"rank"}
+#'   requires the input to carry the rank matrix, i.e. build it with
+#'   \code{calc_REO_matrix(..., return_rank = TRUE)}. The \code{active} call is
+#'   unchanged (binary), so only the reported \code{lcs} differs.
 #' @param verbose Print progress.
 #' @param ... Deprecated neighborhood arguments, accepted for backward
 #'   compatibility and ignored with a warning.
@@ -165,10 +167,11 @@ summarize_celltype_communication <- function(reo_mat,
     lcs_global <- n_active_global / pmax(n_global_possible_by_group, 1)
 
     # Communication score. "binary" (default) is the co-expression fraction
-    # product. "rank" weights by REO intensity: the mean within-cell rank
-    # percentile of the ligand among expressing sender cells, times the same for
-    # the receptor among receiving cells -- this restores dynamic range so a
-    # ligand at the 99th within-cell percentile separates from one at the 51st.
+    # product. "rank" weights by REO intensity: the prevalence-weighted within-cell
+    # rank of the ligand in the sender type (fraction expressing x mean rank among
+    # expressers) times the same for the receptor -- this keeps the prevalence
+    # signal that separates specific from ubiquitous axes while adding dynamic
+    # range, so a ligand at the 99th within-cell percentile separates from the 51st.
     if (lcs_weighting == "rank") {
       lig_str <- as.numeric(complex_type_meanrank[[lig_key]][group_defs$sender_type])
       rec_str <- as.numeric(complex_type_meanrank[[rec_key]][group_defs$receiver_type])
@@ -394,15 +397,18 @@ celltype_comm_to_lcs <- function(ct_comm,
   r
 }
 
-# Mean complex rank per cell type, averaged over the cells where the complex is
-# active (binary REO TRUE). This is the REO intensity of the complex among the
-# cells that express it; 0 for cell types with no expressing cells.
+# Prevalence-weighted complex rank per cell type: the summed complex rank over
+# the cells where the complex is active, divided by ALL cells of the type. This
+# is (fraction expressing) x (mean within-cell rank among expressers) -- it keeps
+# the prevalence signal that separates specific from ubiquitous axes (a gene
+# expressed in one type scores ~0 elsewhere) while adding REO intensity. Averaging
+# rank over expressers ONLY would discard prevalence and inflate ubiquitous axes.
 .mean_rank_by_type <- function(rank_vec, logic_vec, labels, cell_types) {
   active <- as.logical(logic_vec)
   fl <- factor(labels, levels = cell_types)
   num <- tapply(ifelse(active, as.numeric(rank_vec), 0), fl, sum, na.rm = TRUE)
-  den <- tapply(as.numeric(active), fl, sum, na.rm = TRUE)
-  out <- as.numeric(num) / pmax(as.numeric(den), 1)
+  den <- as.numeric(table(fl))   # all cells of the type, not just expressers
+  out <- as.numeric(num) / pmax(den, 1)
   out[!is.finite(out)] <- 0
   names(out) <- cell_types
   out
