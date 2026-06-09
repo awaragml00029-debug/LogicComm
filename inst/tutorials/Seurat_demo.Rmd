@@ -68,7 +68,7 @@ install.packages(c(
 install.packages(c("Seurat", "SeuratObject", "pheatmap", "patchwork"))
 
 # Install a local source tarball; adjust the path if needed.
-install.packages("LogicComm_0.12.0.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.12.3.tar.gz", repos = NULL, type = "source")
 ```
 
 PBMC3K can be installed via SeuratData:

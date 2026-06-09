@@ -1,4 +1,4 @@
-# LogicComm 0.12.0
+# LogicComm 0.12.3
 
 ## Major change: cell-type co-expression scoring (neighborhood removal, stage 1)
 

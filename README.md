@@ -58,11 +58,11 @@ install.packages("igraph")
 ### Install LogicComm from a local source tarball
 
 ```r
-install.packages("LogicComm_0.10.4.tar.gz", repos = NULL, type = "source")
+install.packages("LogicComm_0.12.3.tar.gz", repos = NULL, type = "source")
 
 # Or install a published release directly from GitHub:
 # install.packages(
-#   "https://github.com/awaragml00029-debug/LogicComm/releases/download/v0.10.4/LogicComm_0.10.4.tar.gz",
+#   "https://github.com/awaragml00029-debug/LogicComm/releases/download/v0.12.3/LogicComm_0.12.3.tar.gz",
 #   repos = NULL, type = "source")
 ```
 
