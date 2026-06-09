@@ -77,10 +77,9 @@ bootstrap_celltype_communication <- function(ct_comm,
 #' @param reo_mat Binary REO matrix or LogicCommREOResult.
 #' @param cell_labels Named cell-type labels. Defaults to \code{ct_comm$cell_labels}
 #'   when \code{ct_comm} is supplied. If \code{ct_comm} was built after filtering
-#'   unlabeled cells, \code{reo_mat} and named \code{knn_mat} inputs are aligned to
-#'   those retained cells automatically.
-#' @param knn_mat Optional KNN/SNN graph. Named graphs are subset to retained cells
-#'   when necessary.
+#'   unlabeled cells, \code{reo_mat} is aligned to those retained cells automatically.
+#' @param knn_mat Deprecated and ignored. Permutations now shuffle cell labels in
+#'   the cell-type co-expression model rather than a per-cell KNN/SNN graph.
 #' @param lr_db LR database. Defaults to \code{ct_comm$lr_db} when available.
 #' @param n_perm Number of permutations.
 #' @param n_cores Number of forked worker processes for the permutation loop

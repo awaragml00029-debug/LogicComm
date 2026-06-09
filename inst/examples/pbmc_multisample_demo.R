@@ -3,7 +3,7 @@
 # This script derives four sample-level PBMC matrices from SeuratData::pbmc3k,
 # applies a controlled Case perturbation to pbmc1 and pbmc2, and validates that
 # LogicComm recovers the simulated ligand-receptor signal at the sample level.
-# It is intended as an executable companion to vignettes/PBMC_multisample_demo.Rmd.
+# It is intended as an executable companion to inst/tutorials/PBMC_multisample_demo.Rmd.
 
 load_pbmc3k_counts <- function() {
   if (!requireNamespace("Seurat", quietly = TRUE)) {
@@ -68,7 +68,7 @@ run_pbmc_multisample_demo <- function(seed = 20260526,
 
   group_info <- c(pbmc1 = "Case", pbmc2 = "Case", pbmc3 = "Ctrl", pbmc4 = "Ctrl")
 
-  result <- LogicComm::run_multisample(
+  result <- LogicComm::logic_run(
     pbmc_list,
     group_info = group_info,
     lr_db = LogicComm::lr_pairs_human,
@@ -88,12 +88,13 @@ run_pbmc_multisample_demo <- function(seed = 20260526,
 
   rank_results <- rank_comparison <- rank_target_rows <- NULL
   if (isTRUE(run_rank_evidence)) {
-    lr_genes <- LogicComm::all_lr_genes(LogicComm::lr_pairs_human)
+    lr_genes <- LogicComm::logic_get_lr_genes(LogicComm::lr_pairs_human)
     rank_results <- lapply(names(pbmc_list), function(sname) {
       if (verbose) message(sprintf("[PBMC rank demo] Scoring rank-aware REO evidence for %s...", sname))
-      reo <- LogicComm::calc_REO_matrix(
+      reo <- LogicComm::logic_prepare(
         pbmc_list[[sname]],
-        lr_genes = lr_genes,
+        genes = lr_genes,
+        lr_db = NULL,
         rank_threshold = 0.5,
         return_rank = TRUE,
         rank_output = "percentile",

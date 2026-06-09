@@ -586,16 +586,21 @@ summarize_communication_findings <- function(ct_comm, top_n = 10) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   pair <- ct_comm$pair_summary
   if (!"communication_support_label" %in% names(pair)) {
-    pair$communication_support_label <- ifelse(pair$n_active_lr > 0 & pair$n_local_active == 0 & pair$n_distal_candidate > 0,
-                                                "global_only_candidate",
-                                                ifelse(pair$n_distal_candidate > 0, "mixed_local_global", "local_graph_supported"))
+    pair$communication_support_label <- ifelse(pair$n_active_lr == 0,
+                                                "inactive",
+                                                ifelse(pair$n_local_active == 0 & pair$n_distal_candidate == 0,
+                                                       "cell_type_coexpression_supported",
+                                                       ifelse(pair$n_local_active == 0 & pair$n_distal_candidate > 0,
+                                                              "global_only_candidate",
+                                                              ifelse(pair$n_distal_candidate > 0, "mixed_local_global", "local_graph_supported"))))
   }
   if (!"local_support_fraction_active" %in% names(pair)) {
     pair$local_support_fraction_active <- ifelse(pair$n_active_lr > 0, pair$n_local_active / pair$n_active_lr, NA_real_)
   }
   pair <- pair[is.finite(pair$sum_lcs) & pair$n_active_lr > 0, , drop = FALSE]
   support_rank <- match(pair$communication_support_label,
-                        c("local_graph_supported", "mixed_local_global", "global_only_candidate", "inactive"))
+                        c("cell_type_coexpression_supported", "local_graph_supported",
+                          "mixed_local_global", "global_only_candidate", "inactive"))
   pair <- pair[order(support_rank, -pair$sum_lcs, -pair$n_active_lr, na.last = TRUE), , drop = FALSE]
   global_only_pair <- pair[pair$communication_support_label == "global_only_candidate", , drop = FALSE]
   global_only_pair <- global_only_pair[order(-global_only_pair$sum_lcs, -global_only_pair$n_active_lr), , drop = FALSE]

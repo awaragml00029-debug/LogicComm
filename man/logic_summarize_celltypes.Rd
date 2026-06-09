@@ -23,27 +23,35 @@ logic_summarize_celltypes(
 
 \item{cell_labels}{Named cell type labels.}
 
-\item{seurat_obj}{Optional Seurat object.}
+\item{seurat_obj}{Optional Seurat object used to resolve cell labels.}
 
-\item{label_col}{Optional Seurat metadata column.}
+\item{label_col}{Optional Seurat metadata column for cell labels.}
 
-\item{knn_mat}{Optional cells x cells graph.}
+\item{knn_mat}{Deprecated compatibility graph input. Ignored when supplied.}
 
 \item{lr_db}{LogicComm ligand-receptor database.}
 
-\item{graph_name}{Optional Seurat graph name.}
+\item{graph_name}{Deprecated compatibility Seurat graph name. Ignored when supplied.}
 
-\item{mode}{\code{"auto"}, \code{"neighborhood"}, or \code{"global"}.}
+\item{mode}{Compatibility mode selector. \code{"auto"}, \code{"global"}, and
+\code{"celltype"} all use the current cell-type co-expression scorer;
+legacy \code{"neighborhood"} is ignored with a warning.}
 
 \item{include_self}{Include same-cell-type sender/receiver pairs.}
 
-\item{remove_self_edges}{Remove cell-level graph self-loops.}
+\item{remove_self_edges}{Deprecated compatibility graph control. Ignored unless
+changed from its default, in which case a warning is emitted.}
 
-\item{...}{Additional arguments passed to \code{summarize_celltype_communication()}.}
+\item{...}{Additional arguments passed to \code{summarize_celltype_communication()},
+such as \code{lcs_threshold}, \code{min_edges}, \code{min_expr_frac}, and
+\code{lcs_weighting}.}
 }
 \value{
 \code{LogicCommCellTypeComm} object.
 }
 \description{
-Summarize cell-type-resolved LogicComm communication
+Summarizes directed sender-cell-type to receiver-cell-type communication from
+cell-type co-expression logic. Seurat objects are used only to resolve cell
+labels when requested; ordinary scRNA-seq scoring does not aggregate over a
+per-cell KNN/SNN graph.
 }

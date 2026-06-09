@@ -1,0 +1,414 @@
+---
+title: "LogicComm: multi-sample cell-type co-expression analysis"
+output: rmarkdown::html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+## Overview
+
+**LogicComm** converts single-cell expression into Relative Expression Ordering
+(REO) logic states and scores ligand-receptor communication with Logic Consensus
+Scores (LCS). The recommended public API is the `logic_*` pipeline:
+
+1. `logic_check_lrdb()` / `logic_import_lrdb()` validate or import an LR database.
+2. `logic_prepare()` builds REO logic matrices.
+3. `logic_score_lr()` scores sample-level LR logic.
+4. `logic_summarize_celltypes()` summarizes sender-cell-type -> receiver-cell-type
+   communication.
+5. `logic_run()` and `logic_compare_groups()` compare biological samples.
+
+LogicComm 0.12 centers ordinary dissociated scRNA-seq analysis on **cell-type
+co-expression**, not on per-cell KNN/SNN neighborhood aggregation. A Seurat graph is
+useful for clustering and UMAP, but it is not physical proximity evidence. For
+cell-type interpretation, LogicComm asks whether a ligand is active in sender-type
+cells and a receptor is active in receiver-type cells.
+
+**中文说明。** LogicComm 的核心流程是 `logic_*`。普通 scRNA-seq 中，核心证据是
+cell-type co-expression，而不是把 Seurat KNN/SNN 当作空间邻域。旧函数仍保留给历史脚本，
+但新文档优先使用 `logic_prepare()`、`logic_score_lr()`、`logic_summarize_celltypes()`、
+`logic_run()`。
+
+---
+
+## Installation
+
+```{r install, eval=FALSE}
+install.packages(c(
+  "Matrix", "dplyr", "ggplot2", "ggrepel", "scales", "Rcpp"
+))
+
+# Optional plotting / Seurat helpers
+install.packages(c("pheatmap", "Seurat", "SeuratObject", "patchwork"))
+
+install.packages("LogicComm_0.12.0.tar.gz", repos = NULL, type = "source")
+```
+
+Input matrices should be **genes x cells**. Sparse matrices are supported. On
+Windows, keep `mc_cores = 1` unless you provide another parallel backend.
+
+---
+
+## Simulated data
+
+This tutorial simulates 8 samples (4 Case + 4 Control). Case samples have elevated
+VEGFA and IL6 axes so the expected direction is known.
+
+```{r simulate}
+library(LogicComm)
+set.seed(2025)
+
+n_cells <- 300
+n_genes <- 80
+gene_pool <- c(
+  "VEGFA", "KDR", "FLT1", "TGFB1", "TGFBR1", "TGFBR2",
+  "CXCL12", "CXCR4", "TNF", "TNFRSF1A", "IL6", "IL6R", "IL6ST",
+  "COL1A1", "CD44", "PDGFB", "PDGFRB", "FGF2", "FGFR1",
+  "CD274", "PDCD1", "HGF", "MET", "ANGPT1", "TEK",
+  "CCL2", "CCR2", "CXCL10", "CXCR3",
+  paste0("BG", seq_len(n_genes - 28))
+)
+
+make_sample <- function(seed, case = FALSE) {
+  set.seed(seed)
+  mat <- matrix(
+    stats::rpois(length(gene_pool) * n_cells, lambda = 1.2),
+    nrow = length(gene_pool),
+    ncol = n_cells,
+    dimnames = list(gene_pool, paste0("C", seed, "_", seq_len(n_cells)))
+  )
+  if (case) {
+    mat["VEGFA", ] <- mat["VEGFA", ] + stats::rpois(n_cells, 6)
+    mat["KDR", ]   <- mat["KDR", ]   + stats::rpois(n_cells, 4)
+    mat["IL6", ]   <- mat["IL6", ]   + stats::rpois(n_cells, 5)
+    mat["IL6R", ]  <- mat["IL6R", ]  + stats::rpois(n_cells, 3)
+  }
+  mat
+}
+
+sample_list <- c(
+  lapply(1:4, function(s) make_sample(s, case = TRUE)),
+  lapply(5:8, function(s) make_sample(s + 10, case = FALSE))
+)
+names(sample_list) <- c(paste0("Case_", 1:4), paste0("Ctrl_", 1:4))
+
+group_info <- c(rep("Case", 4), rep("Ctrl", 4))
+names(group_info) <- names(sample_list)
+```
+
+---
+
+## Step 1: Validate the LR database
+
+```{r lrdb}
+data(lr_pairs_human)
+logic_check_lrdb(lr_pairs_human, require_metadata = TRUE)
+lr_genes <- logic_get_lr_genes(lr_pairs_human)
+head(lr_genes)
+```
+
+`lr_pairs_human` is a compact LR seed database. If you use a custom database, keep
+its schema stable across all samples and validate it before scoring.
+
+---
+
+## Step 2: Build one REO matrix
+
+```{r reo}
+reo_demo <- logic_prepare(
+  sample_list[[1]],
+  lr_db          = lr_pairs_human,
+  rank_threshold = 0.5,
+  gene_background = "quantile",
+  return_rank    = TRUE,
+  verbose        = FALSE
+)
+reo_demo
+```
+
+`logic_prepare()` computes a within-cell REO anchor and returns LR genes for
+scoring. With `return_rank = TRUE`, downstream cell-type summaries can use
+rank-weighted LCS.
+
+---
+
+## Step 3: Score sample-level LCS
+
+```{r lcs}
+lcs_demo <- logic_score_lr(
+  reo_demo,
+  lr_db         = lr_pairs_human,
+  lcs_threshold = 0.01,
+  verbose       = FALSE
+)
+
+sort(lcs_demo, decreasing = TRUE)[1:10]
+```
+
+The result is a named vector: one LCS value per LR pair. This sample-level vector
+is useful for multi-sample comparison but does not yet assign sender and receiver
+cell types.
+
+---
+
+## Step 4: Multi-sample pipeline
+
+`logic_run()` wraps per-sample REO building, per-sample LCS scoring, and group
+comparison.
+
+```{r multisample, message=TRUE}
+result <- logic_run(
+  sample_list,
+  group_info     = group_info,
+  lr_db          = lr_pairs_human,
+  rank_threshold = 0.5,
+  lcs_threshold  = 0.01,
+  chunk_size     = 1000,
+  mc_cores       = 1,
+  verbose        = TRUE
+)
+```
+
+```{r print_result}
+print(result$comparison, n = 10)
+```
+
+You can retrieve or recompute the comparison with `logic_compare_groups()`:
+
+```{r compare_groups}
+comparison <- logic_compare_groups(result)
+head(comparison[order(-abs(comparison$asymmetry)), ], 10)
+```
+
+---
+
+## Step 5: Visualize group-level results
+
+```{r bubble, fig.cap="Case vs Control frequency bubble plot. Points above the diagonal are enriched in Case. Bubble size = |asymmetry|."}
+plot_lcs_bubble(result$comparison, top_n = 15, min_asymmetry = 0.2)
+```
+
+```{r heatmap, fig.height=6, eval=requireNamespace("pheatmap", quietly = TRUE), fig.cap="LCS values across samples for top differentially active pairs."}
+plot_lcs_heatmap(
+  result$comparison,
+  group_info = group_info,
+  top_n      = 20,
+  fdr_cutoff = 1
+)
+```
+
+This simulation is underpowered for publication-level FDR. Use it to check
+direction, recurrence, and effect size.
+
+---
+
+## Step 6: Cell-type co-expression summary
+
+If cell labels are available, summarize sender-cell-type -> receiver-cell-type
+communication. This example uses mock labels only to demonstrate the API.
+
+```{r celltype_comm_intro, eval=FALSE}
+cell_labels <- setNames(
+  rep(c("Fibroblast", "Endothelial", "Macrophage"), length.out = n_cells),
+  colnames(sample_list[[1]])
+)
+
+ct_comm <- logic_summarize_celltypes(
+  reo_demo,
+  cell_labels      = cell_labels,
+  lr_db            = lr_pairs_human,
+  include_self     = TRUE,
+  lcs_threshold    = 0.01,
+  min_edges        = 20,
+  min_expr_frac    = 0.1,
+  lcs_weighting    = "rank",
+  verbose          = TRUE
+)
+
+head(ct_comm$pair_summary[order(-ct_comm$pair_summary$sum_lcs), ], 10)
+head(ct_comm$role_summary, 10)
+```
+
+Plot the cell-type result:
+
+```{r celltype_plots_intro, eval=FALSE}
+plot_celltype_heatmap(ct_comm, metric = "sum_lcs")
+plot_celltype_roles(ct_comm)
+plot_celltype_role_heatmap(ct_comm)
+plot_lr_bubble_advanced(ct_comm, top_n_per_pair = 5)
+```
+
+`include_self = TRUE` keeps same-cell-type communication such as `Macrophage ->
+Macrophage`, interpreted as homotypic/autocrine-like potential.
+
+---
+
+## Step 7: Compare cell-type-resolved features across samples
+
+For cohort analysis, compute `ct_comm` inside each biological sample, convert each
+object to a named vector, then compare vectors with `logic_compare_groups()`.
+
+```{r celltype_compare_intro, eval=FALSE}
+sample_ct_list <- lapply(names(sample_list), function(sname) {
+  reo_i <- logic_prepare(
+    sample_list[[sname]],
+    lr_db          = lr_pairs_human,
+    rank_threshold = 0.5,
+    gene_background = "quantile",
+    return_rank    = TRUE,
+    verbose        = FALSE
+  )
+  labels_i <- setNames(
+    rep(c("Fibroblast", "Endothelial", "Macrophage"), length.out = ncol(sample_list[[sname]])),
+    colnames(sample_list[[sname]])
+  )
+  logic_summarize_celltypes(
+    reo_i,
+    cell_labels   = labels_i,
+    lr_db         = lr_pairs_human,
+    lcs_threshold = 0.01,
+    min_edges     = 20,
+    min_expr_frac = 0.1,
+    lcs_weighting = "rank",
+    verbose       = FALSE
+  )
+})
+names(sample_ct_list) <- names(sample_list)
+
+ct_lcs_list <- lapply(sample_ct_list, celltype_comm_to_lcs,
+                      level = "celltype_lr", metric = "lcs")
+
+ct_comparison <- logic_compare_groups(
+  ct_lcs_list,
+  group_info    = group_info[names(ct_lcs_list)],
+  case_label    = "Case",
+  ctrl_label    = "Ctrl",
+  lcs_threshold = 0.01
+)
+```
+
+The comparison unit remains the biological sample, not the cell.
+
+---
+
+## Step 8: Per-cell activity scores
+
+```{r cell_score}
+reo_logic <- reo_demo$logic
+scores <- score_lr_activity(reo_logic, mode = "both", aggregate = TRUE, verbose = FALSE)
+summary(scores$comm_score)
+```
+
+```{r cell_score_hist}
+hist(
+  scores$comm_score,
+  breaks = 30,
+  col = "#64B5F6",
+  main = "Per-cell communication score distribution",
+  xlab = "Fraction of LR pairs active",
+  border = "white"
+)
+```
+
+```{r rank_cells}
+top_cells <- rank_comm_cells(scores, n = 10)
+print(top_cells[, c("cell", "sender_score", "receiver_score", "comm_score", "rank")])
+```
+
+---
+
+## Step 9: Rank shift analysis
+
+Rank shift asks which genes became more dominant in Case cells, independently of
+LR-pair scoring.
+
+```{r rank_shift}
+rs <- calc_rank_shift(
+  sample_list,
+  group_info = group_info,
+  genes      = lr_genes
+)
+print(rs, n = 8)
+```
+
+```{r rank_shift_plot, fig.cap="Rank-shift volcano plot."}
+plot_rank_shift(rs, top_n_label = 15, min_shift_label = 0.05)
+```
+
+---
+
+## Step 10: Filter and export
+
+```{r filter_export, eval=FALSE}
+sig_pairs <- filter_lcs(
+  result$comparison,
+  min_asymmetry = 0.3,
+  max_fdr       = 0.05,
+  direction     = "up"
+)
+
+export_results(sig_pairs, file = "LogicComm_significant_pairs.csv")
+```
+
+---
+
+## Interpretation guide
+
+| Output column | Meaning |
+|---|---|
+| `asymmetry` | `case_freq - ctrl_freq`; positive values are Case-enriched. |
+| `case_freq` / `ctrl_freq` | Fraction of samples active above the LCS threshold. |
+| `lcs` | Logic Consensus Score for an LR pair or cell-type LR feature. |
+| `log2fc_lcs` | Fold-change in mean LCS. Use with recurrence and sample count. |
+| `fdr_fisher` | BH-adjusted Fisher p-value on sample-level recurrence. |
+| `discovery_score` | Integrated strength/specificity/support score for cell-type axes. |
+
+---
+
+## Current behavior notes
+
+- Multimer ligands/receptors require all subunits to be present and active.
+- `group_info` must contain one label for every sample.
+- L-R pairs are aligned by name across samples; missing pairs are treated as `NA`.
+- `filter_lcs(direction = ...)` accepts only `"up"`, `"down"`, or `"both"`.
+- `plot_lcs_bubble(color_by = ...)` accepts `"log2fc"` or `"asymmetry"`.
+- Legacy neighborhood/KNN arguments are compatibility inputs; new ordinary
+  scRNA-seq analyses should use the cell-type co-expression workflow above.
+
+---
+
+## Troubleshooting
+
+### Missing dependencies during install
+
+```{r install_missing, eval=FALSE}
+install.packages(c("dplyr", "ggplot2", "ggrepel", "scales", "Rcpp"))
+```
+
+### Cell labels do not align
+
+```{r check_label_names, eval=FALSE}
+all(colnames(reo_demo$logic) %in% names(cell_labels))
+setdiff(colnames(reo_demo$logic), names(cell_labels))[1:5]
+```
+
+### Heatmap dependency
+
+```{r install_pheatmap, eval=FALSE}
+install.packages("pheatmap")
+```
+
+---
+
+## Session info
+
+```{r sessioninfo}
+sessionInfo()
+```

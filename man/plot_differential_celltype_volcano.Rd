@@ -22,9 +22,15 @@ plot_differential_celltype_volcano(
 
 \item{fdr_col}{FDR column.}
 
+\item{fdr_cutoff}{FDR threshold for significance colouring and guide line.}
+
+\item{lfc_threshold}{Optional minimum absolute effect size for significance.}
+
 \item{top_n_label}{Number of labels.}
 
 \item{title}{Optional title.}
+
+\item{x_lab}{Optional x-axis label.}
 }
 \value{
 A ggplot2 object.

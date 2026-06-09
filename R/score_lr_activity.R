@@ -178,6 +178,13 @@ score_receiver_response <- function(ct_comm,
     stop("response_db must contain lr_pair and response_genes columns.")
   }
   labels <- ct_comm$cell_labels[colnames(reo_mat)]
+  valid_cells <- !is.na(labels) & nzchar(as.character(labels))
+  if (!any(valid_cells)) {
+    stop("No cells in reo_mat have valid labels in ct_comm$cell_labels.", call. = FALSE)
+  }
+  labels <- labels[valid_cells]
+  labels <- stats::setNames(as.character(labels), names(labels))
+  reo_mat <- reo_mat[, names(labels), drop = FALSE]
   response_map <- stats::setNames(lapply(as.character(response_db$response_genes), .parse_response_genes), as.character(response_db$lr_pair))
   df <- ct_comm$lr_table
   response_score <- numeric(nrow(df))

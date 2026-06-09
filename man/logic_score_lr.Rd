@@ -6,16 +6,9 @@
 \usage{
 logic_score_lr(
   reo,
-  seurat_obj = NULL,
-  knn_mat = NULL,
   lr_db = lr_pairs_human,
-  graph_name = NULL,
-  mode = c("auto", "neighborhood", "global"),
   gates = FALSE,
   lcs_threshold = 0.01,
-  remove_self_edges = TRUE,
-  graph_symmetrize = NULL,
-  edge_weight_mode = c("binary", "weighted"),
   verbose = TRUE,
   ...
 )
@@ -23,35 +16,24 @@ logic_score_lr(
 \arguments{
 \item{reo}{REO matrix or \code{LogicCommREOResult}.}
 
-\item{seurat_obj}{Optional Seurat object for graph extraction.}
-
-\item{knn_mat}{Optional cells x cells graph.}
-
 \item{lr_db}{LogicComm ligand-receptor database.}
-
-\item{graph_name}{Optional Seurat graph name.}
-
-\item{mode}{\code{"auto"}, \code{"neighborhood"}, or \code{"global"}.}
 
 \item{gates}{Use gate-aware LR scoring via \code{IdentifyLogicGateConsensus()}.}
 
 \item{lcs_threshold}{LCS activity threshold.}
 
-\item{remove_self_edges}{Remove cell-level graph self-loops.}
-
-\item{graph_symmetrize}{Optional graph symmetrization mode. If \code{NULL}, the
-scorer default is used.}
-
-\item{edge_weight_mode}{Edge weight handling.}
-
 \item{verbose}{Print progress messages.}
 
-\item{...}{Additional arguments passed to the underlying scorer.}
+\item{...}{For the ordinary scorer, deprecated neighborhood arguments accepted
+for backward compatibility and ignored with a warning; for \code{gates =
+TRUE}, additional arguments passed to \code{IdentifyLogicGateConsensus()}.}
 }
 \value{
 \code{LCSVector} for ordinary scoring, or \code{LogicGateResult} for
   gate-aware scoring.
 }
 \description{
-Score ligand-receptor communication logic
+Computes global REO co-expression Logic Consensus Scores. LogicComm scores
+communication at the cell-type / co-expression level and no longer aggregates
+over a per-cell neighborhood graph.
 }

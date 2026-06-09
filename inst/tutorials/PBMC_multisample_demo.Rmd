@@ -1,0 +1,214 @@
+---
+title: "PBMC multi-sample simulation demo"
+output: rmarkdown::html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+## Purpose
+
+This tutorial demonstrates the LogicComm 0.12 sample-level workflow using the same
+PBMC3K data source as `Seurat_demo.Rmd`. It is a **software validation demo**, not a
+biological disease analysis:
+
+1. Split one PBMC3K count matrix into four pseudo-samples: `pbmc1` to `pbmc4`.
+2. Treat `pbmc1` and `pbmc2` as simulated Case samples.
+3. Treat `pbmc3` and `pbmc4` as simulated Ctrl samples.
+4. Add a controlled perturbation to selected LR genes in Case only.
+5. Run the recommended `logic_run()` / `logic_compare_groups()` sample-level API.
+
+**中文说明。** 这个示例验证的是软件流程：样本名是否对齐、已知扰动是否能被恢复、比较是否
+以“样本”为统计单位。它不能替代真实 Case/Ctrl 队列，也不应把 PBMC3K 的模拟扰动解释成
+真实疾病机制。
+
+Because there are only two simulated samples per group, Fisher-test p-values have
+very low resolution. Success is judged by direction, recurrence, and effect size:
+targeted LR pairs should be active in both Case pseudo-samples, inactive or weaker
+in Controls, and have positive `log2fc_lcs`.
+
+---
+
+## Executable script
+
+The full executable script is installed with the package at
+`inst/examples/pbmc_multisample_demo.R`. After installing LogicComm and PBMC3K via
+SeuratData, run:
+
+```{r run_script, eval=FALSE}
+source(system.file("examples", "pbmc_multisample_demo.R", package = "LogicComm"))
+
+demo <- run_pbmc_multisample_demo(
+  seed = 20260526,
+  perturb_lambda = 50,
+  lcs_threshold = 0.2,
+  rank_threshold_grid = c(0.4, 0.5, 0.6, 0.7, 0.8),
+  run_rank_evidence = TRUE,
+  verbose = TRUE
+)
+```
+
+The script uses the current public API for the main workflow:
+
+```{r main_api, eval=FALSE}
+result <- LogicComm::logic_run(
+  pbmc_list,
+  group_info = group_info,
+  lr_db = LogicComm::lr_pairs_human,
+  rank_threshold = 0.5,
+  lcs_threshold = lcs_threshold,
+  case_label = "Case",
+  ctrl_label = "Ctrl",
+  chunk_size = 2000,
+  mc_cores = 1,
+  min_samples_per_group = 2,
+  verbose = verbose
+)
+
+comparison <- LogicComm::logic_compare_groups(result)
+```
+
+The optional rank-aware evidence layer still uses the rank-specific compatibility
+function because it exposes threshold-grid diagnostics directly:
+
+```{r rank_api, eval=FALSE}
+reo <- LogicComm::logic_prepare(
+  pbmc_list[[sname]],
+  genes = LogicComm::logic_get_lr_genes(LogicComm::lr_pairs_human),
+  lr_db = NULL,
+  rank_threshold = 0.5,
+  return_rank = TRUE,
+  rank_output = "percentile",
+  chunk_size = 2000,
+  verbose = FALSE
+)
+
+rank_res <- LogicComm::IdentifyRankLogicConsensus(
+  reo,
+  lr_db = LogicComm::lr_pairs_human,
+  threshold_grid = rank_threshold_grid,
+  lcs_threshold = 0.01,
+  verbose = FALSE
+)
+```
+
+---
+
+## Inspect recovered target rows
+
+```{r target_rows, eval=FALSE}
+demo$target_rows[, intersect(c(
+  "lr_pair", "pathway", "case_freq", "ctrl_freq", "asymmetry",
+  "case_mean_lcs", "ctrl_mean_lcs", "log2fc_lcs", "fdr_fisher",
+  "n_case_avail", "n_ctrl_avail"
+), names(demo$target_rows)), drop = FALSE]
+```
+
+Expected targeted axes include MIF, GALECTIN, and MHC-I examples:
+
+| Target LR pair | Pathway |
+|---|---|
+| `MIF_CD74` | MIF |
+| `MIF_CD44` | MIF |
+| `LGALS3_CD44` | GALECTIN |
+| `HLA-A_CD8A` | MHC-I |
+| `HLA-B_CD8A` | MHC-I |
+
+A successful run should recover these as Case-enriched under the selected
+threshold. The exact numeric values can vary with package version, SeuratData
+object version, and random seed, so this document describes the expected direction
+instead of hard-coding a release-specific result table.
+
+---
+
+## Rank-aware companion evidence
+
+The optional rank-aware table asks whether targeted genes are placed higher in the
+within-cell rank order in Case samples.
+
+```{r rank_rows, eval=FALSE}
+demo$rank_target_rows[, intersect(c(
+  "lr_pair", "pathway", "case_mean_rank_score", "ctrl_mean_rank_score",
+  "delta_rank_score", "log2fc_rank_score",
+  "case_mean_binary_lcs", "ctrl_mean_binary_lcs"
+), names(demo$rank_target_rows)), drop = FALSE]
+```
+
+Interpret this table as an effect-size companion to the binary LCS comparison. It
+is not a replacement for biological replication or external validation.
+
+---
+
+## Plotting the comparison
+
+```{r plot_demo, eval=FALSE, fig.width=11, fig.height=5}
+comparison <- demo$result$comparison
+group_info <- demo$group_info
+
+plot_lcs_bubble(
+  comparison,
+  top_n = 15,
+  min_asymmetry = 0.2,
+  color_by = "asymmetry"
+)
+
+plot_lcs_heatmap(
+  comparison,
+  group_info = group_info,
+  top_n = 20,
+  fdr_cutoff = 1
+)
+```
+
+With only two pseudo-samples per group, FDR will usually be uninformative. In this
+demo, focus on `case_freq`, `ctrl_freq`, `asymmetry`, and `log2fc_lcs`.
+
+---
+
+## How this aligns with the core package
+
+- The main workflow uses `logic_run()` rather than the legacy direct
+  `run_multisample()` entry point.
+- Sample-level comparison can be retrieved with `logic_compare_groups()`.
+- REO construction in the optional rank layer uses `logic_prepare()` rather than
+  calling `calc_REO_matrix()` directly.
+- No Seurat KNN/SNN graph is used for the main ordinary scRNA-seq scoring path;
+  LogicComm 0.12 uses sample-level and cell-type co-expression logic.
+- The statistical unit is the biological sample. Cells are never treated as
+  independent Case/Ctrl replicates.
+
+**中文说明。** 新文档和脚本都改成以 `logic_*` 为入口。KNN/SNN 不再作为普通 PBMC
+scRNA-seq 的主证据；多样本比较仍然以 sample 为单位。
+
+---
+
+## Real cohort recommendations
+
+For a real PBMC cohort:
+
+1. Use one object or matrix per biological sample.
+2. Keep sample names unique and aligned to `group_info`.
+3. Use the same LR database, `rank_threshold`, assay/layer, and preprocessing
+   choices across samples.
+4. Prefer `logic_run()` for sample-level LR comparison.
+5. For cell-type-resolved differential communication, build `ct_comm` per sample,
+   convert with `celltype_comm_to_lcs()`, then compare with `logic_compare_groups()`.
+6. Interpret p-values only when group sample sizes are sufficient.
+7. Support mechanistic claims with specificity, permutation/null diagnostics,
+   receiver-response evidence, and independent validation.
+
+---
+
+## Session info
+
+```{r sessioninfo, eval=FALSE}
+sessionInfo()
+```

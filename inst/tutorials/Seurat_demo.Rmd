@@ -1,0 +1,618 @@
+---
+title: "Seurat demo: LogicComm 0.12 cell-type co-expression workflow"
+output: rmarkdown::html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+## Overview / 概览
+
+This tutorial shows the recommended **LogicComm 0.12** workflow on a Seurat
+PBMC3K object. The main public API is the `logic_*` pipeline:
+
+1. `logic_import_lrdb()` / `logic_check_lrdb()` validate the ligand-receptor database.
+2. `logic_prepare()` converts expression to REO binary logic states.
+3. `logic_score_lr()` scores sample-level ligand-receptor Logic Consensus Scores (LCS).
+4. `logic_summarize_celltypes()` summarizes directed sender-cell-type to
+   receiver-cell-type communication.
+5. `logic_compare_groups()` or `logic_run()` compares biological samples.
+
+**中文说明。** 本教程按 LogicComm 0.12 的主 API 编写。旧函数
+`calc_REO_matrix()`、`IdentifyLogicConsensus()`、`CompareLogicGroups()` 仍保留给历史脚本，
+但新分析建议从 `logic_*` 流程开始。
+
+### What changed from older tutorials?
+
+LogicComm now treats dissociated scRNA-seq communication as a **cell-type
+co-expression** problem. Seurat's PCA/UMAP/clustering remain useful for annotation
+and visualization, but Seurat KNN/SNN graphs are no longer the core evidence for
+ordinary scRNA-seq communication scoring. A transcriptomic nearest-neighbor graph
+is not physical contact evidence, so the package reports cell-type-level LCS,
+activity, specificity, role scores, null diagnostics, and optional validation
+adapters.
+
+**中文说明。** 对普通单细胞转录组，LogicComm 不再把 Seurat KNN/SNN 当作局部空间邻域证据。
+核心单位是 cell-type co-expression：sender 细胞类型中 ligand 活跃、receiver 细胞类型中
+receptor 活跃的比例。KNN/SNN 可以用于 Seurat 聚类和 UMAP，但不要把它解释成真实空间接触。
+
+### Key terms / 关键术语
+
+| Term | Meaning |
+|---|---|
+| REO | Relative Expression Ordering: per-cell binary logic state based on within-cell gene rank. |
+| LCS | Logic Consensus Score: ligand/receptor logic support for a sample or cell-type pair. |
+| Cell-type co-expression | Sender-type ligand activity x receiver-type receptor activity across cell-type cells. |
+| Same-cell-type signaling | `T cell -> T cell` style homotypic/autocrine-like communication potential. |
+| Validation adapters | Optional receiver-response, target, TF-switch, or external evidence layers. |
+
+---
+
+## Installation
+
+```{r install, eval=FALSE}
+# Core package dependencies
+install.packages(c(
+  "Matrix", "dplyr", "ggplot2", "ggrepel", "scales", "Rcpp"
+))
+
+# Optional packages used in this tutorial
+install.packages(c("Seurat", "SeuratObject", "pheatmap", "patchwork"))
+
+# Install a local source tarball; adjust the path if needed.
+install.packages("LogicComm_0.12.0.tar.gz", repos = NULL, type = "source")
+```
+
+PBMC3K can be installed via SeuratData:
+
+```{r install_pbmc3k, eval=FALSE}
+install.packages("remotes")
+remotes::install_github("satijalab/seurat-data")
+SeuratData::InstallData("pbmc3k")
+```
+
+If SeuratData is unavailable, use the manual 10X download section near the end.
+
+---
+
+## Load packages
+
+```{r load_packages, eval=FALSE}
+library(LogicComm)
+library(Seurat)
+library(SeuratData)
+library(Matrix)
+library(ggplot2)
+```
+
+---
+
+## Step 1: Load PBMC3K
+
+```{r load_pbmc3k, eval=FALSE}
+SeuratData::data("pbmc3k")
+pbmc <- pbmc3k
+pbmc
+```
+
+PBMC3K is a single healthy peripheral-blood sample. It is useful for demonstrating
+within-sample communication discovery, but it is not a Case-vs-Control cohort.
+
+**中文说明。** PBMC3K 是单个健康 PBMC 样本。它适合演示“哪些细胞类型可能发送/接收信号”，
+但不能解读成疾病差异通讯。差异分析需要多个独立生物样本。
+
+---
+
+## Step 2: Standard Seurat preprocessing for annotation and visualization
+
+LogicComm's REO/LCS scoring does not require Seurat normalization. We still run a
+standard Seurat workflow because clustering and UMAP help interpret the results.
+
+```{r seurat_preprocess, eval=FALSE}
+pbmc <- NormalizeData(pbmc, verbose = FALSE)
+pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000,
+                             verbose = FALSE)
+pbmc <- ScaleData(pbmc, verbose = FALSE)
+pbmc <- RunPCA(pbmc, npcs = 30, verbose = FALSE)
+pbmc <- FindNeighbors(pbmc, dims = 1:20, verbose = FALSE)
+pbmc <- FindClusters(pbmc, resolution = 0.5, verbose = FALSE)
+pbmc <- RunUMAP(pbmc, dims = 1:20, verbose = FALSE)
+```
+
+The neighbor graph created above is for Seurat clustering/UMAP context. The
+LogicComm core analysis below uses cell-type co-expression rather than the Seurat
+KNN/SNN graph.
+
+---
+
+## Step 3: Choose cell labels
+
+For a quick demo, use `seurat_clusters`. For a real analysis, replace this with a
+curated annotation column after marker-gene review.
+
+```{r label_column, eval=FALSE}
+label_col <- if ("seurat_annotations" %in% colnames(pbmc@meta.data)) {
+  "seurat_annotations"
+} else {
+  "seurat_clusters"
+}
+
+celltype_labels <- setNames(
+  as.character(pbmc[[label_col]][, 1]),
+  colnames(pbmc)
+)
+
+table(celltype_labels)
+```
+
+**中文说明。** sender/receiver 的解释完全依赖 cell type label。正式分析应使用人工校正后的
+细胞类型注释，而不是未经检查的 cluster 编号。
+
+---
+
+## Step 4: Prepare the LR database
+
+The built-in `lr_pairs_human` is a compact human LR seed database. Validate it once
+before analysis:
+
+```{r lrdb_check, eval=FALSE}
+data(lr_pairs_human)
+logic_check_lrdb(lr_pairs_human, require_metadata = TRUE)
+lr_genes <- logic_get_lr_genes(lr_pairs_human)
+head(lr_genes)
+```
+
+To use CellChatDB, convert it into LogicComm's explicit list-column schema:
+
+```{r cellchatdb_convert, eval=FALSE}
+data(CellChatDB.human, package = "CellChat")
+cellchat_lr <- logic_import_lrdb(
+  CellChatDB.human,
+  source = "cellchat",
+  include_modulators = TRUE
+)
+logic_check_lrdb(cellchat_lr, require_metadata = TRUE)
+```
+
+Use one LR database consistently across all samples if you plan to compare groups.
+
+---
+
+## Step 5: Build REO logic with `logic_prepare()`
+
+REO converts each cell into binary gene-activity states. `gene_background =
+"quantile"` adds a cell-type-free ambient guard and is the recommended default for
+PBMC-style data.
+
+```{r logic_prepare, eval=FALSE}
+reo_pbmc <- logic_prepare(
+  pbmc,
+  lr_db          = lr_pairs_human,
+  rank_threshold = 0.5,
+  layer          = "counts",
+  gene_background = "quantile",
+  return_rank    = TRUE,
+  verbose        = TRUE
+)
+
+reo_logic <- reo_pbmc$logic
+reo_logic
+```
+
+Important points:
+
+- Input matrices are interpreted as **genes x cells**.
+- `logic_prepare()` keeps LR genes for output/scoring, while the REO anchor can use
+  the full expression background.
+- `rank_threshold = 0.5` uses the within-cell median as the activity anchor.
+- `return_rank = TRUE` keeps rank-percentile information for rank-weighted
+  cell-type scoring.
+
+---
+
+## Step 6: Score sample-level LR logic with `logic_score_lr()`
+
+`logic_score_lr()` returns a named LCS vector for the whole sample. It is useful for
+quick LR prioritization and multi-sample comparison.
+
+```{r logic_score_lr, eval=FALSE}
+lcs_pbmc <- logic_score_lr(
+  reo_pbmc,
+  lr_db         = lr_pairs_human,
+  lcs_threshold = 0.01,
+  verbose       = TRUE
+)
+
+head(sort(lcs_pbmc[!is.na(lcs_pbmc)], decreasing = TRUE), 20)
+```
+
+Convert the vector to a table when you want to export or merge it:
+
+```{r lcs_table, eval=FALSE}
+lcs_tbl <- data.frame(
+  lr_pair = names(lcs_pbmc),
+  lcs     = as.numeric(lcs_pbmc),
+  stringsAsFactors = FALSE
+)
+lcs_tbl <- lcs_tbl[!is.na(lcs_tbl$lcs), ]
+lcs_tbl <- lcs_tbl[order(lcs_tbl$lcs, decreasing = TRUE), ]
+head(lcs_tbl, 20)
+```
+
+**中文说明。** sample-level LCS 是全样本 LR 逻辑优先级列表，不包含 sender/receiver
+细胞类型。要解释“谁发给谁”，继续做 cell-type summary。
+
+---
+
+## Step 7: Score per-cell communication activity
+
+`score_lr_activity()` estimates how many LR programs each cell can participate in
+as sender and/or receiver.
+
+```{r score_cells, eval=FALSE}
+cell_scores <- score_lr_activity(
+  reo_logic,
+  lr_db     = lr_pairs_human,
+  mode      = "both",
+  aggregate = TRUE,
+  verbose   = TRUE
+)
+
+summary(cell_scores$comm_score)
+head(rank_comm_cells(cell_scores, n = 20), 20)
+```
+
+Add the scores back to Seurat metadata by cell name:
+
+```{r add_metadata, eval=FALSE}
+cell_order <- colnames(pbmc)
+pbmc$LogicComm_sender   <- cell_scores$sender_score[cell_order]
+pbmc$LogicComm_receiver <- cell_scores$receiver_score[cell_order]
+pbmc$LogicComm_score    <- cell_scores$comm_score[cell_order]
+```
+
+Visualize on UMAP:
+
+```{r umap_logiccomm, eval=FALSE, fig.width=10, fig.height=4}
+FeaturePlot(
+  pbmc,
+  features  = c("LogicComm_sender", "LogicComm_receiver", "LogicComm_score"),
+  reduction = "umap",
+  ncol      = 3
+)
+
+VlnPlot(pbmc, features = "LogicComm_score", group.by = label_col, pt.size = 0)
+```
+
+Interpret high per-cell scores as broad LR logic participation, not as proof that a
+cell is biologically more important in every sense.
+
+---
+
+## Step 8: Summarize sender-cell-type -> receiver-cell-type communication
+
+`logic_summarize_celltypes()` is the main bridge from LR scores to biological
+interpretation. It reports cell-type-pair summaries, LR drivers, pathway summaries,
+role scores, confidence labels, and evidence support.
+
+```{r summarize_celltypes, eval=FALSE}
+ct_comm <- logic_summarize_celltypes(
+  reo_pbmc,
+  seurat_obj      = pbmc,
+  label_col       = label_col,
+  lr_db           = lr_pairs_human,
+  include_self    = TRUE,
+  lcs_threshold   = 0.01,
+  min_edges       = 20,
+  min_active_edges = 1,
+  min_expr_frac   = 0.1,
+  lcs_weighting   = "rank",
+  verbose         = TRUE
+)
+
+ct_comm
+head(ct_comm$pair_summary[order(-ct_comm$pair_summary$sum_lcs), ], 20)
+head(ct_comm$lr_table[order(-ct_comm$lr_table$lcs), ], 20)
+```
+
+How to read the key outputs:
+
+| Object | Use |
+|---|---|
+| `ct_comm$lr_table` | One row per sender type -> receiver type -> LR pair. |
+| `ct_comm$pair_summary` | Aggregated sender -> receiver strength and active LR counts. |
+| `ct_comm$pathway_summary` | Pathway-level sender -> receiver summaries. |
+| `ct_comm$role_summary` | Sender, receiver, mediator, and influencer tendencies per cell type. |
+
+`include_self = TRUE` keeps same-cell-type communication such as `T cell -> T
+cell`, interpreted as homotypic or autocrine-like potential. It does not prove that
+one single cell both secreted and received the signal.
+
+---
+
+## Step 9: Cell-type communication plots
+
+```{r celltype_plots, eval=FALSE, fig.width=9, fig.height=6}
+plot_celltype_heatmap(ct_comm, metric = "sum_lcs")
+plot_celltype_heatmap(ct_comm, metric = "n_active_lr")
+
+plot_celltype_roles(ct_comm)
+plot_celltype_role_heatmap(ct_comm)
+
+plot_lr_bubble_advanced(ct_comm, top_n_per_pair = 5)
+plot_pathway_heatmap(ct_comm, metric = "sum_lcs", top_n_pathways = 25)
+```
+
+For one event, inspect the evidence behind the sender -> receiver -> LR claim:
+
+```{r explain_event, eval=FALSE, fig.width=7, fig.height=5}
+# Replace these with values present in ct_comm$lr_table.
+ex <- explain_celltype_interaction(
+  ct_comm,
+  sender     = ct_comm$lr_table$sender_type[1],
+  receiver   = ct_comm$lr_table$receiver_type[1],
+  lr_pair    = ct_comm$lr_table$lr_pair[1],
+  reo_mat    = reo_logic,
+  seurat_obj = pbmc
+)
+
+ex$evidence
+ex$plot
+```
+
+---
+
+## Step 10: Specificity, ranking, and discovery view
+
+Raw LCS can be dominated by broad immune-recognition axes. Use specificity and the
+discovery view to prioritize pair-specific mechanisms.
+
+```{r discovery_ranking, eval=FALSE}
+ct_comm <- score_communication_specificity(ct_comm)
+
+ranked_axes <- rank_communication_axes(ct_comm)
+head(ranked_axes[, c(
+  "sender_type", "receiver_type", "lr_pair", "lcs",
+  "specificity_class", "discovery_score", "evidence_tier",
+  "broad_axis_flag"
+)], 20)
+
+plot_communication_discovery(ranked_axes)
+
+clean_axes <- communication_discovery_view(ranked_axes)
+head(clean_axes[, c(
+  "sender_type", "receiver_type", "lr_pair", "lcs",
+  "discovery_score", "specificity_class", "evidence_tier"
+)], 20)
+```
+
+**中文说明。** 不建议只按原始 `lcs` 排名。MHC/MIF/B2M 等广谱轴可能很强但不一定是特异机制。
+`communication_discovery_view()` 会给出更适合发表机制筛选的视图。
+
+---
+
+## Step 11: Null diagnostics and threshold sensitivity
+
+Permutation tests shuffle cell-type labels to ask whether a sender -> receiver
+structure is stronger than random labels. Use enough permutations for the p-value
+resolution you need.
+
+```{r permutation_null, eval=FALSE}
+null_pair <- permute_celltype_communication(
+  ct_comm = ct_comm,
+  reo_mat = reo_logic,
+  n_perm  = 1000,
+  n_cores = 8,
+  metric  = "sum_lcs",
+  seed    = 1
+)
+
+head(null_pair[order(null_pair$fdr), ], 10)
+diagnose_permutation_resolution(null_pair)
+```
+
+Threshold sensitivity checks whether candidate axes are robust to the REO anchor:
+
+```{r threshold_sensitivity, eval=FALSE}
+sens <- sensitivity_REO_threshold(
+  pbmc,
+  rank_threshold_grid = c(0.4, 0.5, 0.6, 0.7),
+  lr_db       = lr_pairs_human,
+  cell_labels = celltype_labels,
+  layer       = "counts"
+)
+
+plot_specificity_stability(sens, ct_comm = ct_comm)
+```
+
+With `n_perm = 12`, the smallest empirical p-value is `1 / 13 = 0.077`; use
+`n_perm >= 200` or adaptive refinement for interpretable FDR.
+
+---
+
+## Step 12: Optional receiver-response validation
+
+L-R co-expression is communication potential. Receiver-response scoring asks
+whether receiver cells also show downstream response-state logic.
+
+```{r receiver_response, eval=FALSE}
+response_db <- data.frame(
+  lr_pair = c("IFNG_IFNGR1_IFNGR2", "TGFB1_TGFBR1_TGFBR2"),
+  response_genes = c("STAT1;IRF1;CXCL10", "SMAD7;SERPINE1;COL1A1"),
+  stringsAsFactors = FALSE
+)
+
+ct_comm <- add_receiver_response_score(
+  ct_comm,
+  reo_mat       = reo_logic,
+  response_db   = response_db,
+  response_mode = "any"
+)
+
+head(ct_comm$lr_table[order(ct_comm$lr_table$response_integrated_score,
+                            decreasing = TRUE), ], 10)
+```
+
+Validation columns are evidence annotations. Count columns alone are not treated as
+positive validation support; use positive scores or supportive labels.
+
+---
+
+## Step 13: Multi-sample comparison
+
+For Case-vs-Control studies, one biological sample is the statistical unit. Build
+one object per sample, score each sample, then compare sample-level vectors.
+
+```{r multisample_logic_run, eval=FALSE}
+pbmc_list <- list(
+  sample001 = pbmc_case_1,
+  sample002 = pbmc_case_2,
+  sample003 = pbmc_ctrl_1,
+  sample004 = pbmc_ctrl_2
+)
+
+group_info <- c(
+  sample001 = "Case",
+  sample002 = "Case",
+  sample003 = "Ctrl",
+  sample004 = "Ctrl"
+)
+
+analysis <- logic_run(
+  pbmc_list,
+  group_info     = group_info,
+  lr_db          = lr_pairs_human,
+  rank_threshold = 0.5,
+  lcs_threshold  = 0.01,
+  layer          = "counts",
+  chunk_size     = 2000,
+  mc_cores       = 1,
+  verbose        = TRUE
+)
+
+comparison <- logic_compare_groups(analysis)
+head(comparison[order(comparison$fdr_fisher), ], 20)
+```
+
+For cell-type-resolved cohort comparison, compute `ct_comm` separately for each
+sample and compare vectors from `celltype_comm_to_lcs()`:
+
+```{r multisample_celltype, eval=FALSE}
+sample_ct_list <- lapply(names(pbmc_list), function(sname) {
+  reo_i <- logic_prepare(
+    pbmc_list[[sname]],
+    lr_db          = lr_pairs_human,
+    rank_threshold = 0.5,
+    layer          = "counts",
+    gene_background = "quantile",
+    return_rank    = TRUE,
+    verbose        = FALSE
+  )
+
+  labels_i <- setNames(
+    as.character(pbmc_list[[sname]][[label_col]][, 1]),
+    colnames(pbmc_list[[sname]])
+  )
+
+  logic_summarize_celltypes(
+    reo_i,
+    cell_labels     = labels_i,
+    lr_db           = lr_pairs_human,
+    lcs_threshold   = 0.01,
+    min_edges       = 20,
+    min_expr_frac   = 0.1,
+    lcs_weighting   = "rank",
+    verbose         = FALSE
+  )
+})
+names(sample_ct_list) <- names(pbmc_list)
+
+ct_lcs_list <- lapply(sample_ct_list, celltype_comm_to_lcs,
+                      level = "celltype_lr", metric = "lcs")
+
+ct_comparison <- logic_compare_groups(
+  ct_lcs_list,
+  group_info    = group_info[names(ct_lcs_list)],
+  case_label    = "Case",
+  ctrl_label    = "Ctrl",
+  lcs_threshold = 0.01
+)
+
+plot_differential_celltype_heatmap(ct_comparison, metric = "asymmetry")
+plot_differential_celltype_volcano(ct_comparison, x = "log2fc_lcs")
+```
+
+Do not merge all cells from all samples and treat them as replicates. That creates
+pseudo-replication.
+
+---
+
+## Step 14: Manual PBMC3K download alternative
+
+```{r manual_download, eval=FALSE}
+dir.create("data", showWarnings = FALSE)
+url <- "https://cf.10xgenomics.com/samples/cell-exp/1.1.0/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz"
+dest <- file.path("data", "pbmc3k_filtered_gene_bc_matrices.tar.gz")
+download.file(url, destfile = dest, mode = "wb")
+untar(dest, exdir = "data")
+
+pbmc_data <- Read10X(data.dir = "data/filtered_gene_bc_matrices/hg19")
+pbmc <- CreateSeuratObject(counts = pbmc_data, project = "pbmc3k")
+```
+
+Then continue from Step 2.
+
+---
+
+## Troubleshooting
+
+### `logic_summarize_celltypes()` reports missing labels
+
+Make sure labels are named by cell barcode and cover all REO cells:
+
+```{r troubleshoot_labels, eval=FALSE}
+all(colnames(reo_logic) %in% names(celltype_labels))
+setdiff(colnames(reo_logic), names(celltype_labels))[1:5]
+```
+
+### Memory usage is high
+
+Lower `chunk_size` in `logic_prepare()`:
+
+```{r troubleshoot_memory, eval=FALSE}
+reo_pbmc <- logic_prepare(pbmc, lr_db = lr_pairs_human,
+                          layer = "counts", chunk_size = 1000)
+```
+
+### Which Seurat layer should I use?
+
+Raw counts are a good default for REO logic:
+
+```{r troubleshoot_layer, eval=FALSE}
+reo_pbmc <- logic_prepare(pbmc, lr_db = lr_pairs_human, layer = "counts")
+```
+
+Keep the same layer across all samples in a cohort.
+
+### Why not use the Seurat KNN graph as core evidence?
+
+For dissociated scRNA-seq, KNN/SNN edges represent transcriptional similarity, not
+physical proximity. LogicComm keeps the core inference at the cell-type
+co-expression level and reserves spatial/neighbor graphs for appropriate spatial or
+legacy compatibility contexts.
+
+---
+
+## Session info
+
+```{r sessioninfo, eval=FALSE}
+sessionInfo()
+```

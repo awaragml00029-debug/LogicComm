@@ -8,20 +8,26 @@
 \description{
 LogicComm identifies cell-cell communication by converting single-cell gene
 expression into Relative Expression Ordering (REO) binary logic states, then
-detecting ligand-receptor Logic Consensus Scores (LCS) across cells or cell
-neighborhoods.
+detecting ligand-receptor Logic Consensus Scores (LCS) at the cell-type
+co-expression level.
 }
 \details{
-Main workflow:
+Main pipeline API:
 \enumerate{
-  \item \code{\link{calc_REO_matrix}}: convert expression to a binary logic matrix.
-  \item \code{\link{IdentifyLogicConsensus}}: compute per-sample LCS values.
-  \item \code{\link{CompareLogicGroups}}: compare LCS between sample groups.
-  \item \code{\link{summarize_celltype_communication}}: summarize cell-type resolved communication, weighted graph scoring, receiver-response evidence, uncertainty diagnostics, and signaling roles.
-  \item \code{\link{summarize_spatial_communication}} and \code{\link{summarize_communication_dynamics}}: analyze spatial or pseudotime/time-bin communication.
-  \item \code{\link{fit_celltype_comm_glm}}: fit sample-level differential communication models with covariates.
-  \item \code{\link{run_multisample}}: run the full multi-sample pipeline.
+  \item \code{\link{logic_import_lrdb}} / \code{\link{logic_check_lrdb}}:
+    bring a ligand-receptor database into LogicComm format.
+  \item \code{\link{logic_prepare}}: convert expression to REO logic input.
+  \item \code{\link{logic_score_lr}}: score ligand-receptor logic for one sample.
+  \item \code{\link{logic_summarize_celltypes}}: summarize directed
+    sender-cell-type to receiver-cell-type communication.
+  \item \code{\link{logic_compare_groups}} or \code{\link{logic_run}}:
+    compare sample groups or run the multi-sample workflow end to end.
 }
+
+Advanced compatibility functions such as \code{\link{calc_REO_matrix}},
+\code{\link{IdentifyLogicConsensus}}, and \code{\link{CompareLogicGroups}}
+remain available for existing scripts, but new analyses should start from the
+\code{logic_*} pipeline above.
 
 Visualization helpers include \code{\link{plot_lcs_bubble}},
 \code{\link{plot_lcs_heatmap}}, \code{\link{plot_umap_logic}},
@@ -34,6 +40,11 @@ Visualization helpers include \code{\link{plot_lcs_bubble}},
 }
 \author{
 \strong{Maintainer}: LogicComm Developer \email{dev@logiccomm.io}
+
+Authors:
+\itemize{
+  \item LogicComm Developer \email{dev@logiccomm.io}
+}
 
 }
 \keyword{internal}

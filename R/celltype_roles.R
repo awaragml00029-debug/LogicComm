@@ -20,32 +20,37 @@
 
   betweenness <- rep(0, n)
   information <- rep(0, n)
-  if (requireNamespace("igraph", quietly = TRUE) && n > 1) {
+  if (n > 1 && any(adj_strength > 0, na.rm = TRUE)) {
     # adj_strength stores communication strength (sum_lcs): larger = stronger.
     # igraph interprets edge weights as distances/costs (smaller = closer), so
     # mediator betweenness must use the INVERSE strength as a distance. Passing
     # strength directly would route shortest paths through the weakest edges and
     # invert the mediator role. Self-loops (diag) never lie on a shortest path
     # and distort centrality, so they are excluded from the graph.
-    g <- igraph::graph_from_adjacency_matrix(adj_strength, mode = "directed",
-                                             weighted = TRUE, diag = FALSE)
-    if (igraph::ecount(g) > 0) {
-      w <- as.numeric(igraph::E(g)$weight)
-      pos_w <- w[is.finite(w) & w > 0]
-      dist_w <- 1 / w
-      dist_w[!is.finite(dist_w)] <- if (length(pos_w)) 1e3 / min(pos_w) else 1
-      betweenness <- tryCatch(
-        as.numeric(igraph::betweenness(g, weights = dist_w, normalized = TRUE)),
-        error = function(e) rep(0, n))
-      # PageRank gives the influencer / information-flow score. It is the robust,
-      # well-conditioned analogue of incoming eigenvector centrality (a cell type
-      # is influential when influential cell types communicate with it) and,
-      # unlike eigen_centrality(directed = TRUE), it does not collapse to zeros or
-      # to sink nodes on the acyclic / weakly connected communication graphs that
-      # are common here. Higher edge weight = stronger random-walk flow.
-      information <- tryCatch(
-        as.numeric(igraph::page_rank(g, directed = TRUE, weights = w)$vector),
-        error = function(e) rep(0, n))
+    if (requireNamespace("igraph", quietly = TRUE)) {
+      g <- igraph::graph_from_adjacency_matrix(adj_strength, mode = "directed",
+                                               weighted = TRUE, diag = FALSE)
+      if (igraph::ecount(g) > 0) {
+        w <- as.numeric(igraph::E(g)$weight)
+        pos_w <- w[is.finite(w) & w > 0]
+        dist_w <- 1 / w
+        dist_w[!is.finite(dist_w)] <- if (length(pos_w)) 1e3 / min(pos_w) else 1
+        betweenness <- tryCatch(
+          as.numeric(igraph::betweenness(g, weights = dist_w, normalized = TRUE)),
+          error = function(e) .base_weighted_betweenness(adj_strength))
+        # PageRank gives the influencer / information-flow score. It is the robust,
+        # well-conditioned analogue of incoming eigenvector centrality (a cell type
+        # is influential when influential cell types communicate with it) and,
+        # unlike eigen_centrality(directed = TRUE), it does not collapse to zeros or
+        # to sink nodes on the acyclic / weakly connected communication graphs that
+        # are common here. Higher edge weight = stronger random-walk flow.
+        information <- tryCatch(
+          as.numeric(igraph::page_rank(g, directed = TRUE, weights = w)$vector),
+          error = function(e) .base_weighted_pagerank(adj_strength))
+      }
+    } else {
+      betweenness <- .base_weighted_betweenness(adj_strength)
+      information <- .base_weighted_pagerank(adj_strength)
     }
   }
   # igraph::betweenness(normalized = TRUE) returns NaN for n == 1 (division by
@@ -139,6 +144,81 @@
     role_biological_interpretation = role_biological_interpretation,
     stringsAsFactors = FALSE
   )
+}
+
+.base_weighted_betweenness <- function(adj_strength) {
+  w <- as.matrix(adj_strength)
+  n <- nrow(w)
+  if (n < 3) return(rep(0, n))
+  w[!is.finite(w) | w <= 0] <- 0
+  diag(w) <- 0
+  cb <- numeric(n)
+  tol <- 1e-12
+
+  for (s in seq_len(n)) {
+    pred <- vector("list", n)
+    sigma <- numeric(n)
+    sigma[s] <- 1
+    dist <- rep(Inf, n)
+    dist[s] <- 0
+    seen <- rep(FALSE, n)
+    stack <- integer(0)
+
+    repeat {
+      candidates <- which(!seen & is.finite(dist))
+      if (!length(candidates)) break
+      v <- candidates[which.min(dist[candidates])]
+      seen[v] <- TRUE
+      stack <- c(stack, v)
+      for (to in which(w[v, ] > 0)) {
+        alt <- dist[v] + 1 / w[v, to]
+        if (alt < dist[to] - tol) {
+          dist[to] <- alt
+          sigma[to] <- sigma[v]
+          pred[[to]] <- v
+        } else if (abs(alt - dist[to]) <= tol) {
+          sigma[to] <- sigma[to] + sigma[v]
+          pred[[to]] <- unique(c(pred[[to]], v))
+        }
+      }
+    }
+
+    delta <- numeric(n)
+    for (node in rev(stack)) {
+      if (length(pred[[node]]) && sigma[node] > 0) {
+        for (p in pred[[node]]) {
+          delta[p] <- delta[p] + (sigma[p] / sigma[node]) * (1 + delta[node])
+        }
+      }
+      if (node != s) cb[node] <- cb[node] + delta[node]
+    }
+  }
+
+  cb / ((n - 1) * (n - 2))
+}
+
+.base_weighted_pagerank <- function(adj_strength, damping = 0.85,
+                                    max_iter = 200, tol = 1e-10) {
+  w <- as.matrix(adj_strength)
+  n <- nrow(w)
+  if (n == 0) return(numeric(0))
+  w[!is.finite(w) | w <= 0] <- 0
+  diag(w) <- 0
+  row_total <- rowSums(w)
+  transition <- matrix(1 / n, nrow = n, ncol = n)
+  non_dangling <- row_total > 0
+  transition[non_dangling, ] <- w[non_dangling, , drop = FALSE] / row_total[non_dangling]
+  pr <- rep(1 / n, n)
+
+  for (i in seq_len(max_iter)) {
+    next_pr <- (1 - damping) / n + damping * as.numeric(crossprod(transition, pr))
+    if (sum(abs(next_pr - pr)) < tol) {
+      pr <- next_pr
+      break
+    }
+    pr <- next_pr
+  }
+  pr
 }
 
 #' Plot Sender-Receiver Role Positioning

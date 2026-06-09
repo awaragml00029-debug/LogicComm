@@ -6,52 +6,29 @@
 \usage{
 IdentifyLogicConsensus(
   reo_mat,
-  seurat_obj = NULL,
-  knn_mat = NULL,
   lr_db = lr_pairs_human,
-  graph_name = NULL,
   lcs_threshold = 0.01,
-  remove_self_edges = TRUE,
-  graph_symmetrize = c("or", "none", "max"),
-  edge_weight_mode = c("binary", "weighted"),
-  verbose = TRUE
+  verbose = TRUE,
+  ...
 )
 }
 \arguments{
 \item{reo_mat}{Binary REO matrix (genes x cells), output of
 \code{\link{calc_REO_matrix}}.}
 
-\item{seurat_obj}{Optional Seurat object. If provided and \code{knn_mat} is
-\code{NULL}, the KNN graph is extracted from
-\code{seurat_obj@graphs} automatically.}
-
-\item{knn_mat}{Optional KNN adjacency sparse matrix (cells x cells). Overrides
-automatic extraction. Non-zero entries indicate neighbor relationships.
-Can be a \code{dgCMatrix} or binary matrix.}
-
 \item{lr_db}{Ligand-receptor database. Data frame with columns
 \code{lr_pair}, \code{ligand_genes}, \code{receptor_genes} (list columns).
 Defaults to the built-in \code{lr_pairs_human}.}
 
-\item{graph_name}{Name of the KNN graph slot in \code{seurat_obj}. If
-\code{NULL}, auto-selected.}
-
 \item{lcs_threshold}{Minimum LCS for a pair to be considered "active" in
 downstream comparisons. Default: \code{0.01}.}
 
-\item{remove_self_edges}{Logical; if \code{TRUE}, diagonal/self-loop entries
-in KNN graphs are removed before scoring. Default: \code{TRUE}.}
-
-\item{graph_symmetrize}{How to symmetrize the graph before scoring: \code{"none"}
-keeps the matrix as supplied; \code{"or"} uses binary union; \code{"max"}
-keeps the maximum weight in either direction. By default, binary KNN scoring
-uses \code{"or"} when self-loops are removed; weighted scoring and explicit
-self-loop scoring keep supplied directed weights.}
-
-\item{edge_weight_mode}{\code{"binary"} treats every non-zero graph entry
-as one edge; \code{"weighted"} uses graph weights in the LCS denominator.}
-
 \item{verbose}{Print progress messages. Default: \code{TRUE}.}
+
+\item{...}{Deprecated neighborhood arguments (\code{knn_mat}, \code{seurat_obj},
+\code{graph_name}, \code{remove_self_edges}, \code{graph_symmetrize},
+\code{edge_weight_mode}), accepted for backward compatibility and ignored
+with a warning.}
 }
 \value{
 A named numeric vector of LCS values, one per L-R pair in
@@ -60,25 +37,16 @@ A named numeric vector of LCS values, one per L-R pair in
 }
 \description{
 For each ligand-receptor pair in the database, computes a Logic Consensus
-Score (LCS) that measures how consistently the complete L-R signaling logic
-is realized across the cell population (or its neighborhoods).
+Score (LCS): the fraction of cells in which the complete ligand logic and the
+complete receptor logic are simultaneously realized (co-expression).
 }
 \details{
-**Two scoring modes:**
+\deqn{LCS = \frac{\text{cells with both L=TRUE AND R=TRUE}}{n_{cells}}}
 
-\describe{
-  \item{\strong{Neighborhood mode} (recommended, requires KNN)}{
-    For each directed KNN edge (sender → receiver):
-    \deqn{LCS = \frac{\text{edges where sender has L=TRUE AND receiver has R=TRUE}}{\text{total edges}}}
-    This captures the *spatial* logic of cell-cell communication — the ligand
-    must be expressed in the sending cell, and the receptor in the (neighboring)
-    receiving cell.
-  }
-  \item{\strong{Global mode} (no KNN required)}{
-    \deqn{LCS = \frac{\text{cells with both L=TRUE AND R=TRUE}}{n_{cells}}}
-    Simpler co-expression score; ignores spatial arrangement.
-  }
-}
+LogicComm scores communication from REO co-expression and does not aggregate
+over a per-cell KNN/SNN neighborhood graph: for dissociated scRNA-seq that
+graph lives in expression space, not physical space, so it cannot license
+spatial juxtacrine/paracrine claims.
 
 **Multimer complexes:** A complex like "TGFBR1+TGFBR2" requires ALL subunit
 genes to be active (\code{TRUE}) for the receptor to be counted as expressed.
@@ -89,10 +57,6 @@ data(lr_pairs_human)
 lr_genes <- all_lr_genes(lr_pairs_human)
 reo <- calc_REO_matrix(my_seurat, lr_genes = lr_genes)
 
-# Neighborhood mode
-lcs <- IdentifyLogicConsensus(reo, seurat_obj = my_seurat)
-
-# Global mode (no KNN)
 lcs <- IdentifyLogicConsensus(reo)
 
 # View top pairs

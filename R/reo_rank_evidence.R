@@ -141,10 +141,12 @@ score_lr_rank_activity <- function(rank_mat,
 #'   \code{reo_mat} or calculated from \code{expr_mat}.
 #' @param expr_mat Optional expression input used to calculate \code{rank_mat}
 #'   when no rank matrix is supplied.
-#' @param seurat_obj Optional Seurat object for KNN graph extraction.
-#' @param knn_mat Optional cells x cells adjacency matrix.
+#' @param seurat_obj Deprecated compatibility input for KNN graph extraction. New
+#'   analyses should use the global rank-evidence mode without expression-space
+#'   KNN/SNN graph controls.
+#' @param knn_mat Deprecated compatibility cells x cells adjacency matrix.
 #' @param lr_db Ligand-receptor database.
-#' @param graph_name Optional Seurat graph name.
+#' @param graph_name Deprecated compatibility Seurat graph name.
 #' @param rank_threshold Binary activity threshold applied to ranks when
 #'   \code{reo_mat} is not supplied.
 #' @param threshold_grid Rank thresholds used for stability scoring.
@@ -152,9 +154,9 @@ score_lr_rank_activity <- function(rank_mat,
 #' @param layer Seurat layer used when \code{expr_mat} is provided.
 #' @param chunk_size Chunk size used when \code{expr_mat} is provided.
 #' @param anchor_genes Optional anchor genes used when \code{expr_mat} is provided.
-#' @param remove_self_edges Whether to remove diagonal graph edges.
-#' @param graph_symmetrize Graph symmetrization mode.
-#' @param edge_weight_mode \code{"binary"} or \code{"weighted"} graph scoring.
+#' @param remove_self_edges Deprecated compatibility graph control.
+#' @param graph_symmetrize Deprecated compatibility graph control.
+#' @param edge_weight_mode Deprecated compatibility graph scoring control.
 #' @param complex_aggregate How to combine multi-subunit ranks.
 #' @param lcs_threshold Activity threshold used only for evidence-tier labels.
 #' @param verbose Whether to print progress messages.
@@ -190,6 +192,10 @@ IdentifyRankLogicConsensus <- function(reo_mat = NULL,
     graph_symmetrize <- if (edge_weight_mode == "binary" && isTRUE(remove_self_edges)) "or" else "none"
   } else {
     graph_symmetrize <- match.arg(graph_symmetrize)
+  }
+  if (!is.null(seurat_obj) || !is.null(knn_mat) || !is.null(graph_name)) {
+    warning("IdentifyRankLogicConsensus(): seurat_obj/knn_mat/graph_name are deprecated compatibility inputs; ",
+            "new analyses should use the global rank-evidence mode.", call. = FALSE)
   }
 
   parsed <- .resolve_rank_logic_inputs(

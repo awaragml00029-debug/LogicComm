@@ -205,17 +205,27 @@ logic_score_lr <- function(reo,
 
 #' Summarize cell-type-resolved LogicComm communication
 #'
+#' Summarizes directed sender-cell-type to receiver-cell-type communication from
+#' cell-type co-expression logic. Seurat objects are used only to resolve cell
+#' labels when requested; ordinary scRNA-seq scoring does not aggregate over a
+#' per-cell KNN/SNN graph.
+#'
 #' @param reo REO matrix or \code{LogicCommREOResult}.
 #' @param cell_labels Named cell type labels.
-#' @param seurat_obj Optional Seurat object.
-#' @param label_col Optional Seurat metadata column.
-#' @param knn_mat Optional cells x cells graph.
+#' @param seurat_obj Optional Seurat object used to resolve cell labels.
+#' @param label_col Optional Seurat metadata column for cell labels.
+#' @param knn_mat Deprecated compatibility graph input. Ignored when supplied.
 #' @param lr_db LogicComm ligand-receptor database.
-#' @param graph_name Optional Seurat graph name.
-#' @param mode \code{"auto"}, \code{"neighborhood"}, or \code{"global"}.
+#' @param graph_name Deprecated compatibility Seurat graph name. Ignored when supplied.
+#' @param mode Compatibility mode selector. \code{"auto"}, \code{"global"}, and
+#'   \code{"celltype"} all use the current cell-type co-expression scorer;
+#'   legacy \code{"neighborhood"} is ignored with a warning.
 #' @param include_self Include same-cell-type sender/receiver pairs.
-#' @param remove_self_edges Remove cell-level graph self-loops.
-#' @param ... Additional arguments passed to \code{summarize_celltype_communication()}.
+#' @param remove_self_edges Deprecated compatibility graph control. Ignored unless
+#'   changed from its default, in which case a warning is emitted.
+#' @param ... Additional arguments passed to \code{summarize_celltype_communication()},
+#'   such as \code{lcs_threshold}, \code{min_edges}, \code{min_expr_frac}, and
+#'   \code{lcs_weighting}.
 #' @return \code{LogicCommCellTypeComm} object.
 #' @export
 logic_summarize_celltypes <- function(reo,
@@ -231,19 +241,25 @@ logic_summarize_celltypes <- function(reo,
                                       ...) {
   mode <- match.arg(mode)
   logic_check_lrdb(lr_db, stop_on_error = TRUE)
-  summarize_celltype_communication(
-    reo_mat = reo,
-    cell_labels = cell_labels,
-    seurat_obj = seurat_obj,
-    label_col = label_col,
-    knn_mat = knn_mat,
-    lr_db = lr_db,
-    graph_name = graph_name,
-    mode = mode,
-    include_self = include_self,
-    remove_self_edges = remove_self_edges,
-    ...
+
+  args <- c(
+    list(
+      reo_mat = reo,
+      cell_labels = cell_labels,
+      seurat_obj = seurat_obj,
+      label_col = label_col,
+      lr_db = lr_db,
+      include_self = include_self
+    ),
+    list(...)
   )
+
+  if (!is.null(knn_mat)) args$knn_mat <- knn_mat
+  if (!is.null(graph_name)) args$graph_name <- graph_name
+  if (!mode %in% c("auto", "celltype", "global")) args$mode <- mode
+  if (!isTRUE(remove_self_edges)) args$remove_self_edges <- remove_self_edges
+
+  do.call(summarize_celltype_communication, args)
 }
 
 #' Compare LogicComm scores between sample groups

@@ -9,8 +9,8 @@ Author: LogicComm Developer
 Maintainer: LogicComm Developer <dev@logiccomm.io>
 Description: Identifies cell-cell communication signals by converting single-cell
     gene expression into Relative Expression Ordering (REO) binary logic states,
-    then detecting ligand-receptor Logic Consensus Scores (LCS) across cell
-    neighborhoods. Designed for scalable multi-sample comparison, such as case
+    then detecting ligand-receptor Logic Consensus Scores (LCS) at the cell-type
+    co-expression level. Designed for scalable multi-sample comparison, such as case
     versus control cohorts, without requiring cell type pre-annotation. Supports
     cell-type-resolved communication summaries, weighted graph scoring,
     signaling-role centrality with confidence labels, bootstrap/null diagnostics,
@@ -26,10 +26,9 @@ Depends: R (>= 4.1.0)
 Imports: Matrix (>= 1.5.0), methods, stats, utils, grDevices, grid, parallel,
     dplyr (>= 1.0.0), ggplot2 (>= 3.4.0), ggrepel (>= 0.9.0),
     scales, Rcpp (>= 1.0.0)
-Suggests: knitr, rmarkdown, testthat (>= 3.0.0), pheatmap, Seurat,
-    SeuratObject, BPCells, igraph, patchwork
+Suggests: testthat (>= 3.0.0), pheatmap, Seurat, SeuratObject, BPCells,
+    igraph, patchwork
 LinkingTo: Rcpp
-VignetteBuilder: knitr
 Config/testthat/edition: 3
 NeedsCompilation: yes
 Config/roxygen2/version: 8.0.0

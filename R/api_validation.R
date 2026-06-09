@@ -326,6 +326,13 @@ logic_grade_evidence <- function(ct_comm,
   has_positive <- function(col) {
     col %in% names(lr) & !is.na(lr[[col]]) & as.numeric(lr[[col]]) > 0
   }
+  has_supportive_label <- function(col) {
+    if (!col %in% names(lr)) return(rep(FALSE, n))
+    label <- tolower(as.character(lr[[col]]))
+    positive <- grepl("support|validated|confirm|positive|protein|spatial|perturb|response", label)
+    negative <- grepl("negative|unsupported|refut|no[_ -]?support|anti", label)
+    !is.na(label) & nzchar(label) & positive & !negative
+  }
 
   local <- if ("local_active" %in% names(lr)) lr$local_active %in% TRUE else rep(FALSE, n)
   global <- if ("global_candidate_active" %in% names(lr)) lr$global_candidate_active %in% TRUE else rep(FALSE, n)
@@ -334,9 +341,23 @@ logic_grade_evidence <- function(ct_comm,
 
   validation <- rep(FALSE, n)
   if (isTRUE(use_validation)) {
-    for (col in c("validation_response_score", "validation_target_n", "validation_tf_n", "validation_external_n")) {
+    for (col in c("validation_response_score", "validation_response_integrated_lcs",
+                  "validation_target_score_max", "validation_target_score_mean",
+                  "validation_target_active_frac", "validation_tf_score_max",
+                  "validation_tf_score_mean", "validation_tf_switch_delta")) {
       if (col %in% names(lr)) validation <- validation | has_positive(col)
     }
+    external_score <- if ("validation_external_score_mean" %in% names(lr)) {
+      has_positive("validation_external_score_mean")
+    } else {
+      rep(FALSE, n)
+    }
+    external_label <- has_supportive_label("validation_external_label") |
+      has_supportive_label("validation_external_type")
+    validation <- validation | external_label | (external_score & !grepl(
+      "negative|unsupported|refut|no[_ -]?support|anti",
+      tolower(as.character(lr$validation_external_label %||% rep("", n)))
+    ))
   }
 
   grade <- rep(NA_character_, n)

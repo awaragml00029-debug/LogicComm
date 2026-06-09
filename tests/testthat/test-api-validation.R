@@ -93,6 +93,7 @@ test_that("logic_grade_evidence summarizes local, validation, and distal evidenc
     distal_candidate = c(FALSE, TRUE, FALSE),
     active = c(TRUE, TRUE, FALSE),
     validation_target_n = c(2L, 0L, 0L),
+    validation_target_score_max = c(0.8, NA_real_, NA_real_),
     n_edges = c(4, 4, 1),
     n_active_edges = c(2, 0, 0),
     stringsAsFactors = FALSE

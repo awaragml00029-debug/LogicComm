@@ -12,7 +12,7 @@ permute_celltype_communication(
   lr_db = NULL,
   n_perm = 100,
   n_cores = 1L,
-  metric = "sum_lcs",
+  metric = "lcs",
   seed = NULL,
   adaptive = FALSE,
   adaptive_top_n = 25,
@@ -29,11 +29,10 @@ permute_celltype_communication(
 
 \item{cell_labels}{Named cell-type labels. Defaults to \code{ct_comm$cell_labels}
 when \code{ct_comm} is supplied. If \code{ct_comm} was built after filtering
-unlabeled cells, \code{reo_mat} and named \code{knn_mat} inputs are aligned to
-those retained cells automatically.}
+unlabeled cells, \code{reo_mat} is aligned to those retained cells automatically.}
 
-\item{knn_mat}{Optional KNN/SNN graph. Named graphs are subset to retained cells
-when necessary.}
+\item{knn_mat}{Deprecated and ignored. Permutations now shuffle cell labels in
+the cell-type co-expression model rather than a per-cell KNN/SNN graph.}
 
 \item{lr_db}{LR database. Defaults to \code{ct_comm$lr_db} when available.}
 
@@ -43,7 +42,11 @@ when necessary.}
 (Unix/macOS). Default 1 (serial). Higher values give a near-linear speedup,
 making a publication-grade \code{n_perm} affordable; ignored on Windows.}
 
-\item{metric}{Pair-level metric to test.}
+\item{metric}{Metric to test. The default \code{"lcs"} (a column of
+\code{lr_table}) builds an \strong{axis-level} null: every sender ->
+receiver -> L-R axis gets its own empirical p-value. A metric found in
+\code{pair_summary} (e.g. \code{"sum_lcs"}) builds a legacy cell-type-pair
+null instead.}
 
 \item{seed}{Optional random seed.}
 
@@ -63,7 +66,9 @@ additional full permutations for the top candidates.}
 \item{...}{Passed to \code{summarize_celltype_communication()}.}
 }
 \value{
-Pair-level null summary with empirical p-values.
+Axis-level (default) or pair-level null summary with per-test
+  empirical p-values and BH-adjusted FDR. Axis-level rows carry an
+  \code{lr_pair} column so each L-R axis can be joined to its own p-value.
 }
 \description{
 Cell-Label Permutation Null for Cell-Type Communication

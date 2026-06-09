@@ -35,13 +35,15 @@ IdentifyRankLogicConsensus(
 \item{expr_mat}{Optional expression input used to calculate \code{rank_mat}
 when no rank matrix is supplied.}
 
-\item{seurat_obj}{Optional Seurat object for KNN graph extraction.}
+\item{seurat_obj}{Deprecated compatibility input for KNN graph extraction. New
+analyses should use the global rank-evidence mode without expression-space
+KNN/SNN graph controls.}
 
-\item{knn_mat}{Optional cells x cells adjacency matrix.}
+\item{knn_mat}{Deprecated compatibility cells x cells adjacency matrix.}
 
 \item{lr_db}{Ligand-receptor database.}
 
-\item{graph_name}{Optional Seurat graph name.}
+\item{graph_name}{Deprecated compatibility Seurat graph name.}
 
 \item{rank_threshold}{Binary activity threshold applied to ranks when
 \code{reo_mat} is not supplied.}
@@ -56,11 +58,11 @@ when no rank matrix is supplied.}
 
 \item{anchor_genes}{Optional anchor genes used when \code{expr_mat} is provided.}
 
-\item{remove_self_edges}{Whether to remove diagonal graph edges.}
+\item{remove_self_edges}{Deprecated compatibility graph control.}
 
-\item{graph_symmetrize}{Graph symmetrization mode.}
+\item{graph_symmetrize}{Deprecated compatibility graph control.}
 
-\item{edge_weight_mode}{\code{"binary"} or \code{"weighted"} graph scoring.}
+\item{edge_weight_mode}{Deprecated compatibility graph scoring control.}
 
 \item{complex_aggregate}{How to combine multi-subunit ranks.}
 

@@ -81,9 +81,13 @@ plot_celltype_network <- function(ct_comm,
   edges <- merge(edges, nodes[, c("cell_type", "x", "y")],
                  by.x = "receiver_type", by.y = "cell_type", all.x = TRUE, suffixes = c("", "end"))
   if (!"communication_support_label" %in% names(edges)) {
-    edges$communication_support_label <- ifelse(edges$n_active_lr > 0 & edges$n_local_active == 0 & edges$n_distal_candidate > 0,
-                                                "global_only_candidate",
-                                                ifelse(edges$n_distal_candidate > 0, "mixed_local_global", "local_graph_supported"))
+    edges$communication_support_label <- ifelse(edges$n_active_lr == 0,
+                                                 "inactive",
+                                                 ifelse(edges$n_local_active == 0 & edges$n_distal_candidate == 0,
+                                                        "cell_type_coexpression_supported",
+                                                        ifelse(edges$n_local_active == 0 & edges$n_distal_candidate > 0,
+                                                               "global_only_candidate",
+                                                               ifelse(edges$n_distal_candidate > 0, "mixed_local_global", "local_graph_supported"))))
   }
   edges$edge_color <- if (color_edges_by == "range") edges$dominant_communication_range else edges$top_pathway
   edges$edge_linetype <- ifelse(edges$dominant_communication_range == "distal/endocrine", "distal/endocrine", "local/mixed")
@@ -468,8 +472,11 @@ plot_differential_celltype_heatmap <- function(result, metric = "asymmetry", top
 #' @param result Output from \code{CompareLogicGroups()}.
 #' @param x X-axis metric.
 #' @param fdr_col FDR column.
+#' @param fdr_cutoff FDR threshold for significance colouring and guide line.
+#' @param lfc_threshold Optional minimum absolute effect size for significance.
 #' @param top_n_label Number of labels.
 #' @param title Optional title.
+#' @param x_lab Optional x-axis label.
 #' @return A ggplot2 object.
 #' @export
 plot_differential_celltype_volcano <- function(result, x = "log2fc_lcs", fdr_col = "fdr_fisher",

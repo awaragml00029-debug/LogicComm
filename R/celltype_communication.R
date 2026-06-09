@@ -340,6 +340,11 @@ celltype_comm_to_lcs <- function(ct_comm,
       cell_labels <- seurat_obj@meta.data[[label_col]]
       names(cell_labels) <- rownames(seurat_obj@meta.data)
     } else {
+      if (!requireNamespace("SeuratObject", quietly = TRUE)) {
+        stop("SeuratObject is required to infer cell labels from seurat_obj; ",
+             "install SeuratObject or pass cell_labels/label_col explicitly.",
+             call. = FALSE)
+      }
       cell_labels <- SeuratObject::Idents(seurat_obj)
       names(cell_labels) <- colnames(seurat_obj)
     }
@@ -429,6 +434,8 @@ celltype_comm_to_lcs <- function(ct_comm,
     local_support_fraction <- if (nrow(active_sub) > 0) n_local_active / nrow(active_sub) else NA_real_
     support_label <- if (nrow(active_sub) == 0) {
       "inactive"
+    } else if (n_local_active == 0 && n_distal_candidate == 0) {
+      "cell_type_coexpression_supported"
     } else if (n_local_active == 0 && n_distal_candidate > 0) {
       "global_only_candidate"
     } else if (n_distal_candidate == 0 && n_local_active > 0) {
@@ -498,7 +505,9 @@ celltype_comm_to_lcs <- function(ct_comm,
     n_local_active <- sum(sub$local_active %in% TRUE)
     n_distal_candidate <- sum(sub$distal_candidate %in% TRUE)
     local_support_fraction <- n_local_active / nrow(sub)
-    support_label <- if (n_local_active == 0 && n_distal_candidate > 0) {
+    support_label <- if (n_local_active == 0 && n_distal_candidate == 0) {
+      "cell_type_coexpression_supported"
+    } else if (n_local_active == 0 && n_distal_candidate > 0) {
       "global_only_candidate"
     } else if (n_distal_candidate == 0 && n_local_active > 0) {
       "local_graph_supported"

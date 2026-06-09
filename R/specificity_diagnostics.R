@@ -461,6 +461,7 @@ communication_discovery_view <- function(ranked,
 #' @param ranked Output of \code{\link{rank_communication_axes}}.
 #' @param top_n_label Number of top axes (by discovery score) to label.
 #' @param title Optional plot title.
+#' @param subtitle Optional plot subtitle.
 #' @return A ggplot2 object.
 #' @export
 plot_communication_discovery <- function(ranked, top_n_label = 15,

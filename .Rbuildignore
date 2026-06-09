@@ -3,6 +3,8 @@
 ^\.Rbuildignore$
 ^data-raw$
 ^LogicComm\.Rcheck$
+^\.\.Rcheck$
+^src/.*\.(o|so|dll|dylib|rds)$
 ^LogicComm_.*\.tar\.gz$
 ^.*\.tar\.gz$
 ^.*\.Rproj$
