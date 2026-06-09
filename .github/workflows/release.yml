@@ -61,6 +61,9 @@ jobs:
         with:
           name: LogicComm ${{ steps.meta.outputs.version }}
           tag_name: v${{ steps.meta.outputs.version }}
+          # This branch carries the in-progress cell-type co-expression rewrite,
+          # so releases cut from it are published as pre-releases.
+          prerelease: true
           # Pin the tag to the exact commit being built. Without this, a tag
           # created on a workflow_dispatch event defaults to the repository's
           # default branch, so dispatching from a feature branch would tag the
