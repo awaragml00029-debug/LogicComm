@@ -59,9 +59,9 @@ with a Seurat workflow.
 The goal is to demonstrate a practical single-sample workflow:
 
 1. Load PBMC3K as a `Seurat` object.
-2. Run standard Seurat preprocessing and build a KNN graph.
+2. Run standard Seurat preprocessing (clustering/UMAP for cell-type labels).
 3. Convert expression to a LogicComm REO matrix.
-4. Calculate ligand-receptor Logic Consensus Scores (LCS) using Seurat KNN.
+4. Calculate ligand-receptor Logic Consensus Scores (LCS) from cell-type co-expression.
 5. Score per-cell communication activity.
 6. Visualize communication activity on UMAP.
 7. Optionally summarize top active L-R pairs and cluster-level signals.
@@ -71,9 +71,9 @@ The goal is to demonstrate a practical single-sample workflow:
 中文流程对应为：
 
 1. 读取 PBMC3K，并构建 Seurat 对象。
-2. 运行标准 Seurat 预处理，建立 KNN 邻居图。
+2. 运行标准 Seurat 预处理（聚类/UMAP 用于细胞类型标签）。
 3. 将表达矩阵转换成 LogicComm 的 REO 二值逻辑矩阵。
-4. 基于 Seurat KNN 计算配体-受体 LCS 分数。
+4. 基于细胞类型共表达计算配体-受体 LCS 分数。
 5. 评估每个细胞作为发送者或接收者的通讯活性。
 6. 在 UMAP 上展示通讯活性。
 7. 汇总高活性的配体-受体对和 cluster 层面的信号。
@@ -105,9 +105,9 @@ neighborhood analysis, pseudotime dynamics, and sample-level differential models
 | English term | 中文解释 |
 |---|---|
 | REO matrix | 相对表达排序得到的二值逻辑矩阵，表示每个细胞内基因是否相对活跃。 |
-| LCS | Logic Consensus Score，表示配体-受体逻辑在细胞或邻域边中被满足的比例。 |
-| neighborhood mode | 使用 Seurat KNN/SNN 或空间图，只把邻近细胞之间的 L-R 逻辑作为局部证据。 |
-| global potential | 不依赖局部邻居图的细胞类型层面通讯潜力，可补充远距离或图中漏掉的信号。 |
+| LCS | Logic Consensus Score，v0.12 中表示配体-受体逻辑在“发送细胞类型 × 接收细胞类型”共表达机会中被满足的比例。 |
+| cell-type co-expression | v0.12 的打分单元：每个 sender→receiver 细胞类型对，配体在 sender、受体在 receiver 同时活跃的比例（不依赖 per-cell 图）。 |
+| 已弃用的 neighborhood mode | 旧版基于 Seurat KNN/SNN 的 per-cell 邻域打分；表达空间的图不能代表物理邻近，已移除（相关参数接受但忽略并警告）。 |
 | self-loop | 单个细胞自己连自己，例如 `CellA -> CellA`，默认去掉。 |
 | same-cell-type signaling | 同一细胞类型内部通讯，例如 `T cell -> T cell`，默认保留。 |
 | autocrine-like / homotypic | 自分泌样或同类细胞通讯潜力，不能直接证明同一个单细胞自己分泌并自己接收。 |
@@ -219,7 +219,7 @@ pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000,
 pbmc <- ScaleData(pbmc, verbose = FALSE)
 pbmc <- RunPCA(pbmc, npcs = 30, verbose = FALSE)
 
-# KNN graph used later by LogicComm neighborhood mode
+# Standard Seurat neighbors/clustering (used for cell-type labels, not by LogicComm)
 pbmc <- FindNeighbors(pbmc, dims = 1:20, verbose = FALSE)
 
 # UMAP for visualization
@@ -294,9 +294,7 @@ reo_pbmc_cellchat <- calc_REO_matrix(
 
 lcs_pbmc_cellchat <- IdentifyLogicConsensus(
   reo_pbmc_cellchat$logic,
-  seurat_obj = pbmc,
-  graph_name = "RNA_nn",
-  lr_db      = cellchat_lr
+  lr_db = cellchat_lr
 )
 
 mod_summary <- summarize_lr_modulators(
@@ -307,8 +305,6 @@ mod_summary <- summarize_lr_modulators(
 
 gate_pbmc_cellchat <- IdentifyLogicGateConsensus(
   reo_pbmc_cellchat,
-  seurat_obj     = pbmc,
-  graph_name     = "RNA_nn",
   lr_db          = cellchat_lr,
   positive_gate  = "all",
   negative_gate  = "rank_block"
@@ -394,21 +390,19 @@ only stronger within-cell activity and may reduce noisy low-level immune signals
 
 ---
 
-## Step 4: Compute LCS with Seurat KNN
+## Step 4: Compute Logic Consensus Scores (LCS)
 
-Now calculate ligand-receptor activity using the Seurat KNN graph. In
-neighborhood mode, a pair is counted when a sender cell has the ligand active and
-its neighboring receiver cell has the receptor active.
+`IdentifyLogicConsensus()` computes, for each L-R pair, a **dataset-level** Logic
+Consensus Score: the fraction of cells in which the complete ligand logic and the
+complete receptor logic are simultaneously realized (co-expression). LogicComm
+v0.12 scores from REO co-expression and no longer uses a per-cell KNN/SNN graph.
 
-**中文说明。** 这一步计算 LCS。直观理解：如果一个细胞的 ligand 是活跃的，而它邻近的
-另一个细胞 receptor 也是活跃的，这条邻域边就支持该 L-R 通讯。LCS 越高，说明这种
-邻域层面的 ligand -> receptor 逻辑越常见。
+**中文说明。** 这一步计算每个 L-R 对的 LCS：在多大比例的细胞里配体逻辑和受体逻辑
+同时成立（共表达）。v0.12 起 LogicComm 基于 REO 共表达打分，不再使用 per-cell 邻域图。
 
-```{r lcs_seurat_knn, eval=FALSE}
+```{r lcs_global, eval=FALSE}
 lcs_pbmc <- IdentifyLogicConsensus(
   reo_pbmc,
-  seurat_obj    = pbmc,
-  graph_name    = "RNA_nn",  # recommended: direct nearest-neighbor graph
   lr_db         = lr_pairs_human,
   lcs_threshold = 0.01,
   verbose       = TRUE
@@ -424,55 +418,24 @@ top_lcs <- sort(lcs_pbmc[!is.na(lcs_pbmc)], decreasing = TRUE)
 head(top_lcs, 20)
 ```
 
-**Biological interpretation.** A high LCS means that the ligand and receptor are
-frequently active in neighboring cells. In PBMC3K, top pairs often reflect common
-immune biology rather than disease-specific effects: chemokine axes may indicate
-immune-cell positioning or monocyte/lymphocyte trafficking; cytokine axes may
-reflect inflammatory readiness; integrin/collagen/ECM-like axes can reflect
-adhesion-related programs; checkpoint or co-stimulatory axes can indicate
-lymphocyte regulatory states. Treat the top list as hypotheses about active
-cellular programs in this PBMC sample. Confirm the sender and receiver cell types
-with marker genes, cluster summaries, and external biology before making a strong
-claim.
+**Biological interpretation.** A high LCS means the ligand and receptor are
+frequently co-expressed across the sample. In PBMC3K, top pairs often reflect
+common immune biology rather than disease-specific effects: chemokine axes may
+indicate immune-cell positioning; cytokine axes may reflect inflammatory
+readiness; integrin/collagen/ECM-like axes can reflect adhesion programs;
+checkpoint or co-stimulatory axes can indicate lymphocyte regulatory states.
+Treat the top list as hypotheses; confirm cell types with marker genes before a
+strong claim.
 
-If auto-detection chooses the wrong graph, pass a graph name explicitly.
-For LogicComm neighborhood LCS, `RNA_nn` is usually recommended because it is the
-direct nearest-neighbor graph. `RNA_snn` is the shared-nearest-neighbor graph used
-by Seurat clustering and can be used as a sensitivity check.
+> The dataset-level `IdentifyLogicConsensus()` score measures co-expression
+> across all cells (most informative for autocrine-like / same-cell co-expression).
+> For directional **sender -> receiver cell-type** communication, use
+> `summarize_celltype_communication()` (Step 9) or the one-call
+> `discover_celltype_communication()`.
 
-```{r lcs_named_graph, eval=FALSE}
-names(pbmc@graphs)
-
-lcs_pbmc <- IdentifyLogicConsensus(
-  reo_pbmc,
-  seurat_obj = pbmc,
-  graph_name = "RNA_nn",
-  lr_db      = lr_pairs_human
-)
-
-# Optional sensitivity check
-lcs_pbmc_snn <- IdentifyLogicConsensus(
-  reo_pbmc,
-  seurat_obj = pbmc,
-  graph_name = "RNA_snn",
-  lr_db      = lr_pairs_human
-)
-
-cor(lcs_pbmc, lcs_pbmc_snn, use = "complete.obs")
-```
-
-LogicComm aligns the KNN graph to `colnames(reo_pbmc)` if row and column names
-are present. If the graph does not contain all REO cells, it stops with an error
-instead of silently calculating mismatched cell-cell communication. Diagonal
-self-loops are removed by default; set `remove_self_edges = FALSE` only for a
-specific sensitivity analysis.
-
-**中文说明：self-loop 与同类通讯不是一回事。** 默认去掉的是细胞级别的自环，
-也就是 `CellA -> CellA`。这样可以避免把同一个细胞内 ligand/receptor 共表达直接当成
-“细胞间通讯证据”。但这并不会删除同一细胞类型内部通讯，例如 `Tumor -> Tumor`、
-`Macrophage -> Macrophage` 或 `T cell -> T cell`。这些 same-cell-type 结果仍然保留，
-可以解释为 autocrine-like / homotypic / within-cell-type signaling potential，
-也就是类似 CellChat 中常见的同类细胞通讯或自分泌样通讯潜力。
+> **Migration note.** Legacy neighborhood arguments (`seurat_obj`, `graph_name`,
+> `knn_mat`, `remove_self_edges`, `graph_symmetrize`, `edge_weight_mode`) are
+> accepted but deprecated and ignored with a warning.
 
 ### 4.1 Same-cell-type signaling and autocrine-like interpretation
 
@@ -711,30 +674,27 @@ ct_comm <- summarize_celltype_communication(
 )
 ```
 
-### 9.1 Signaling Range Analysis
-Understand the global landscape of local vs. long-range communication.
+### 9.1 A note on communication "range"
 
-```{r range_summary, eval=FALSE, fig.width=8, fig.height=5}
-# Breakdown of communication types by pathway
-plot_communication_range_summary(ct_comm)
-```
+v0.12 scores at the **cell-type level from co-expression**, so the former
+local / distal "communication range" — a per-cell neighborhood concept — no
+longer applies: every axis is a cell-type co-expression axis. Genuine
+distance/range claims require physical spatial coordinates (see the spatial
+module). Pathway- and strength-level overviews are in §9.4–§9.5.
 
-**Biological interpretation.** If a pathway is dominated by `distal/endocrine` signals, it suggests systemic communication that might be missed by purely spatial or neighborhood-based tools. `juxtacrine` dominance suggests strict local regulation.
-
-**中文说明。** 如果某个通路主要是 `distal/endocrine`，说明它可能不是局部邻居图最容易
-捕捉的信号，而是更偏远距离或全局候选通讯。相反，如果主要是 `juxtacrine`，则更像依赖
-近距离接触或局部邻域结构的调控。
+**中文说明。** v0.12 在细胞类型层面用共表达打分，旧的 local/distal“通讯距离”属于
+per-cell 邻域概念，已不再适用——每条都是细胞类型共表达 axis。真正的距离声称需要物理
+空间坐标（见空间模块）。
 
 ### 9.2 Publication-Ready Network Visualization
-Visualize the communication network, highlighting the range of interaction.
+Visualize the sender -> receiver cell-type communication network.
 
 ```{r celltype_network, eval=FALSE, fig.width=8, fig.height=8}
-# Network colored by communication range (Solid = Local, Dashed = Distal)
 plot_celltype_network(
   ct_comm,
   metric         = "sum_lcs",
   layout         = "circle",
-  color_edges_by = "range"
+  color_edges_by = "pathway"
 )
 ```
 
@@ -856,8 +816,7 @@ lr_audit <- lr_audit[order(-lr_audit$lcs, -lr_audit$n_active_edges), ]
 
 audit_cols <- intersect(c(
   "sender_type", "receiver_type", "lr_pair", "pathway",
-  "lcs", "communication_range",
-  "n_edges", "n_active_edges", "n_active_neighborhood", "edge_weight_sum", "active_edge_weight_sum",
+  "lcs", "n_edges", "n_active_edges", "n_global_possible", "n_active_global",
   "sender_cell_count", "receiver_cell_count",
   "ligand_active_frac_sender", "receptor_active_frac_receiver",
   "pair_specificity", "specificity_class"
@@ -874,11 +833,11 @@ Interpret the audit table as follows:
    `Pair-specific candidate` from `Broad/ubiquitous axis` and
    `Identity-associated axis`. Broad axes can be real biology, but should not be
    overclaimed as a highly specific mechanism.
-3. **Edge support.** `n_edges`, `edge_weight_sum`, `n_active_edges`,
-   `n_active_neighborhood`, and `active_edge_weight_sum` show whether the signal
-   is supported by local sender-receiver opportunities. A high `lcs` with
-   `n_edges = 0` or `n_active_neighborhood = 0` is a global/distal candidate,
-   not a directly observed neighborhood interaction.
+3. **Opportunity support.** `n_edges` / `n_global_possible` is the sender x
+   receiver cell-count opportunity, and `n_active_edges` / `n_active_global` is
+   how much of it co-expresses the L-R pair. A high `lcs` resting on very few
+   cells (small `sender_cell_count` / `receiver_cell_count`) is less robust than
+   the same `lcs` over abundant populations.
 4. **Specificity score.** `pair_specificity` close to 1 means the L-R pair is
    concentrated in fewer sender-receiver combinations. Low values mean the L-R
    pair is distributed broadly across the cell-type network.
@@ -993,7 +952,6 @@ sens <- sensitivity_REO_threshold(
   rank_threshold_grid = c(0.4, 0.5, 0.6, 0.7),
   lr_db       = lr_pairs_human,
   cell_labels = celltype_labels,
-  knn_mat     = pbmc@graphs$RNA_snn,
   layer       = "counts"
 )
 head(sens$stability, 20)
@@ -1102,47 +1060,27 @@ A concise results sentence could be:
 
 ### 9.7 Spatial transcriptomics extension
 
-PBMC3K is not spatial, but the same LogicComm logic can be used with Visium,
-MERFISH, Xenium, CosMx, or any coordinate-resolved assay. In spatial mode, the
-neighborhood graph is built from physical coordinates rather than Seurat KNN/SNN.
+With genuine spatial coordinates (Visium, MERFISH, Xenium, CosMx) a *physical*
+neighborhood graph is a legitimate, non-expression-space basis for local
+juxtacrine/paracrine scoring — unlike a transcriptional KNN graph.
 
-**中文说明。** PBMC3K 没有真实空间坐标，但 LogicComm 的思想可以迁移到空间转录组。
-空间模式下，邻居图来自物理坐标，因此 local evidence 更接近真实组织空间邻近关系。
+> **Status (v0.12).** Graph-based spatial **scoring**
+> (`summarize_spatial_communication()`) is pending re-implementation in the
+> cell-type-co-expression rewrite: it currently warns and returns cell-type
+> co-expression (the graph is not used). Graph construction
+> (`build_spatial_graph()`) and per-spot REO visualization (`plot_spatial_logic()`)
+> still work.
+
+**中文说明。** 用真实空间坐标时，物理邻居图是合理的（不同于表达空间的 KNN）。但 v0.12
+的空间**打分**正在按细胞类型重写中暂不可用，目前会警告并返回细胞类型共表达；
+`build_spatial_graph()` 和 `plot_spatial_logic()` 仍可用。
 
 ```{r spatial_extension, eval=FALSE}
-# coords must have rownames matching cells/spots and two coordinate columns.
-# Common coordinate names such as x/y, imagecol/imagerow, or
+# coords: rownames matching cells/spots; x/y, imagecol/imagerow, or
 # pxl_col_in_fullres/pxl_row_in_fullres are recognized automatically.
 coords <- spatial_coordinates
 
-sp_graph <- build_spatial_graph(
-  coords,
-  mode            = "knn",
-  k               = 6,
-  directed        = FALSE,
-  distance_weight = "gaussian"
-)
-
-ct_spatial <- summarize_celltype_communication(
-  reo_pbmc,
-  cell_labels      = celltype_labels,
-  knn_mat          = sp_graph,
-  lr_db            = lr_pairs_human,
-  edge_weight_mode = "weighted",
-  lcs_threshold    = 0.01,
-  min_edges        = 20
-)
-
-# Wrapper version:
-ct_spatial <- summarize_spatial_communication(
-  reo_mat       = reo_pbmc,
-  coords        = coords,
-  cell_labels   = celltype_labels,
-  lr_db         = lr_pairs_human,
-  spatial_mode  = "knn",
-  k             = 6,
-  distance_weight = "gaussian"
-)
+sp_graph <- build_spatial_graph(coords, mode = "knn", k = 6, distance_weight = "gaussian")
 
 plot_spatial_logic(
   reo_pbmc,
@@ -1152,11 +1090,6 @@ plot_spatial_logic(
   cell_labels = celltype_labels
 )
 ```
-
-**Interpretation difference.** With a spatial graph, a sender -> receiver LCS is
-supported by local physical proximity. With a Seurat graph, it is supported by
-transcriptional-neighborhood proximity. Both are useful, but they answer slightly
-different biological questions.
 
 ### 9.8 Pseudotime and time-course communication dynamics
 
@@ -1174,15 +1107,12 @@ dyn <- summarize_communication_dynamics(
   reo_mat      = reo_pbmc,
   pseudotime   = pseudotime_vector,
   cell_labels  = celltype_labels,
-  knn_mat      = pbmc@graphs$RNA_snn,
   lr_db        = lr_pairs_human,
   n_bins       = 6,
   bin_method   = "quantile",
   min_cells_per_bin = 50,
   lcs_threshold = 0.01,
-  min_edges     = 20,
-  graph_symmetrize = "max",
-  edge_weight_mode = "weighted"
+  min_edges     = 20
 )
 
 plot_communication_dynamics(dyn, level = "pair", metric = "sum_lcs", top_n = 8)
@@ -1403,11 +1333,7 @@ ct_lcs_list <- lapply(names(pbmc_list), function(sname) {
 
   ct_i <- summarize_celltype_communication(
     reo_i,
-    seurat_obj       = pbmc_list[[sname]],
     cell_labels      = labels_i,
-    graph_name       = "RNA_snn",
-    graph_symmetrize = "max",
-    edge_weight_mode = "weighted",
     lr_db            = lr_pairs_human,
     lcs_threshold    = 0.01,
     min_edges        = 20,
@@ -1671,10 +1597,10 @@ For standard RNA workflows, you will usually see `RNA_nn` and `RNA_snn`. For
 LogicComm KNN mode, `RNA_nn` is recommended because it represents the direct
 nearest-neighbor adjacency.
 
-### 13.3 Recommended explicit multi-sample workflow with Seurat KNN
+### 13.3 Recommended explicit multi-sample workflow
 
-`run_multisample()` can process a list of Seurat objects and now exposes
-`graph_name`, `layer`, and `remove_self_edges`. The explicit workflow below is
+`run_multisample()` processes a list of Seurat objects and computes each sample's
+LCS from REO co-expression (no per-cell graph). The explicit workflow below is
 still shown because it is transparent and makes it easy to save each sample's REO
 matrix, LCS vector, and optional cell-type communication summary:
 
@@ -1699,8 +1625,6 @@ lcs_list <- lapply(names(pbmc_list), function(sname) {
   message("[", sname, "] LCS")
   IdentifyLogicConsensus(
     reo_list[[sname]],
-    seurat_obj    = pbmc_list[[sname]],
-    graph_name    = "RNA_nn",
     lr_db         = lr_pairs_human,
     lcs_threshold = 0.01,
     verbose       = FALSE
@@ -1765,8 +1689,8 @@ export_results(comparison, file = "PBMC_multi_sample_LogicComm_comparison.csv")
 
 ### 13.4 One-line helper workflow
 
-If you are fine with LogicComm auto-selecting the Seurat graph, you can also use
-`run_multisample()` directly:
+`run_multisample()` runs per-sample REO + co-expression LCS + group comparison
+in one call:
 
 ```{r multisample_run_helper, eval=FALSE}
 result <- run_multisample(
@@ -1777,7 +1701,6 @@ result <- run_multisample(
   lcs_threshold  = 0.01,
   case_label     = "Case",
   ctrl_label     = "Ctrl",
-  graph_name     = "RNA_nn",
   layer          = "counts",
   chunk_size     = 2000,
   mc_cores       = 1,
@@ -1814,25 +1737,8 @@ result <- run_multisample(
 )
 ```
 
-When no KNN graph is provided, LogicComm uses global co-expression mode. If you
-have sample-specific KNN matrices, pass them as `knn_list`:
-
-```{r multisample_matrix_knn, eval=FALSE}
-knn_list <- list(
-  pbmcsample001 = knn001,
-  pbmcsample002 = knn002,
-  pbmcsample003 = knn003,
-  pbmcsample004 = knn004
-)
-
-result <- run_multisample(
-  expr_list,
-  group_info = group_info[names(expr_list)],
-  lr_db      = lr_pairs_human,
-  knn_list   = knn_list,
-  mc_cores   = 1
-)
-```
+Each sample's LCS is computed from REO co-expression; any legacy `knn_list` /
+graph arguments are deprecated and ignored.
 
 ### 13.6 Practical recommendations for multiple PBMC samples
 
@@ -1842,7 +1748,6 @@ result <- run_multisample(
 - Use one object per biological sample.
 - Keep sample names unique and stable: `pbmcsample001`, `pbmcsample002`, etc.
 - Keep `group_info` named and aligned to `pbmc_list`.
-- Prefer `graph_name = "RNA_nn"` for Seurat KNN LCS.
 - Use the same `rank_threshold`, LR database, assay, and layer for all samples.
 - Do not compare only cell-pooled results; use sample-level replicates.
 - For Windows, use `mc_cores = 1`.
@@ -1881,12 +1786,7 @@ reo_pbmc <- calc_REO_matrix(
   layer          = "counts"
 )
 
-lcs_pbmc <- IdentifyLogicConsensus(
-  reo_pbmc,
-  seurat_obj = pbmc,
-  graph_name = "RNA_nn",
-  lr_db      = lr_pairs_human
-)
+lcs_pbmc <- IdentifyLogicConsensus(reo_pbmc, lr_db = lr_pairs_human)
 
 head(sort(lcs_pbmc[!is.na(lcs_pbmc)], decreasing = TRUE), 20)
 
@@ -1914,26 +1814,12 @@ FeaturePlot(pbmc, features = "LogicComm_score", reduction = "umap")
 
 Use the manual 10X download route in Step 12.
 
-### `KNN graph not found, falling back to global mode`
+### Warning: a `knn_mat` / `mode` / `graph_*` argument is deprecated and ignored
 
-Run Seurat `FindNeighbors()` before `IdentifyLogicConsensus()`:
-
-```{r troubleshoot_knn, eval=FALSE}
-pbmc <- FindNeighbors(pbmc, dims = 1:20)
-names(pbmc@graphs)
-```
-
-Then retry with either `graph_name = NULL` or a specific graph name. For standard
-Seurat RNA workflows, LogicComm analyses should usually use `graph_name = "RNA_nn"`:
-
-```{r troubleshoot_knn_named, eval=FALSE}
-lcs_pbmc <- IdentifyLogicConsensus(
-  reo_pbmc,
-  seurat_obj = pbmc,
-  graph_name = "RNA_nn",
-  lr_db      = lr_pairs_human
-)
-```
+v0.12 scores at the cell-type level from co-expression and no longer uses a
+per-cell KNN/SNN graph. Drop these arguments — they are accepted only for
+backward compatibility and have no effect. (Cell-type labels still come from your
+usual Seurat clustering; LogicComm just doesn't consume the graph.)
 
 ### Cell names do not match between REO and KNN
 
