@@ -122,11 +122,21 @@ permute_celltype_communication <- function(ct_comm = NULL,
                                            ...) {
   if (!is.null(seed)) set.seed(seed)
   dots <- list(...)
-  if (is.list(reo_mat) && !is.null(reo_mat$logic)) reo_mat <- reo_mat$logic
+  rank_mat <- NULL
+  if (is.list(reo_mat) && !is.null(reo_mat$logic)) {
+    rank_mat <- reo_mat$rank
+    reo_mat <- reo_mat$logic
+  }
+  # Re-wrap logic + rank as an REO result for summarize() so a rank-weighted
+  # observed score is tested against a rank-weighted null (cells are fixed; only
+  # labels are shuffled, so the rank matrix is subset once alongside reo_mat).
+  reo_input <- function(logic, rk) {
+    if (is.null(rk)) logic else structure(list(logic = logic, rank = rk), class = "LogicCommREOResult")
+  }
   if (is.null(ct_comm)) {
     ct_comm <- do.call(
       summarize_celltype_communication,
-      c(list(reo_mat = reo_mat, cell_labels = cell_labels,
+      c(list(reo_mat = reo_input(reo_mat, rank_mat), cell_labels = cell_labels,
              lr_db = lr_db, verbose = FALSE), dots)
     )
   }
@@ -134,7 +144,7 @@ permute_celltype_communication <- function(ct_comm = NULL,
   inherited_params <- intersect(
     names(ct_comm$params),
     c("include_self", "lcs_threshold", "min_edges", "min_active_edges",
-      "min_expr_frac")
+      "min_expr_frac", "lcs_weighting")
   )
   for (param in inherited_params) {
     if (is.null(dots[[param]])) {
@@ -168,6 +178,7 @@ permute_celltype_communication <- function(ct_comm = NULL,
       )
     }
     reo_mat <- reo_mat[, shared_cells, drop = FALSE]
+    if (!is.null(rank_mat)) rank_mat <- rank_mat[, shared_cells, drop = FALSE]
     cell_labels <- cell_labels[shared_cells]
   } else {
     cell_labels <- cell_labels[colnames(reo_mat)]
@@ -190,6 +201,7 @@ permute_celltype_communication <- function(ct_comm = NULL,
     cell_labels <- cell_labels[!invalid_labels]
     reo_mat <- reo_mat[, names(cell_labels), drop = FALSE]
   }
+  if (!is.null(rank_mat)) rank_mat <- rank_mat[, colnames(reo_mat), drop = FALSE]
   if (is.null(lr_db)) lr_db <- ct_comm$lr_db
 
   # Axis-level null (default): test each sender -> receiver -> L-R axis on its own
@@ -217,7 +229,7 @@ permute_celltype_communication <- function(ct_comm = NULL,
     names(perm_labels) <- names(cell_labels)
     perm <- do.call(
       summarize_celltype_communication,
-      c(list(reo_mat = reo_mat, cell_labels = perm_labels,
+      c(list(reo_mat = reo_input(reo_mat, rank_mat), cell_labels = perm_labels,
              lr_db = lr_db, verbose = FALSE), dots)
     )
     if (axis_level) {

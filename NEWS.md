@@ -73,6 +73,24 @@ cores retained**:
   the ranking). A copy-paste template lives in
   `inst/workflows/standard_discovery.R`.
 
+### Stage 4: REO rank-weighted LCS (opt-in)
+
+* `summarize_celltype_communication(lcs_weighting = "rank")` scores by REO
+  intensity instead of the binary co-expression fraction: the mean within-cell
+  rank percentile of the ligand among expressing sender cells times the same for
+  the receptor among receiving cells. This restores dynamic range that binarizing
+  discards (a ligand at the 99th within-cell percentile separates from one at the
+  51st), addressing the compressed, near-floor LCS values seen on real data.
+  Requires the rank matrix from `calc_REO_matrix(..., return_rank = TRUE)`. The
+  default remains `"binary"`, so existing results are unchanged.
+* The `active` call still uses the binary co-expression fraction, so the active
+  axis set is identical under either weighting -- only the reported `lcs` differs.
+* `permute_celltype_communication()` inherits `lcs_weighting` from the scored
+  object and carries the rank matrix through, so a rank-weighted observed score is
+  tested against a rank-weighted null (coherent significance). It also flows
+  through `discover_celltype_communication(..., lcs_weighting = "rank")` when the
+  input is built with `return_rank = TRUE`.
+
 ### Stage 6 (started): benchmark harness vs. baselines
 
 * New `inst/benchmark/benchmark_vs_baselines.R`: a sandbox-runnable harness that

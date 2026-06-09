@@ -42,6 +42,13 @@
 #' @param min_role_event_count Minimum event count.
 #' @param include_self Include same-cell-type sender/receiver pairs, interpreted
 #'   as autocrine-like or homotypic signaling potential.
+#' @param lcs_weighting Communication score. \code{"binary"} (default) is the
+#'   co-expression fraction product (binary REO). \code{"rank"} weights by REO
+#'   intensity -- the mean within-cell rank percentile of the ligand among
+#'   expressing sender cells times the same for the receptor -- to restore dynamic
+#'   range. \code{"rank"} requires the input to carry the rank matrix, i.e. build
+#'   it with \code{calc_REO_matrix(..., return_rank = TRUE)}. The \code{active}
+#'   call is unchanged (binary), so only the reported \code{lcs} differs.
 #' @param verbose Print progress.
 #' @param ... Deprecated neighborhood arguments, accepted for backward
 #'   compatibility and ignored with a warning.
@@ -60,10 +67,20 @@ summarize_celltype_communication <- function(reo_mat,
                                              min_role_hub_quantile = 0.2,
                                              min_role_event_count = 5,
                                              include_self = TRUE,
+                                             lcs_weighting = c("binary", "rank"),
                                              verbose = TRUE,
                                              ...) {
-  if (is.list(reo_mat) && !is.null(reo_mat$logic)) reo_mat <- reo_mat$logic
+  lcs_weighting <- match.arg(lcs_weighting)
+  rank_mat <- NULL
+  if (is.list(reo_mat) && !is.null(reo_mat$logic)) {
+    rank_mat <- reo_mat$rank
+    reo_mat <- reo_mat$logic
+  }
   .deprecate_neighborhood_args(list(...))
+  if (lcs_weighting == "rank" && is.null(rank_mat)) {
+    stop("lcs_weighting = 'rank' needs the within-cell REO rank matrix; build the ",
+         "input with calc_REO_matrix(..., return_rank = TRUE).", call. = FALSE)
+  }
   stopifnot(is.numeric(min_expr_frac), length(min_expr_frac) == 1,
             min_expr_frac >= 0, min_expr_frac <= 1)
   .validate_lr_db_for_celltype(lr_db)
@@ -89,6 +106,7 @@ summarize_celltype_communication <- function(reo_mat,
     labels <- labels[!invalid_labels]
     reo_mat <- reo_mat[, names(labels), drop = FALSE]
   }
+  if (!is.null(rank_mat)) rank_mat <- rank_mat[, colnames(reo_mat), drop = FALSE]
   cell_types <- sort(unique(labels))
   n_by_type <- table(factor(labels, levels = cell_types))
   celltype_sizes <- data.frame(cell_type = names(n_by_type), n_cells = as.integer(n_by_type), stringsAsFactors = FALSE)
@@ -117,6 +135,15 @@ summarize_celltype_communication <- function(reo_mat,
   complex_logic_map <- lapply(unique_complexes, function(gs) .resolve_complex_logic(gs, reo_mat))
   names(complex_logic_map) <- complex_keys
   complex_type_sums <- lapply(complex_logic_map, .sum_logic_by_type, labels = labels, cell_types = cell_types)
+  complex_type_meanrank <- NULL
+  if (lcs_weighting == "rank") {
+    complex_rank_map <- lapply(unique_complexes, function(gs) .resolve_complex_rank(gs, rank_mat))
+    names(complex_rank_map) <- complex_keys
+    complex_type_meanrank <- stats::setNames(
+      Map(function(lg, rk) .mean_rank_by_type(rk, lg, labels, cell_types),
+          complex_logic_map, complex_rank_map),
+      complex_keys)
+  }
 
   if (verbose) message(sprintf("[CellTypeComm] Scoring %d L-R pairs for %d CT pairs...", nrow(lr_db), n_groups))
 
@@ -137,11 +164,26 @@ summarize_celltype_communication <- function(reo_mat,
     n_active_global <- ligand_active_n_sender * receptor_active_n_receiver
     lcs_global <- n_active_global / pmax(n_global_possible_by_group, 1)
 
+    # Communication score. "binary" (default) is the co-expression fraction
+    # product. "rank" weights by REO intensity: the mean within-cell rank
+    # percentile of the ligand among expressing sender cells, times the same for
+    # the receptor among receiving cells -- this restores dynamic range so a
+    # ligand at the 99th within-cell percentile separates from one at the 51st.
+    if (lcs_weighting == "rank") {
+      lig_str <- as.numeric(complex_type_meanrank[[lig_key]][group_defs$sender_type])
+      rec_str <- as.numeric(complex_type_meanrank[[rec_key]][group_defs$receiver_type])
+      lcs_value <- lig_str * rec_str
+    } else {
+      lcs_value <- lcs_global
+    }
+
     # Cell-type expressing-fraction gate: the ligand must be active in at least
     # min_expr_frac of sender cells and the receptor in at least min_expr_frac of
     # receiver cells. This prevents a few high-expressing cells from calling an
     # axis "active" when the gene is detected in a negligible fraction of the
-    # cell type (e.g. ambient CD8A in a few Treg cells).
+    # cell type (e.g. ambient CD8A in a few Treg cells). The active call uses the
+    # binary co-expression fraction, so the active set is identical under either
+    # weighting; only the reported lcs score differs.
     expr_ok <- ligand_active_frac_sender >= min_expr_frac &
                receptor_active_frac_receiver >= min_expr_frac
 
@@ -152,7 +194,7 @@ summarize_celltype_communication <- function(reo_mat,
     # the cell-type level only; the former neighborhood / local / distal / range
     # fields are retained as inert stubs so existing readers keep working, and
     # are removed in a later cleanup step.
-    lcs_final <- lcs_global
+    lcs_final <- lcs_value
     lcs_unweighted <- lcs_global
     lcs_neighborhood <- rep(NA_real_, n_groups)
     n_active_neighborhood <- rep(0L, n_groups)
@@ -232,6 +274,7 @@ summarize_celltype_communication <- function(reo_mat,
     lr_db = lr_db,
     params = list(
       mode = "celltype",
+      lcs_weighting = lcs_weighting,
       include_self = include_self,
       lcs_threshold = lcs_threshold,
       min_edges = min_edges,
@@ -332,6 +375,36 @@ celltype_comm_to_lcs <- function(ct_comm,
   out <- as.numeric(vals)
   names(out) <- cell_types
   out[is.na(out)] <- 0
+  out
+}
+
+# Per-cell rank of a (possibly multi-subunit) complex: the minimum within-cell
+# rank percentile across subunits (a complex is as strong as its weakest
+# subunit, matching the AND logic of .resolve_complex_logic). Returns 0 for every
+# cell when any required subunit is absent from the rank matrix.
+.resolve_complex_rank <- function(genes, rank_mat) {
+  genes <- unique(as.character(genes))
+  genes <- genes[nzchar(genes) & !is.na(genes)]
+  if (!length(genes)) return(rep(0, ncol(rank_mat)))
+  available <- intersect(genes, rownames(rank_mat))
+  if (length(available) < length(genes)) return(rep(0, ncol(rank_mat)))
+  sub <- rank_mat[available, , drop = FALSE]
+  r <- if (nrow(sub) == 1) as.numeric(sub) else apply(sub, 2, min)
+  r[!is.finite(r)] <- 0
+  r
+}
+
+# Mean complex rank per cell type, averaged over the cells where the complex is
+# active (binary REO TRUE). This is the REO intensity of the complex among the
+# cells that express it; 0 for cell types with no expressing cells.
+.mean_rank_by_type <- function(rank_vec, logic_vec, labels, cell_types) {
+  active <- as.logical(logic_vec)
+  fl <- factor(labels, levels = cell_types)
+  num <- tapply(ifelse(active, as.numeric(rank_vec), 0), fl, sum, na.rm = TRUE)
+  den <- tapply(as.numeric(active), fl, sum, na.rm = TRUE)
+  out <- as.numeric(num) / pmax(as.numeric(den), 1)
+  out[!is.finite(out)] <- 0
+  names(out) <- cell_types
   out
 }
 
