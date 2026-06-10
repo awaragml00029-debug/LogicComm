@@ -13,18 +13,18 @@ LogicComm converts single-cell expression matrices into **Relative Expression Or
 3. **Rank-aware REO evidence**: rank dominance, margin, threshold stability, and cell-type-pair specificity complement binary active calls.
 4. **Multi-sample comparison**: active L-R pairs are compared across N Case vs N Control samples using frequency voting, continuous rank evidence, and statistical tests.
 5. **Per-cell activity scoring**: cells can be ranked by sender, receiver, or combined communication potential.
-5. **Cell-type-resolved interpretation**: summarize celltypeA -> celltypeB communication counts, logic strength, pathway drivers, and signaling roles.
-7. **Publication-level diagnostics**: spatial neighborhoods, pseudotime dynamics, sample-level GLMs, QC plots, and markdown report helpers.
+6. **Cell-type-resolved interpretation**: summarize celltypeA -> celltypeB communication counts, logic strength, pathway drivers, and signaling roles.
+7. **Publication-level diagnostics**: specificity and proliferation/transcriptional-breadth confound scoring, pseudotime dynamics, sample-level GLMs, QC plots, and markdown report helpers.
 
 | Feature | LogicComm behavior |
 |---|---|
 | Input orientation | genes x cells |
 | Input types | base matrix, sparse `Matrix`, Seurat object, optional BPCells IterableMatrix |
-| Cell-type annotation | not required for global LCS; optional for cell-type-resolved summaries |
-| KNN/SNN graph | optional but recommended; binary or weighted graph scoring supported |
+| Cell-type annotation | not required for global LCS; required for cell-type-resolved summaries |
+| Neighborhood graph | not used; communication is scored from cell-type REO co-expression, not a per-cell KNN/SNN graph |
 | Multimer complexes | all listed subunits must be present and active |
 | Large sparse matrices | all genes used for anchors by default; retained genes processed in chunks |
-| Interpretability | cell-type roles, receiver response, bootstrap/null diagnostics, spatial/pseudotime modules, sample-level GLMs, and report helpers |
+| Interpretability | cell-type roles, receiver response, bootstrap/null diagnostics, specificity/proliferation diagnostics, pseudotime modules, sample-level GLMs, and report helpers |
 
 ---
 
@@ -45,7 +45,7 @@ install.packages(c(
 # Required only for heatmap plotting
 install.packages("pheatmap")
 
-# Required only for Seurat object input / Seurat KNN extraction
+# Required only for Seurat object input
 install.packages(c("Seurat", "SeuratObject"))
 
 # Optional for graph centrality acceleration and publication diagnostics
@@ -111,7 +111,7 @@ reo <- calc_REO_matrix(
   verbose         = TRUE
 )
 
-# Global mode: no KNN graph required.
+# Global co-expression LCS (fraction of cells co-expressing ligand and receptor).
 lcs_global <- IdentifyLogicConsensus(reo, verbose = FALSE)
 
 # View top pairs.
