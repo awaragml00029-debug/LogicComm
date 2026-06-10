@@ -1062,16 +1062,19 @@ With genuine spatial coordinates (Visium, MERFISH, Xenium, CosMx) a *physical*
 neighborhood graph is a legitimate, non-expression-space basis for local
 juxtacrine/paracrine scoring — unlike a transcriptional KNN graph.
 
-> **Status (v0.12).** Graph-based spatial **scoring**
-> (`summarize_spatial_communication()`) is pending re-implementation in the
-> cell-type-co-expression rewrite: it currently warns and returns cell-type
-> co-expression (the graph is not used). Graph construction
-> (`build_spatial_graph()`) and per-spot REO visualization (`plot_spatial_logic()`)
-> still work.
+> **Status.** LogicComm does not ship a spatial communication **scorer**. The
+> former `summarize_spatial_communication()` was a placeholder that ignored the
+> spatial graph and returned ordinary cell-type co-expression, so it was removed
+> to avoid implying spatially resolved results. The spatial **utilities** remain:
+> graph construction (`build_spatial_graph()`) and per-spot REO visualization
+> (`plot_spatial_logic()`). For communication scores use
+> `summarize_celltype_communication()` / `discover_celltype_communication()`.
 
-**中文说明。** 用真实空间坐标时，物理邻居图是合理的（不同于表达空间的 KNN）。但 v0.12
-的空间**打分**正在按细胞类型重写中暂不可用，目前会警告并返回细胞类型共表达；
-`build_spatial_graph()` 和 `plot_spatial_logic()` 仍可用。
+**中文说明。** 用真实空间坐标时，物理邻居图是合理的（不同于表达空间的 KNN）。本包**不**
+提供空间打分器：原来的 `summarize_spatial_communication()` 只是忽略空间图、返回普通细胞
+类型共表达的占位实现，已删除以免误导。空间**工具**仍保留：`build_spatial_graph()` 建图、
+`plot_spatial_logic()` 可视化；通讯打分请用 `summarize_celltype_communication()` /
+`discover_celltype_communication()`。
 
 ```{r spatial_extension, eval=FALSE}
 # coords: rownames matching cells/spots; x/y, imagecol/imagerow, or

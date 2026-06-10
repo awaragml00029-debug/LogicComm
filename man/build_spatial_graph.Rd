@@ -41,7 +41,11 @@ distance is used.}
 Sparse adjacency matrix with cells/spots as rows and columns.
 }
 \description{
-Builds a sparse cell/spot adjacency graph from spatial coordinates. The graph
-can be passed directly to IdentifyLogicConsensus() or
-summarize_celltype_communication().
+Builds a sparse, distance-weighted cell/spot adjacency graph from spatial
+coordinates (k-nearest-neighbors or fixed-radius). This is a standalone
+spatial utility: the returned graph can be used for your own spatial analyses
+or visualization alongside \code{\link{plot_spatial_logic}}. Note that
+LogicComm's communication scorers do not consume a per-cell graph -- they
+score cell-type REO co-expression -- so turning this graph into spatially
+resolved communication scores would require a dedicated spatial edge scorer.
 }

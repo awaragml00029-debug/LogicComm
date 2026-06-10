@@ -392,10 +392,11 @@ dyn <- summarize_communication_dynamics(
 plot_communication_dynamics(dyn, level = "pair", metric = "sum_lcs")
 ```
 
-> **Spatial.** Graph-based spatial scoring (`summarize_spatial_communication()`)
-> is pending re-implementation in the v0.12 cell-type rewrite; it currently warns
-> and returns cell-type co-expression. `build_spatial_graph()` and
-> `plot_spatial_logic()` still work.
+> **Spatial.** LogicComm does not ship a spatial communication scorer; the
+> former `summarize_spatial_communication()` placeholder (which ignored the
+> spatial graph and returned cell-type co-expression) has been removed. The
+> spatial utilities `build_spatial_graph()` and `plot_spatial_logic()` remain for
+> graph construction and per-spot visualization.
 
 
 ## Step 11: Filter and Export

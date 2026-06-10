@@ -51,9 +51,13 @@ extract_spatial_coordinates <- function(object,
 
 #' Build a Spatial Neighborhood Graph
 #'
-#' Builds a sparse cell/spot adjacency graph from spatial coordinates. The graph
-#' can be passed directly to IdentifyLogicConsensus() or
-#' summarize_celltype_communication().
+#' Builds a sparse, distance-weighted cell/spot adjacency graph from spatial
+#' coordinates (k-nearest-neighbors or fixed-radius). This is a standalone
+#' spatial utility: the returned graph can be used for your own spatial analyses
+#' or visualization alongside \code{\link{plot_spatial_logic}}. Note that
+#' LogicComm's communication scorers do not consume a per-cell graph -- they
+#' score cell-type REO co-expression -- so turning this graph into spatially
+#' resolved communication scores would require a dedicated spatial edge scorer.
 #'
 #' @param coords Coordinate matrix/data frame or Seurat object.
 #' @param coord_cols Optional coordinate columns.
@@ -139,73 +143,6 @@ build_spatial_graph <- function(coords,
   attr(out, "distance_weight") <- distance_weight
   attr(out, "directed") <- isTRUE(directed)
   out
-}
-
-#' Summarize Spatial Logic Communication
-#'
-#' Convenience wrapper that builds a spatial graph and then calls
-#' summarize_celltype_communication().
-#'
-#' @param reo_mat Binary REO matrix or LogicCommREOResult.
-#' @param coords Spatial coordinates or Seurat object.
-#' @param cell_labels Named cell-type labels.
-#' @param lr_db LR database.
-#' @param coord_cols Optional coordinate columns.
-#' @param spatial_mode \code{"knn"} or \code{"radius"} spatial graph construction.
-#' @param k Number of neighbors in kNN mode.
-#' @param radius Radius threshold in radius mode.
-#' @param directed Whether to keep directed spatial edges.
-#' @param distance_weight \code{"binary"}, \code{"inverse"}, or \code{"gaussian"}.
-#' @param sigma Gaussian distance kernel bandwidth.
-#' @param graph_symmetrize How to symmetrize the spatial graph before scoring.
-#' @param edge_weight_mode Optional edge weighting mode passed to communication scoring.
-#' @param verbose Print progress messages.
-#' @param ... Additional arguments passed to summarize_celltype_communication().
-#' @return LogicCommCellTypeComm object with spatial_graph and spatial_coords.
-#' @export
-summarize_spatial_communication <- function(reo_mat,
-                                            coords,
-                                            cell_labels,
-                                            lr_db = lr_pairs_human,
-                                            coord_cols = NULL,
-                                            spatial_mode = c("knn", "radius"),
-                                            k = 6,
-                                            radius = NULL,
-                                            directed = FALSE,
-                                            distance_weight = c("binary", "inverse", "gaussian"),
-                                            sigma = NULL,
-                                            graph_symmetrize = c("none", "or", "max"),
-                                            edge_weight_mode = NULL,
-                                            verbose = TRUE,
-                                            ...) {
-  if (is.list(reo_mat) && !is.null(reo_mat$logic)) reo_logic <- reo_mat$logic else reo_logic <- reo_mat
-  xy <- extract_spatial_coordinates(coords, coord_cols = coord_cols)
-  if (is.null(rownames(xy))) stop("Spatial coordinates must have cell/spot rownames.")
-  if (is.null(colnames(reo_logic))) stop("reo_mat must have cell colnames.")
-  if (identical(rownames(xy), as.character(seq_len(nrow(xy)))) && nrow(xy) == ncol(reo_logic)) {
-    rownames(xy) <- colnames(reo_logic)
-  }
-  missing <- setdiff(colnames(reo_logic), rownames(xy))
-  if (length(missing) > 0) stop("Spatial coordinates are missing ", length(missing), " REO cells/spots. Example: ", missing[1])
-  xy <- xy[colnames(reo_logic), , drop = FALSE]
-  distance_weight <- match.arg(distance_weight)
-  spatial_mode <- match.arg(spatial_mode)
-  graph_symmetrize <- match.arg(graph_symmetrize)
-  if (is.null(edge_weight_mode)) edge_weight_mode <- if (distance_weight == "binary") "binary" else "weighted"
-  warning("summarize_spatial_communication(): graph-based spatial scoring was ",
-          "removed in the v0.12 cell-type rewrite (summarize_celltype_communication() ",
-          "no longer scores over a per-cell graph) and is pending re-implementation ",
-          "as a dedicated spatial edge scorer. This call now returns CELL-TYPE ",
-          "CO-EXPRESSION; the spatial graph is NOT used and results are not spatially ",
-          "resolved. Use summarize_celltype_communication() directly meanwhile.",
-          call. = FALSE)
-  ct <- summarize_celltype_communication(
-    reo_mat = reo_logic, cell_labels = cell_labels, lr_db = lr_db, verbose = verbose, ...
-  )
-  ct$spatial_coords <- xy
-  ct$params$spatial_mode <- spatial_mode
-  ct$params$spatial_distance_weight <- distance_weight
-  ct
 }
 
 #' Plot Spatial Logic States for One L-R Pair

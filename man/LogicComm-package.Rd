@@ -17,8 +17,8 @@ Main workflow:
   \item \code{\link{calc_REO_matrix}}: convert expression to a binary logic matrix.
   \item \code{\link{IdentifyLogicConsensus}}: compute per-sample LCS values.
   \item \code{\link{CompareLogicGroups}}: compare LCS between sample groups.
-  \item \code{\link{summarize_celltype_communication}}: summarize cell-type resolved communication, weighted graph scoring, receiver-response evidence, uncertainty diagnostics, and signaling roles.
-  \item \code{\link{summarize_spatial_communication}} and \code{\link{summarize_communication_dynamics}}: analyze spatial or pseudotime/time-bin communication.
+  \item \code{\link{summarize_celltype_communication}}: summarize cell-type resolved communication, receiver-response evidence, uncertainty diagnostics, and signaling roles.
+  \item \code{\link{summarize_communication_dynamics}}: analyze pseudotime/time-bin communication.
   \item \code{\link{fit_celltype_comm_glm}}: fit sample-level differential communication models with covariates.
   \item \code{\link{run_multisample}}: run the full multi-sample pipeline.
 }

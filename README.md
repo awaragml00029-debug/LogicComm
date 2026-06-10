@@ -715,16 +715,17 @@ LogicComm 0.7 extends several modules intended for manuscript-grade analyses.
 They do not change the core REO/LCS definition; instead they add stronger
 biological context, statistical modeling, and figure/report scaffolding.
 
-### Spatial communication (graph scoring pending in v0.12)
+### Spatial utilities (no spatial scorer)
 
 > **Status.** With genuine spatial coordinates a physical neighborhood graph *is*
-> a legitimate, non-expression-space basis for juxtacrine/paracrine scoring. But
-> the v0.12 cell-type-co-expression rewrite removed the per-cell graph scorer that
-> `summarize_spatial_communication()` relied on, so spatial **graph scoring is
-> temporarily unavailable**: the function now warns and returns cell-type
-> co-expression (the graph is *not* used). A dedicated spatial edge scorer over
-> physical coordinates is planned. `build_spatial_graph()` and
-> `plot_spatial_logic()` (which visualizes REO states on coordinates) still work.
+> a legitimate, non-expression-space basis for juxtacrine/paracrine scoring, but
+> LogicComm does **not** ship a spatial communication scorer. The former
+> `summarize_spatial_communication()` was a placeholder that ignored the spatial
+> graph and returned ordinary cell-type co-expression, so it has been removed to
+> avoid implying spatially resolved results. The spatial **utilities** remain:
+> `build_spatial_graph()` (kNN/radius graph construction) and
+> `plot_spatial_logic()` (per-spot REO visualization). For communication scores
+> use `summarize_celltype_communication()` / `discover_celltype_communication()`.
 
 ```r
 # Graph construction and per-spot visualization still work:
@@ -943,7 +944,7 @@ saturates near 1, so prioritize by effect size and corroborate with
 | `plot_umap_logic()` | UMAP colored by a specific L-R logic state |
 | `filter_lcs()` | Filter comparison results by FDR/asymmetry/direction |
 | `build_spatial_graph()` | Construct spatial kNN/radius graphs from coordinates |
-| `summarize_spatial_communication()` | Run cell-type communication on spatial neighborhoods |
+| `plot_spatial_logic()` | Visualize per-spot L-R REO logic states on coordinates |
 | `summarize_communication_dynamics()` | Analyze communication along pseudotime or time bins |
 | `fit_celltype_comm_glm()` | Sample-level quasibinomial differential communication model |
 | `summarize_communication_findings()` | Create publication-ready top findings and QC tables |

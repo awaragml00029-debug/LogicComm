@@ -600,13 +600,15 @@ test_that("publication extensions support spatial graphs, dynamics, and reports"
   lr_db$ligand_genes <- list("L")
   lr_db$receptor_genes <- list("R")
 
+  # Spatial utilities that remain after summarize_spatial_communication() was
+  # removed: graph construction and per-spot REO visualization.
   g <- build_spatial_graph(coords, k = 1, verbose = FALSE)
   expect_true(inherits(g, "sparseMatrix"))
   expect_equal(dim(g), c(4, 4))
 
-  ct <- summarize_spatial_communication(
-    reo, coords = coords, cell_labels = labels, lr_db = lr_db,
-    k = 1, lcs_threshold = 0.1, min_edges = 1, verbose = FALSE
+  ct <- summarize_celltype_communication(
+    reo, cell_labels = labels, lr_db = lr_db,
+    lcs_threshold = 0.1, min_edges = 1, verbose = FALSE
   )
   expect_true(inherits(ct, "LogicCommCellTypeComm"))
   expect_true("celltype_sizes" %in% names(ct))

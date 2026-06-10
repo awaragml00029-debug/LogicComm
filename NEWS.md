@@ -23,6 +23,15 @@ support" labels referencing a per-cell graph that no longer exists.
   `n_global_candidate_active`, `n_juxtacrine`, `n_paracrine`, `n_distal`,
   `dominant_communication_range`, `sum_active_edge_weight`, and
   `active_edge_weight_sum`.
+* `summarize_spatial_communication()` is removed. After the v0.12 neighborhood
+  removal it was a placeholder that built coordinates, warned, and returned
+  ordinary cell-type co-expression -- it never used a spatial graph and produced
+  no spatially resolved result. The spatial utilities `build_spatial_graph()`
+  (kNN/radius graph construction) and `plot_spatial_logic()` (per-spot REO
+  visualization) remain; use `summarize_celltype_communication()` /
+  `discover_celltype_communication()` for communication scores. A genuine spatial
+  edge scorer would require physical-distance edges and a spatial permutation
+  null, and is intentionally out of scope rather than faked by a wrapper.
 * `plot_communication_range_summary()` is removed; it visualized a signaling
   "range" the method no longer resolves. `plot_celltype_network()` drops its
   `color_edges_by = "range"` mode and distal/global edge styling and now colours
