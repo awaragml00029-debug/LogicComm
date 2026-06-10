@@ -26,8 +26,12 @@ communication probability matrices, LogicComm:
    Relative Expression Ordering (REO) — no cross-sample normalization needed.
 
 2. Detects **Logic Consensus Scores (LCS)** per sample: for each L-R pair,
-   how often is the ligand logic "ON" in a sender cell AND the receptor logic
-   "ON" in a neighboring receiver cell?
+   the fraction of cells (or, in the cell-type-resolved workflow, of
+   sender x receiver cell pairs) in which the ligand logic and the receptor
+   logic are "ON" together (REO co-expression). LogicComm scores communication
+   from co-expression and does not aggregate over a per-cell neighborhood
+   graph — for dissociated scRNA-seq that graph lives in expression space, not
+   physical space, so it cannot license spatial juxtacrine/paracrine claims.
 
 3. Compares LCS across **N Case vs N Control** samples using asymmetric
    frequency voting — no cell type matching required across samples.
@@ -48,7 +52,7 @@ install.packages(c(
 
 # Optional dependencies
 install.packages("pheatmap")              # heatmap plotting
-install.packages(c("Seurat", "SeuratObject"))  # Seurat input / KNN extraction
+install.packages(c("Seurat", "SeuratObject"))  # optional Seurat object input
 
 # Install from local source tarball (adjust the version number)
 install.packages("LogicComm_0.10.4.tar.gz", repos = NULL, type = "source")

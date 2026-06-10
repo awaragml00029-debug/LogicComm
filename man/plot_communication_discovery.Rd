@@ -17,6 +17,9 @@ plot_communication_discovery(
 \item{top_n_label}{Number of top axes (by discovery score) to label.}
 
 \item{title}{Optional plot title.}
+
+\item{subtitle}{Optional plot subtitle. Defaults to a short reading guide for
+the strength-versus-specificity axes.}
 }
 \value{
 A ggplot2 object.

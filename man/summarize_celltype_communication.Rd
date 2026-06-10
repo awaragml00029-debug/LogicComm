@@ -9,21 +9,17 @@ summarize_celltype_communication(
   cell_labels = NULL,
   seurat_obj = NULL,
   label_col = NULL,
-  knn_mat = NULL,
   lr_db = lr_pairs_human,
-  graph_name = NULL,
   lcs_threshold = 0.01,
   min_edges = 20,
   min_active_edges = 1,
   min_expr_frac = 0.1,
-  mode = c("auto", "neighborhood", "global"),
-  remove_self_edges = TRUE,
-  graph_symmetrize = c("none", "or", "max"),
-  edge_weight_mode = c("binary", "weighted"),
   min_role_hub_quantile = 0.2,
   min_role_event_count = 5,
   include_self = TRUE,
-  verbose = TRUE
+  lcs_weighting = c("binary", "rank"),
+  verbose = TRUE,
+  ...
 )
 }
 \arguments{
@@ -31,37 +27,24 @@ summarize_celltype_communication(
 
 \item{cell_labels}{Named character/factor vector mapping cells to cell types.}
 
-\item{seurat_obj}{Optional Seurat object.}
+\item{seurat_obj}{Optional Seurat object (used only to resolve cell labels).}
 
 \item{label_col}{Optional Seurat metadata column for labels.}
 
-\item{knn_mat}{Optional KNN adjacency matrix.}
-
 \item{lr_db}{LogicComm LR database.}
 
-\item{graph_name}{Optional Seurat graph name.}
+\item{lcs_threshold}{Minimum cell-type LCS for an axis to be called active.}
 
-\item{lcs_threshold}{Minimum cell-type LCS.}
+\item{min_edges}{Minimum opportunity universe (sender x receiver cell-count
+product) required for an active call.}
 
-\item{min_edges}{Minimum local/global opportunities required for active calls.}
-
-\item{min_active_edges}{Minimum active local/global support required.}
+\item{min_active_edges}{Minimum co-expressing support required for an active call.}
 
 \item{min_expr_frac}{Minimum fraction of sender cells that must express the
 ligand and of receiver cells that must express the receptor for a
-sender-receiver L-R axis to be called active. Prevents a few high-degree
-(hub) cells from making an axis active when the gene is expressed in a
-negligible fraction of the cell type. Default: \code{0.1}; set \code{0} to
-disable.}
-
-\item{mode}{Scoring mode.}
-
-\item{remove_self_edges}{Remove diagonal cell-level self-loops before local
-graph scoring. This does not remove same-cell-type communication.}
-
-\item{graph_symmetrize}{Graph symmetrization.}
-
-\item{edge_weight_mode}{Edge weighting.}
+sender-receiver L-R axis to be called active. Prevents a few high-expressing
+cells from calling an axis active when the gene is detected in a negligible
+fraction of the cell type. Default: \code{0.1}; set \code{0} to disable.}
 
 \item{min_role_hub_quantile}{Hub score quantile.}
 
@@ -70,28 +53,44 @@ graph scoring. This does not remove same-cell-type communication.}
 \item{include_self}{Include same-cell-type sender/receiver pairs, interpreted
 as autocrine-like or homotypic signaling potential.}
 
+\item{lcs_weighting}{Communication score. \code{"binary"} (default) is the
+co-expression fraction product (binary REO). \code{"rank"} weights by REO
+intensity -- the prevalence-weighted within-cell rank of the ligand in the
+sender type (fraction expressing times mean rank among expressers) times the
+same for the receptor -- which keeps the prevalence signal that separates
+specific from ubiquitous axes while adding dynamic range. \code{"rank"}
+requires the input to carry the rank matrix, i.e. build it with
+\code{calc_REO_matrix(..., return_rank = TRUE)}. The \code{active} call is
+unchanged (binary), so only the reported \code{lcs} differs.}
+
 \item{verbose}{Print progress.}
+
+\item{...}{Deprecated neighborhood arguments, accepted for backward
+compatibility and ignored with a warning.}
 }
 \value{
 A list of class \code{LogicCommCellTypeComm}.
 }
 \description{
 Aggregates ligand-receptor Logic Consensus Scores (LCS) by directed
-sender-cell-type to receiver-cell-type relationships. When a graph is supplied,
-the result reports both local graph-supported evidence and global cell-type
-communication potential so distal candidates are not discarded solely because
-they are absent from a Seurat NN/SNN graph.
+sender-cell-type to receiver-cell-type relationships. Communication is scored
+at the cell-type level from REO co-expression: for each sender -> receiver
+cell-type pair, the LCS is the fraction of the pair's opportunity universe
+(the sender x receiver cell-count product) in which the ligand is active in
+the sender cell and the receptor is active in the receiver cell.
 }
 \details{
-Self-loops and same-cell-type communication are intentionally separated.
-With the default \code{remove_self_edges = TRUE}, diagonal graph entries
-such as cell A -> cell A are removed before neighborhood scoring, which avoids
-treating within-cell ligand/receptor co-expression as direct intercellular
-communication evidence. With the default \code{include_self = TRUE}, sender
-and receiver cell types are still allowed to be identical, so rows such as
-Tumor -> Tumor or Macrophage -> Macrophage are retained and should be
-interpreted as autocrine-like, homotypic, or within-cell-type signaling
-potential. Global candidate scores provide complementary cell-type-level
-potential, including signals that may be distal or not represented in the
-local KNN/SNN graph.
+LogicComm scores communication at the cell-type level and does not aggregate
+over a per-cell KNN/SNN neighborhood graph. For dissociated scRNA-seq that
+graph lives in expression space rather than physical space, so it cannot
+license spatial juxtacrine/paracrine distance claims; cell-type co-expression
+is the honest, comparable unit. With the default \code{include_self = TRUE},
+sender and receiver cell types are allowed to be identical, so rows such as
+Tumor -> Tumor or Macrophage -> Macrophage are retained and interpreted as
+autocrine-like or homotypic signaling potential.
+
+Legacy neighborhood arguments (\code{knn_mat}, \code{graph_name},
+\code{mode}, \code{remove_self_edges}, \code{graph_symmetrize},
+\code{edge_weight_mode}) are accepted via \code{...} for backward
+compatibility but are deprecated and ignored with a warning.
 }

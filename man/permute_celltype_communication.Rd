@@ -12,7 +12,7 @@ permute_celltype_communication(
   lr_db = NULL,
   n_perm = 100,
   n_cores = 1L,
-  metric = "sum_lcs",
+  metric = "lcs",
   seed = NULL,
   adaptive = FALSE,
   adaptive_top_n = 25,
@@ -43,7 +43,11 @@ when necessary.}
 (Unix/macOS). Default 1 (serial). Higher values give a near-linear speedup,
 making a publication-grade \code{n_perm} affordable; ignored on Windows.}
 
-\item{metric}{Pair-level metric to test.}
+\item{metric}{Metric to test. The default \code{"lcs"} (a column of
+\code{lr_table}) builds an \strong{axis-level} null: every sender ->
+receiver -> L-R axis gets its own empirical p-value. A metric found in
+\code{pair_summary} (e.g. \code{"sum_lcs"}) builds a legacy cell-type-pair
+null instead.}
 
 \item{seed}{Optional random seed.}
 
@@ -63,7 +67,9 @@ additional full permutations for the top candidates.}
 \item{...}{Passed to \code{summarize_celltype_communication()}.}
 }
 \value{
-Pair-level null summary with empirical p-values.
+Axis-level (default) or pair-level null summary with per-test
+  empirical p-values and BH-adjusted FDR. Axis-level rows carry an
+  \code{lr_pair} column so each L-R axis can be joined to its own p-value.
 }
 \description{
 Cell-Label Permutation Null for Cell-Type Communication

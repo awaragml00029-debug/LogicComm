@@ -381,21 +381,13 @@ celltype_comm_to_lcs <- function(ct_comm,
   out
 }
 
-# Per-cell rank of a (possibly multi-subunit) complex: the minimum within-cell
-# rank percentile across subunits (a complex is as strong as its weakest
-# subunit, matching the AND logic of .resolve_complex_logic). Returns 0 for every
-# cell when any required subunit is absent from the rank matrix.
-.resolve_complex_rank <- function(genes, rank_mat) {
-  genes <- unique(as.character(genes))
-  genes <- genes[nzchar(genes) & !is.na(genes)]
-  if (!length(genes)) return(rep(0, ncol(rank_mat)))
-  available <- intersect(genes, rownames(rank_mat))
-  if (length(available) < length(genes)) return(rep(0, ncol(rank_mat)))
-  sub <- rank_mat[available, , drop = FALSE]
-  r <- if (nrow(sub) == 1) as.numeric(sub) else apply(sub, 2, min)
-  r[!is.finite(r)] <- 0
-  r
-}
+# Per-cell rank of a (possibly multi-subunit) complex is resolved by the single
+# canonical .resolve_complex_rank() defined in R/modulators.R (conservative "min"
+# aggregation across subunits by default, matching the AND logic of
+# .resolve_complex_logic). It returns NA for cells where a required subunit is
+# absent; .mean_rank_by_type() below only reads ranks at cells where the complex
+# logic is active (all subunits present, hence finite), so the result is
+# unaffected.
 
 # Prevalence-weighted complex rank per cell type: the summed complex rank over
 # the cells where the complex is active, divided by ALL cells of the type. This
