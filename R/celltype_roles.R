@@ -77,14 +77,28 @@
 
   evidence_score <- total_event_count / max(total_event_count, 1L)
   role_scores <- cbind(Sender = out_strength, Receiver = in_strength, Mediator = betweenness, Influencer = information)
-  dominant_idx <- max.col(role_scores, ties.method = "first")
+  # Determine the dominant role from role scores rescaled to a common [0, 1] scale
+  # ACROSS cell types, not from the raw scores. The raw scores live on
+  # incomparable scales -- Sender/Receiver are summed LCS (effectively unbounded),
+  # mediator betweenness is normalized to [0, 1], and the PageRank influencer score
+  # sums to 1 over cell types (~1/n each). A raw max.col would therefore route
+  # almost every cell type to Sender or Receiver and leave Mediator/Influencer
+  # mathematically unreachable as a dominant role. Per-column rescaling (matching
+  # plot_celltype_role_radar) makes "dominant role" mean the role in which a cell
+  # type is most prominent relative to the other cell types; the raw scores are
+  # still reported in the output columns.
+  role_scores_rel <- apply(role_scores, 2, .rescale01)
+  if (is.null(dim(role_scores_rel))) {
+    role_scores_rel <- matrix(role_scores_rel, nrow = n, dimnames = list(NULL, colnames(role_scores)))
+  }
+  dominant_idx <- max.col(role_scores_rel, ties.method = "first")
   dominant_role_strict <- colnames(role_scores)[dominant_idx]
-  secondary_role <- apply(role_scores, 1, function(x) {
+  secondary_role <- apply(role_scores_rel, 1, function(x) {
     ord <- order(x, decreasing = TRUE)
     if (length(ord) < 2 || x[ord[2]] <= 0) NA_character_ else names(x)[ord[2]]
   })
-  top_score <- apply(role_scores, 1, max, na.rm = TRUE)
-  second_score <- apply(role_scores, 1, function(x) {
+  top_score <- apply(role_scores_rel, 1, max, na.rm = TRUE)
+  second_score <- apply(role_scores_rel, 1, function(x) {
     ord <- order(x, decreasing = TRUE)
     if (length(ord) < 2) 0 else x[ord[2]]
   })

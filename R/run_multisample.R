@@ -33,21 +33,18 @@
 #' @param lcs_threshold Minimum LCS for "active" call. Default: \code{0.01}.
 #' @param case_label Label for case group. Default: \code{"Case"}.
 #' @param ctrl_label Label for control group. Default: \code{"Ctrl"}.
-#' @param knn_list Optional named list of KNN matrices (cells x cells),
-#'   one per sample. If \code{NULL}, Seurat graphs are used when available,
-#'   otherwise global LCS mode is used.
-#' @param graph_name Optional Seurat graph name passed to
-#'   \code{IdentifyLogicConsensus()}, for example \code{"RNA_nn"}.
 #' @param layer Seurat assay layer/slot for REO conversion. Default: \code{"counts"}.
-#' @param remove_self_edges Remove KNN self-loops before LCS scoring. Default: \code{TRUE}.
-#' @param graph_symmetrize How to symmetrize KNN/SNN graphs before scoring.
-#' @param edge_weight_mode \code{"binary"} or \code{"weighted"}.
 #' @param chunk_size Cells per chunk for REO computation. Default: \code{5000}.
 #' @param mc_cores Number of parallel cores. Default: \code{1}.
 #'   Set > 1 on Unix/macOS only.
 #' @param min_samples_per_group Minimum number of non-missing samples per group
 #'   required by \code{CompareLogicGroups}. Default: \code{1}.
 #' @param verbose Logical. Default: \code{TRUE}.
+#' @param ... Deprecated neighborhood arguments (\code{knn_list},
+#'   \code{graph_name}, \code{remove_self_edges}, \code{graph_symmetrize},
+#'   \code{edge_weight_mode}), accepted for backward compatibility and ignored
+#'   with a warning. Each sample is scored from REO co-expression, not a per-cell
+#'   neighborhood graph.
 #'
 #' @return A list of class \code{LogicCommMulti} with:
 #'   \describe{
@@ -82,19 +79,26 @@ run_multisample <- function(sample_list,
                              lcs_threshold  = 0.01,
                              case_label     = "Case",
                              ctrl_label     = "Ctrl",
-                             knn_list       = NULL,
-                             graph_name     = NULL,
                              layer          = "counts",
-                             remove_self_edges = TRUE,
-                             graph_symmetrize = c("none", "or", "max"),
-                             edge_weight_mode = c("binary", "weighted"),
                              chunk_size     = 5000,
                              mc_cores       = 1,
                              min_samples_per_group = 1,
-                             verbose        = TRUE) {
+                             verbose        = TRUE,
+                             ...) {
 
-  graph_symmetrize <- match.arg(graph_symmetrize)
-  edge_weight_mode <- match.arg(edge_weight_mode)
+  # LogicComm scores each sample from REO co-expression; the former per-cell
+  # neighborhood graph was removed. Legacy neighborhood arguments are accepted
+  # via ... for backward compatibility but ignored with a warning, matching
+  # IdentifyLogicConsensus() and summarize_celltype_communication().
+  legacy_hit <- intersect(
+    names(list(...)),
+    c("knn_list", "knn_mat", "graph_name", "remove_self_edges",
+      "graph_symmetrize", "edge_weight_mode", "mode", "seurat_obj"))
+  if (length(legacy_hit)) {
+    warning("run_multisample(): argument(s) ", paste(legacy_hit, collapse = ", "),
+            " are deprecated and ignored. Each sample is scored from REO ",
+            "co-expression (no per-cell neighborhood graph).", call. = FALSE)
+  }
 
   # 1. Validate
   if (is.null(names(sample_list))) {
@@ -195,11 +199,7 @@ run_multisample <- function(sample_list,
         lcs_threshold  = lcs_threshold,
         case_label     = case_label,
         ctrl_label     = ctrl_label,
-        graph_name     = graph_name,
         layer          = layer,
-        remove_self_edges = remove_self_edges,
-        graph_symmetrize = graph_symmetrize,
-        edge_weight_mode = edge_weight_mode,
         n_lr_pairs     = nrow(lr_db),
         n_samples      = length(lcs_list)
       )

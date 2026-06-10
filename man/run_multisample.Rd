@@ -13,16 +13,12 @@ run_multisample(
   lcs_threshold = 0.01,
   case_label = "Case",
   ctrl_label = "Ctrl",
-  knn_list = NULL,
-  graph_name = NULL,
   layer = "counts",
-  remove_self_edges = TRUE,
-  graph_symmetrize = c("none", "or", "max"),
-  edge_weight_mode = c("binary", "weighted"),
   chunk_size = 5000,
   mc_cores = 1,
   min_samples_per_group = 1,
-  verbose = TRUE
+  verbose = TRUE,
+  ...
 )
 }
 \arguments{
@@ -51,20 +47,7 @@ uses all genes in each sample.}
 
 \item{ctrl_label}{Label for control group. Default: \code{"Ctrl"}.}
 
-\item{knn_list}{Optional named list of KNN matrices (cells x cells),
-one per sample. If \code{NULL}, Seurat graphs are used when available,
-otherwise global LCS mode is used.}
-
-\item{graph_name}{Optional Seurat graph name passed to
-\code{IdentifyLogicConsensus()}, for example \code{"RNA_nn"}.}
-
 \item{layer}{Seurat assay layer/slot for REO conversion. Default: \code{"counts"}.}
-
-\item{remove_self_edges}{Remove KNN self-loops before LCS scoring. Default: \code{TRUE}.}
-
-\item{graph_symmetrize}{How to symmetrize KNN/SNN graphs before scoring.}
-
-\item{edge_weight_mode}{\code{"binary"} or \code{"weighted"}.}
 
 \item{chunk_size}{Cells per chunk for REO computation. Default: \code{5000}.}
 
@@ -75,6 +58,12 @@ Set > 1 on Unix/macOS only.}
 required by \code{CompareLogicGroups}. Default: \code{1}.}
 
 \item{verbose}{Logical. Default: \code{TRUE}.}
+
+\item{...}{Deprecated neighborhood arguments (\code{knn_list},
+\code{graph_name}, \code{remove_self_edges}, \code{graph_symmetrize},
+\code{edge_weight_mode}), accepted for backward compatibility and ignored
+with a warning. Each sample is scored from REO co-expression, not a per-cell
+neighborhood graph.}
 }
 \value{
 A list of class \code{LogicCommMulti} with:

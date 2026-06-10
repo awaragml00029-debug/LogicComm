@@ -40,6 +40,24 @@ support" labels referencing a per-cell graph that no longer exists.
 
 ## Fixes
 
+* Fixed cell-type role assignment so that **Mediator and Influencer can actually
+  be dominant roles**. `dominant_role` (and `secondary_role` / role separation)
+  are now derived from the four role scores rescaled to a common [0, 1] scale
+  across cell types, matching `plot_celltype_role_radar()`. Previously the raw
+  scores were compared directly even though they live on incomparable scales
+  (Sender/Receiver are summed LCS, mediator betweenness is normalized to [0, 1],
+  and the PageRank influencer score sums to 1 over cell types, ~1/n each), so
+  almost every cell type collapsed to Sender or Receiver and a textbook bridge
+  cell type was mislabelled. The raw `sender_role_score`, `receiver_role_score`,
+  `mediator_role_score`, and `influencer_role_score` columns are unchanged; only
+  the derived role labels improve. Regression test added.
+* `run_multisample()` no longer takes the dead neighborhood parameters
+  (`knn_list`, `graph_name`, `remove_self_edges`, `graph_symmetrize`,
+  `edge_weight_mode`). They had no effect since the v0.12 neighborhood removal —
+  `IdentifyLogicConsensus()` scores from global REO co-expression — yet were
+  silently accepted and `match.arg`-validated. They are now accepted via `...`
+  and ignored with a deprecation warning, consistent with
+  `IdentifyLogicConsensus()` and `summarize_celltype_communication()`.
 * Removed a duplicate internal `.resolve_complex_rank()`. Two definitions
   existed; because R sources package files in the C locale, the canonical
   `modulators.R` version (NA for missing subunits, conservative "min"

@@ -98,3 +98,40 @@ test_that("GLM count table keeps binomial success within the total universe", {
   expect_true(ab$success <= ab$total)
   expect_true(ab$total > 0)
 })
+
+test_that("dominant role can be Mediator or Influencer, not only Sender/Receiver", {
+  # The four role scores live on incomparable scales (summed-LCS strength is
+  # effectively unbounded; mediator betweenness is normalized to [0, 1]; the
+  # PageRank influencer score sums to 1 over cell types, ~1/n each). dominant_role
+  # must therefore be derived from per-column rescaled scores, otherwise raw
+  # strength always wins and Mediator/Influencer are mathematically unreachable.
+  # On the canonical bridge A -> B -> C -> D, B and C are the mediators.
+  adj <- matrix(0, 4, 4, dimnames = list(LETTERS[1:4], LETTERS[1:4]))
+  adj["A", "B"] <- 5; adj["B", "C"] <- 5; adj["C", "D"] <- 5; adj["A", "D"] <- 0.5
+  rs <- .communication_role_summary(adj, (adj > 0) * 1, min_role_event_count = 0)
+  dom <- stats::setNames(rs$dominant_role_strict, rs$cell_type)
+  expect_equal(unname(dom[c("B", "C")]), c("Mediator", "Mediator"))
+  # Raw role-score columns remain the interpretable, un-rescaled values.
+  expect_equal(rs$sender_role_score[rs$cell_type == "A"], 5.5)
+  expect_equal(rs$receiver_role_score[rs$cell_type == "D"], 5.5)
+})
+
+test_that("run_multisample warns on and ignores legacy neighborhood arguments", {
+  mk <- function(seed) {
+    set.seed(seed)
+    matrix(stats::rpois(2 * 30, 5), nrow = 2,
+           dimnames = list(c("L", "R"), paste0("c", seq_len(30))))
+  }
+  samples <- list(s1 = mk(1), s2 = mk(2), s3 = mk(3), s4 = mk(4))
+  groups <- c(s1 = "Case", s2 = "Case", s3 = "Ctrl", s4 = "Ctrl")
+  lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
+                      pathway = "P", stringsAsFactors = FALSE)
+  lr_db$ligand_genes <- list("L")
+  lr_db$receptor_genes <- list("R")
+  expect_warning(
+    run_multisample(samples, group_info = groups, lr_db = lr_db,
+                    min_samples_per_group = 2, verbose = FALSE,
+                    graph_symmetrize = "or"),
+    "deprecated and ignored"
+  )
+})
