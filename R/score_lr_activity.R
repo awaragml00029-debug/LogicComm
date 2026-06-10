@@ -177,7 +177,19 @@ score_receiver_response <- function(ct_comm,
   if (!all(c("lr_pair", "response_genes") %in% names(response_db))) {
     stop("response_db must contain lr_pair and response_genes columns.")
   }
-  labels <- ct_comm$cell_labels[colnames(reo_mat)]
+  # Align labels and reo_mat to their shared cells. ct_comm$cell_labels may cover
+  # fewer cells than reo_mat (summarize_celltype_communication() filters cells
+  # with missing/empty labels), and reo_mat may carry extra cells; indexing
+  # cell_labels by colnames(reo_mat) would otherwise inject NA labels (and NA
+  # names) that propagate into the receiver-cell selection.
+  labels <- ct_comm$cell_labels
+  if (is.null(names(labels))) stop("ct_comm$cell_labels must be named by cell.")
+  common <- intersect(names(labels), colnames(reo_mat))
+  if (!length(common)) {
+    stop("reo_mat shares no cells with ct_comm$cell_labels; recompute on the same cells.")
+  }
+  labels <- labels[common]
+  reo_mat <- reo_mat[, common, drop = FALSE]
   response_map <- stats::setNames(lapply(as.character(response_db$response_genes), .parse_response_genes), as.character(response_db$lr_pair))
   df <- ct_comm$lr_table
   response_score <- numeric(nrow(df))

@@ -40,6 +40,14 @@ support" labels referencing a per-cell graph that no longer exists.
 
 ## Fixes
 
+* Fixed `score_receiver_response()` (and therefore
+  `add_receiver_response_score()`), which errored with "subscript out of bounds"
+  in the standard workflow. It indexed `ct_comm$cell_labels` by
+  `colnames(reo_mat)`, so any reo_mat cell absent from the labels (the normal
+  case once `summarize_celltype_communication()` has filtered cells with
+  missing/empty labels and the original reo_mat is passed back) produced `NA`
+  labels and `NA` cell names that leaked into the receiver-cell selection. Labels
+  and `reo_mat` are now aligned to their shared cells first. Regression test added.
 * Fixed `calc_rank_shift()` to rank each gene within the cell's **full
   transcriptome**, as its documentation describes (and as `calc_REO_matrix()`
   anchors), instead of within the small L-R panel. The matrix was being subset to

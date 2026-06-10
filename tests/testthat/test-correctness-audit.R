@@ -164,3 +164,31 @@ test_that("calc_rank_shift ranks within the full transcriptome, not the L-R pane
   expect_lt(mif$median_rank_case, 0.05)   # transcriptome-dominant in Case
   expect_gt(mif$shift_score, 0)           # more prominent (higher rank) in Case
 })
+
+test_that("score_receiver_response aligns to shared cells when ct_comm filtered cells", {
+  # reo has 4 cells; c4 has an empty label and is filtered out of ct_comm, so the
+  # original reo (4 cells) has a cell absent from ct_comm$cell_labels. Indexing
+  # cell_labels by colnames(reo) previously injected an NA receiver cell and
+  # errored with "subscript out of bounds".
+  reo <- Matrix::Matrix(matrix(c(1, 1, 0, 1,
+                                 1, 1, 1, 0,
+                                 0, 1, 1, 1), nrow = 3, byrow = TRUE,
+                                dimnames = list(c("L", "R", "T1"),
+                                                c("c1", "c2", "c3", "c4"))), sparse = TRUE)
+  labels <- c(c1 = "A", c2 = "B", c3 = "B", c4 = "")
+  lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R",
+                      pathway = "p", stringsAsFactors = FALSE)
+  lr_db$ligand_genes <- list("L")
+  lr_db$receptor_genes <- list("R")
+  ct <- summarize_celltype_communication(reo, cell_labels = labels, lr_db = lr_db,
+                                         lcs_threshold = 0, min_edges = 1,
+                                         min_expr_frac = 0, verbose = FALSE)
+  resp_db <- data.frame(lr_pair = "L_R", response_genes = "T1", stringsAsFactors = FALSE)
+  scored <- score_receiver_response(ct, reo, resp_db)   # original 4-cell reo
+  expect_true(all(c("receiver_response_score", "response_active_frac") %in% names(scored)))
+  # T1 is active in both B cells (c2, c3) and absent in the A cell (c1).
+  b_rows <- scored[scored$receiver_type == "B" & is.finite(scored$receiver_response_score), , drop = FALSE]
+  a_rows <- scored[scored$receiver_type == "A" & is.finite(scored$receiver_response_score), , drop = FALSE]
+  if (nrow(b_rows)) expect_true(all(b_rows$receiver_response_score == 1))
+  if (nrow(a_rows)) expect_true(all(a_rows$receiver_response_score == 0))
+})
