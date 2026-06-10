@@ -11,7 +11,7 @@ plot_lr_bubble_by_celltype(
   top_n = 30,
   active_only = TRUE,
   color_by = c("pathway", "lcs", "n_active_edges", "ligand_active_frac_sender",
-    "receptor_active_frac_receiver", "communication_range"),
+    "receptor_active_frac_receiver"),
   title = NULL
 )
 }

@@ -569,7 +569,6 @@ diagnose_celltype_communication <- function(ct_comm,
     n_lr_rows = nrow(lr),
     n_celltype_pairs = nrow(pair),
     n_active_events = sum(lr$active %in% TRUE, na.rm = TRUE),
-    n_distal_candidates = if ("distal_candidate" %in% names(lr)) sum(lr$distal_candidate %in% TRUE, na.rm = TRUE) else NA_integer_,
     n_low_reliability_roles = if (!is.null(roles) && "role_reliability_label" %in% names(roles)) sum(roles$role_reliability_label %in% c("Low", "Low-communication"), na.rm = TRUE) else NA_integer_,
     role_interpretation = interpret_celltype_roles(ct_comm),
     null_diagnostic = if (!is.null(null_pair)) diagnose_permutation_resolution(null_pair) else NULL,
@@ -583,9 +582,6 @@ diagnose_celltype_communication <- function(ct_comm,
 print.LogicCommDiagnostic <- function(x, ...) {
   cat(sprintf("LogicCommDiagnostic | %d cells | %d active LR events\n",
               x$n_cells, x$n_active_events))
-  if (!is.null(x$n_distal_candidates) && is.finite(x$n_distal_candidates)) {
-    cat(sprintf("Distal/global candidates: %d\n", x$n_distal_candidates))
-  }
   if (!is.null(x$n_low_reliability_roles) && is.finite(x$n_low_reliability_roles)) {
     cat(sprintf("Low-reliability roles: %d\n", x$n_low_reliability_roles))
   }

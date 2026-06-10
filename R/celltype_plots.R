@@ -52,7 +52,6 @@
 #' @param min_weight Filter edges below this threshold.
 #' @param arrow_size Size of edge arrows.
 #' @param show_labels Show cell-type names.
-#' @param color_edges_by How to color edges: \code{"top_pathway"} or \code{"range"}.
 #' @return A ggplot2 object.
 #' @export
 plot_celltype_network <- function(ct_comm,
@@ -60,12 +59,10 @@ plot_celltype_network <- function(ct_comm,
                                   layout = c("auto", "fr", "circle"),
                                   min_weight = 0.05,
                                   arrow_size = 0.2,
-                                  show_labels = TRUE,
-                                  color_edges_by = c("top_pathway", "range")) {
+                                  show_labels = TRUE) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   metric <- match.arg(metric)
   layout <- match.arg(layout)
-  color_edges_by <- match.arg(color_edges_by)
   pair_sum <- ct_comm$pair_summary
   if (!metric %in% names(pair_sum)) stop("metric not found in pair_summary: ", metric)
   pair_sum <- pair_sum[is.finite(pair_sum[[metric]]) & pair_sum[[metric]] >= min_weight, , drop = FALSE]
@@ -80,15 +77,7 @@ plot_celltype_network <- function(ct_comm,
                  by.x = "sender_type", by.y = "cell_type", all.x = TRUE)
   edges <- merge(edges, nodes[, c("cell_type", "x", "y")],
                  by.x = "receiver_type", by.y = "cell_type", all.x = TRUE, suffixes = c("", "end"))
-  if (!"communication_support_label" %in% names(edges)) {
-    edges$communication_support_label <- ifelse(edges$n_active_lr > 0 & edges$n_local_active == 0 & edges$n_distal_candidate > 0,
-                                                "global_only_candidate",
-                                                ifelse(edges$n_distal_candidate > 0, "mixed_local_global", "local_graph_supported"))
-  }
-  edges$edge_color <- if (color_edges_by == "range") edges$dominant_communication_range else edges$top_pathway
-  edges$edge_linetype <- ifelse(edges$dominant_communication_range == "distal/endocrine", "distal/endocrine", "local/mixed")
-  edges$edge_support_alpha <- ifelse(edges$communication_support_label == "global_only_candidate", 0.35,
-                                     ifelse(edges$communication_support_label == "mixed_local_global", 0.6, 0.8))
+  edges$edge_color <- edges$top_pathway
   edges$value <- edges[[metric]]
   self_edge <- is.finite(edges$x) & is.finite(edges$y) & is.finite(edges$xend) & is.finite(edges$yend) &
     abs(edges$x - edges$xend) < .Machine$double.eps & abs(edges$y - edges$yend) < .Machine$double.eps
@@ -116,9 +105,8 @@ plot_celltype_network <- function(ct_comm,
   p <- ggplot2::ggplot() +
     ggplot2::geom_curve(data = edges,
                         ggplot2::aes(x = x, y = y, xend = xend, yend = yend,
-                                     linewidth = value, color = edge_color, linetype = edge_linetype,
-                                     alpha = edge_support_alpha),
-                        curvature = 0.18,
+                                     linewidth = value, color = edge_color),
+                        curvature = 0.18, alpha = 0.8,
                         arrow = grid::arrow(length = grid::unit(arrow_size, "cm"), type = "closed"),
                         lineend = "round") +
     ggplot2::geom_point(data = nodes,
@@ -127,23 +115,15 @@ plot_celltype_network <- function(ct_comm,
     ggplot2::scale_linewidth_continuous(range = c(0.3, 2.5), name = metric) +
     scale_fill_logiccomm_diverging(midpoint = 0, name = "S-R Balance") +
     ggplot2::scale_size_continuous(range = c(3, 12), name = "Hub score") +
-    ggplot2::scale_linetype_manual(values = c("local/mixed" = "solid", "distal/endocrine" = "dashed"), name = "Range style") +
-    ggplot2::scale_alpha_identity() +
     ggplot2::coord_equal() +
-    ggplot2::labs(title = "Cell-type communication network", color = if (color_edges_by == "range") "Range" else "Top pathway",
-                  caption = "Faded dashed edges are global-only distal candidates without local active edge support.") +
+    ggplot2::labs(title = "Cell-type communication network", color = "Top pathway") +
     ggplot2::theme_void(base_size = 12) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold", size = ggplot2::rel(1.25), colour = logiccomm_brand$ink),
       plot.caption = ggplot2::element_text(colour = "grey45", size = ggplot2::rel(0.78), hjust = 0),
       legend.title = ggplot2::element_text(face = "bold", size = ggplot2::rel(0.9)),
-      legend.position = "right")
-
-  if (color_edges_by == "range") {
-    p <- p + ggplot2::scale_color_manual(values = .logiccomm_palettes$range, na.value = "grey70")
-  } else {
-    p <- p + scale_color_logiccomm_d(na.value = "grey75")
-  }
+      legend.position = "right") +
+    scale_color_logiccomm_d(na.value = "grey75")
   if (show_labels) {
     p <- p + ggrepel::geom_text_repel(data = nodes, ggplot2::aes(x = x, y = y, label = node_label),
                                       size = 3.5, fontface = "bold", max.overlaps = 20)
@@ -162,7 +142,7 @@ plot_celltype_network <- function(ct_comm,
 plot_celltype_heatmap <- function(ct_comm,
                                   metric = c("n_active_lr", "active_lr_event_count", "sum_lcs",
                                              "mean_lcs_active", "sum_lcs_all", "n_edges", "edge_weight_sum",
-                                             "sum_active_edges", "sum_active_edge_weight"),
+                                             "sum_active_edges"),
                                   title = NULL,
                                   rotate_x = 45) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
@@ -176,28 +156,6 @@ plot_celltype_heatmap <- function(ct_comm,
     ggplot2::labs(title = title, x = "Sender type", y = "Receiver type") +
     theme_logiccomm() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = rotate_x, hjust = 1))
-}
-
-#' Plot Communication Range Summary
-#'
-#' @param ct_comm Output from \code{summarize_celltype_communication()}.
-#' @return A ggplot2 object.
-#' @export
-plot_communication_range_summary <- function(ct_comm) {
-  stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
-  df <- ct_comm$lr_table
-  df <- df[df$active %in% TRUE, , drop = FALSE]
-  if (nrow(df) == 0) stop("No active events to plot.")
-  pw_df <- as.data.frame(table(df$pathway, df$communication_range), stringsAsFactors = FALSE)
-  colnames(pw_df) <- c("Pathway", "Range", "Count")
-  pw_totals <- tapply(pw_df$Count, pw_df$Pathway, sum)
-  pw_df$Pathway <- factor(pw_df$Pathway, levels = names(sort(pw_totals)))
-  ggplot2::ggplot(pw_df, ggplot2::aes(x = Pathway, y = Count, fill = Range)) +
-    ggplot2::geom_col() +
-    ggplot2::scale_fill_manual(values = .logiccomm_palettes$range, na.value = "grey80") +
-    ggplot2::coord_flip() +
-    theme_logiccomm() +
-    ggplot2::labs(title = "Signaling range by pathway", y = "Number of active L-R pairs", x = "Pathway")
 }
 
 #' Advanced Bubble Plot of L-R Logic Events
@@ -224,16 +182,13 @@ plot_lr_bubble_advanced <- function(ct_comm, senders = NULL, receivers = NULL,
   pw_tot <- tapply(df$lcs, df$pathway, sum, na.rm = TRUE)
   keep_pw <- names(sort(pw_tot, decreasing = TRUE))[seq_len(min(top_n_pathways, length(pw_tot)))]
   df <- df[df$pathway %in% keep_pw, , drop = FALSE]
-  df$point_alpha <- ifelse(df$communication_range == "distal/endocrine" & df$n_active_neighborhood == 0, 0.45, 0.85)
-  ggplot2::ggplot(df, ggplot2::aes(x = sender_type, y = receiver_type, size = lcs, color = communication_range, alpha = point_alpha)) +
-    ggplot2::geom_point() +
+  ggplot2::ggplot(df, ggplot2::aes(x = sender_type, y = receiver_type, size = lcs, color = lcs)) +
+    ggplot2::geom_point(alpha = 0.85) +
     ggplot2::facet_wrap(~pathway, scales = "free") +
-    ggplot2::scale_color_manual(values = .logiccomm_palettes$range, na.value = "grey70", name = "Range") +
+    scale_color_logiccomm_c(name = "LCS") +
     ggplot2::scale_size_continuous(range = c(2, 8), name = "LCS") +
-    ggplot2::scale_alpha_identity() +
     theme_logiccomm() +
-    ggplot2::labs(title = "Cell-type LogicComm hotspots", x = "Sender type", y = "Receiver type",
-                  caption = "Faded distal bubbles are global-only candidates without local active edge support.") +
+    ggplot2::labs(title = "Cell-type LogicComm hotspots", x = "Sender type", y = "Receiver type") +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = ggplot2::rel(0.75)),
                    axis.text.y = ggplot2::element_text(size = ggplot2::rel(0.8)))
 }
@@ -254,7 +209,7 @@ plot_lr_bubble_by_celltype <- function(ct_comm,
                                        receiver = NULL,
                                        top_n = 30,
                                        active_only = TRUE,
-                                       color_by = c("pathway", "lcs", "n_active_edges", "ligand_active_frac_sender", "receptor_active_frac_receiver", "communication_range"),
+                                       color_by = c("pathway", "lcs", "n_active_edges", "ligand_active_frac_sender", "receptor_active_frac_receiver"),
                                        title = NULL) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   color_by <- match.arg(color_by)
@@ -359,9 +314,10 @@ explain_celltype_interaction <- function(ct_comm, sender, receiver, lr_pair,
   if (nrow(ev) == 0) stop("Selected sender/receiver/lr_pair not found.")
   ev <- ev[1, , drop = FALSE]
   interpretation <- paste0(
-    sender, " -> ", receiver, " ", lr_pair, " is classified as ", ev$communication_range,
-    " with local LCS=", signif(ev$lcs_neighborhood, 3),
-    " and global potential=", signif(ev$lcs_global, 3), "."
+    sender, " -> ", receiver, " ", lr_pair,
+    ": cell-type co-expression LCS=", signif(ev$lcs, 3),
+    " (binary co-expression fraction=", signif(ev$lcs_global, 3), "); ",
+    if (isTRUE(ev$active)) "called active." else "not called active."
   )
   plt <- tryCatch(plot_lr_evidence(ct_comm, sender, receiver, lr_pair), error = function(e) NULL)
   list(query = list(sender = sender, receiver = receiver, lr_pair = lr_pair), evidence = ev,
@@ -388,9 +344,9 @@ plot_lr_activity_balance <- function(ct_comm, sender = NULL, receiver = NULL, ac
   df <- utils::head(df[order(df$lcs, decreasing = TRUE), , drop = FALSE], top_n)
   if (is.null(title)) title <- "Ligand and receptor logic activity balance"
   ggplot2::ggplot(df, ggplot2::aes(x = ligand_active_frac_sender, y = receptor_active_frac_receiver)) +
-    ggplot2::geom_point(ggplot2::aes(size = lcs, color = communication_range), alpha = 0.75) +
+    ggplot2::geom_point(ggplot2::aes(size = lcs, color = lcs), alpha = 0.75) +
     ggrepel::geom_text_repel(ggplot2::aes(label = lr_pair), size = 3, max.overlaps = 15) +
-    ggplot2::scale_color_manual(values = .logiccomm_palettes$range, na.value = "grey70") +
+    scale_color_logiccomm_c(name = "LCS") +
     ggplot2::scale_size_continuous(range = c(2, 8), name = "LCS") +
     ggplot2::labs(title = title, x = "Ligand-active fraction in sender", y = "Receptor-active fraction in receiver") +
     theme_logiccomm()
@@ -414,8 +370,8 @@ plot_lr_evidence <- function(ct_comm, sender, receiver, lr_pair, title = NULL) {
   row <- row[1, , drop = FALSE]
   support_fraction <- row$n_active_edges / pmax(row$n_edges, 1)
   plot_df <- data.frame(
-    metric = c("Primary LCS", "Local LCS", "Global potential", "Ligand sender fraction", "Receptor receiver fraction", "Support fraction"),
-    value = c(row$lcs, row$lcs_neighborhood, row$lcs_global, row$ligand_active_frac_sender, row$receptor_active_frac_receiver, support_fraction),
+    metric = c("Reported LCS", "Binary co-expression", "Ligand sender fraction", "Receptor receiver fraction", "Support fraction"),
+    value = c(row$lcs, row$lcs_global, row$ligand_active_frac_sender, row$receptor_active_frac_receiver, support_fraction),
     stringsAsFactors = FALSE
   )
   plot_df$value[!is.finite(plot_df$value)] <- NA_real_
@@ -423,7 +379,8 @@ plot_lr_evidence <- function(ct_comm, sender, receiver, lr_pair, title = NULL) {
   ggplot2::ggplot(plot_df, ggplot2::aes(x = metric, y = value, fill = metric)) +
     ggplot2::geom_col(width = 0.7, show.legend = FALSE) +
     ggplot2::coord_cartesian(ylim = c(0, 1)) +
-    ggplot2::labs(title = title, subtitle = paste("Range:", row$communication_range), x = NULL, y = "Score / fraction") +
+    ggplot2::labs(title = title, subtitle = if (isTRUE(row$active)) "Active cell-type co-expression axis" else "Not called active",
+                  x = NULL, y = "Score / fraction") +
     theme_logiccomm() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 35, hjust = 1))
 }

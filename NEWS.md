@@ -1,3 +1,59 @@
+# LogicComm 0.13.0
+
+## Breaking change: removed the transitional neighborhood / spatial-range output
+
+The inert neighborhood/local/distal/range fields that v0.12 kept as
+back-compatible stubs are now removed, so the output schema matches what the
+cell-type co-expression method actually computes. This resolves a direct
+contradiction in which the method documentation disavowed spatial
+juxtacrine/paracrine claims while the output still carried `n_juxtacrine`,
+`n_paracrine`, `n_distal`, `communication_range`, and "local vs global graph
+support" labels referencing a per-cell graph that no longer exists.
+
+* `summarize_celltype_communication()` `lr_table` no longer contains
+  `lcs_neighborhood`, `lcs_primary_mode`, `communication_range`,
+  `n_active_neighborhood`, `active_edge_weight_sum`, `local_active`,
+  `distal_candidate`, `global_candidate_active`, or `candidate_active`. The
+  honest cell-type columns remain (`lcs`, `lcs_global`, `lcs_unweighted`,
+  `n_edges`/`edge_weight_sum` = the sender x receiver opportunity universe,
+  `n_active_edges` = co-expression support, the per-side active counts/fractions,
+  and `active`).
+* `pair_summary` and `pathway_summary` drop `communication_support_label`,
+  `local_support_fraction_active`, `n_local_active`, `n_distal_candidate`,
+  `n_global_candidate_active`, `n_juxtacrine`, `n_paracrine`, `n_distal`,
+  `dominant_communication_range`, `sum_active_edge_weight`, and
+  `active_edge_weight_sum`.
+* `plot_communication_range_summary()` is removed; it visualized a signaling
+  "range" the method no longer resolves. `plot_celltype_network()` drops its
+  `color_edges_by = "range"` mode and distal/global edge styling and now colours
+  edges by top pathway. `plot_lr_bubble_advanced()` and
+  `plot_lr_activity_balance()` colour by LCS instead of range.
+* `summarize_communication_findings()` drops `distal_candidate_pairs` and the
+  graph-support guide rows; `write_communication_report()` drops the
+  distal-candidate section and the KNN/neighborhood cautions.
+* `logic_grade_evidence()` now grades on the evidence the cell-type model
+  produces — an active co-expression call, optionally corroborated by attached
+  orthogonal validation — rather than the removed local/distal/global graph
+  distinction (grade A = active + validation, B = active, otherwise
+  insufficient).
+* `diagnose_celltype_communication()` no longer reports `n_distal_candidates`.
+
+## Fixes
+
+* Removed a duplicate internal `.resolve_complex_rank()`. Two definitions
+  existed; because R sources package files in the C locale, the canonical
+  `modulators.R` version (NA for missing subunits, conservative "min"
+  aggregation) always shadowed the `celltype_communication.R` copy, which was
+  therefore dead code whose survival depended on file collation order. Cell-type
+  rank weighting only reads ranks where the complex logic is active (all subunits
+  present, hence finite), so results are unchanged.
+* `R CMD check` is clean: regenerated stale `man/` pages (codoc mismatches for
+  `summarize_celltype_communication()`, `permute_celltype_communication()`,
+  `IdentifyLogicConsensus()`, and `logic_score_lr()`), documented
+  `discover_celltype_communication()`, added the missing `@param` entries on the
+  volcano and discovery plots, removed orphan internal Rd files, and registered
+  the `significance` ggplot aesthetic as a global variable.
+
 # LogicComm 0.12.1
 
 ## Documentation

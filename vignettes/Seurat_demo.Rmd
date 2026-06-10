@@ -692,9 +692,8 @@ Visualize the sender -> receiver cell-type communication network.
 ```{r celltype_network, eval=FALSE, fig.width=8, fig.height=8}
 plot_celltype_network(
   ct_comm,
-  metric         = "sum_lcs",
-  layout         = "circle",
-  color_edges_by = "pathway"
+  metric = "sum_lcs",
+  layout = "circle"
 )
 ```
 
@@ -1007,7 +1006,6 @@ diag
 findings <- summarize_communication_findings(ct_comm, top_n = 15)
 findings$qc
 findings$top_celltype_pairs
-findings$distal_candidate_pairs
 findings$top_lr_events
 findings$role_summary
 

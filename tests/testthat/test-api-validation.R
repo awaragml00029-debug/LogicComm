@@ -7,9 +7,6 @@ test_that("logic validation adapters attach downstream evidence", {
     receptor = "R",
     pathway = "test",
     lcs = 0.5,
-    local_active = TRUE,
-    global_candidate_active = FALSE,
-    distal_candidate = FALSE,
     active = TRUE,
     n_edges = 4,
     n_active_edges = 2,
@@ -82,15 +79,12 @@ test_that("logic validation adapters attach downstream evidence", {
   expect_equal(ct_ext$lr_table$validation_external_type, "protein")
 })
 
-test_that("logic_grade_evidence summarizes local, validation, and distal evidence", {
+test_that("logic_grade_evidence grades active cell-type calls and validation evidence", {
   lr <- data.frame(
     sender_type = c("A", "A", "B"),
     receiver_type = c("B", "C", "A"),
     lr_pair = c("L_R", "L_X", "Y_R"),
     lcs = c(0.5, 0.4, 0),
-    local_active = c(TRUE, FALSE, FALSE),
-    global_candidate_active = c(FALSE, TRUE, FALSE),
-    distal_candidate = c(FALSE, TRUE, FALSE),
     active = c(TRUE, TRUE, FALSE),
     validation_target_n = c(2L, 0L, 0L),
     n_edges = c(4, 4, 1),
@@ -100,10 +94,13 @@ test_that("logic_grade_evidence summarizes local, validation, and distal evidenc
   ct <- structure(list(lr_table = lr), class = "LogicCommCellTypeComm")
 
   graded <- logic_grade_evidence(ct, min_edges = 2, min_active_edges = 1)
-  expect_equal(graded$lr_table$evidence_grade, c("A", "C", NA))
-  expect_equal(graded$lr_table$evidence_tier, c(5L, 3L, NA_integer_))
-  expect_equal(graded$lr_table$evidence_components[1], "local_neighborhood;validation")
-  expect_equal(graded$lr_table$evidence_components[2], "global_candidate;distal_candidate")
+  # Row 1: active + validation -> A; row 2: active, no validation -> B;
+  # row 3: not active -> insufficient (grade NA, tier 1).
+  expect_equal(graded$lr_table$evidence_grade, c("A", "B", NA))
+  expect_equal(graded$lr_table$evidence_tier, c(3L, 2L, 1L))
+  expect_equal(graded$lr_table$evidence_components[1], "cell_type_coexpression;validation")
+  expect_equal(graded$lr_table$evidence_components[2], "cell_type_coexpression")
+  expect_equal(graded$lr_table$evidence_components[3], "insufficient_evidence")
   expect_match(graded$lr_table$interpretation_caution[3], "Edge opportunity count")
 })
 

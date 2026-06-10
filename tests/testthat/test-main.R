@@ -463,11 +463,10 @@ test_that("cell-type plotting helpers return ggplot objects", {
     reo, cell_labels = labels, lr_db = lr_db,
     mode = "global", lcs_threshold = 0.1, min_edges = 1, verbose = FALSE
   )
-  expect_true(all(c("plot_communication_range_summary", "plot_lr_bubble_advanced") %in% getNamespaceExports("LogicComm")))
+  expect_true("plot_lr_bubble_advanced" %in% getNamespaceExports("LogicComm"))
   expect_s3_class(plot_celltype_heatmap(ct), "ggplot")
   expect_s3_class(plot_celltype_roles(ct), "ggplot")
   expect_s3_class(plot_celltype_network(ct), "ggplot")
-  expect_s3_class(plot_communication_range_summary(ct), "ggplot")
   expect_s3_class(plot_lr_bubble_by_celltype(ct, active_only = FALSE), "ggplot")
   expect_s3_class(plot_lr_bubble_advanced(ct), "ggplot")
   expect_s3_class(plot_pathway_heatmap(ct), "ggplot")
@@ -484,10 +483,9 @@ test_that("cell-type plotting helpers return ggplot objects", {
     reo_loop, cell_labels = labels_loop, lr_db = lr_db,
     mode = "global", lcs_threshold = 0.1, min_edges = 1, verbose = FALSE
   )
-  p_loop <- plot_celltype_network(ct_loop, min_weight = 0, color_edges_by = "range")
+  p_loop <- plot_celltype_network(ct_loop, min_weight = 0)
   expect_s3_class(p_loop, "ggplot")
   expect_s3_class(ggplot2::ggplotGrob(p_loop), "gtable")
-  expect_match(p_loop$labels$caption, "global-only")
 
   ex <- explain_celltype_interaction(ct, sender = "A", receiver = "B", lr_pair = "L_R")
   expect_true(is.list(ex))
@@ -618,12 +616,12 @@ test_that("publication extensions support spatial graphs, dynamics, and reports"
 
   findings <- summarize_communication_findings(ct, top_n = 2)
   expect_true(inherits(findings, "LogicCommFindings"))
-  expect_true("distal_candidate_pairs" %in% names(findings))
-  expect_false(any(findings$top_celltype_pairs$communication_support_label == "global_only_candidate"))
+  expect_true(all(c("top_celltype_pairs", "top_lr_events", "qc") %in% names(findings)))
+  expect_false("communication_support_label" %in% names(findings$top_celltype_pairs))
   tf <- tempfile(fileext = ".md")
   expect_true(file.exists(write_communication_report(ct, file = tf)))
   report_text <- paste(readLines(tf, warn = FALSE), collapse = "\n")
-  expect_match(report_text, "Global-only distal candidate pairs")
+  expect_match(report_text, "Top sender-to-receiver cell-type pairs")
 
   dyn <- summarize_communication_dynamics(
     reo, pseudotime = setNames(c(0.1, 0.2, 0.8, 0.9), paste0("C", 1:4)),

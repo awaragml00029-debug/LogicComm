@@ -10,8 +10,7 @@ plot_celltype_network(
   layout = c("auto", "fr", "circle"),
   min_weight = 0.05,
   arrow_size = 0.2,
-  show_labels = TRUE,
-  color_edges_by = c("top_pathway", "range")
+  show_labels = TRUE
 )
 }
 \arguments{
@@ -27,8 +26,6 @@ otherwise a circle), "fr", or "circle".}
 \item{arrow_size}{Size of edge arrows.}
 
 \item{show_labels}{Show cell-type names.}
-
-\item{color_edges_by}{How to color edges: \code{"top_pathway"} or \code{"range"}.}
 }
 \value{
 A ggplot2 object.

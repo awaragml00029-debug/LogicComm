@@ -584,22 +584,8 @@ plot_celltype_glm_volcano <- function(glm_result,
 summarize_communication_findings <- function(ct_comm, top_n = 10) {
   stopifnot(inherits(ct_comm, "LogicCommCellTypeComm"))
   pair <- ct_comm$pair_summary
-  if (!"communication_support_label" %in% names(pair)) {
-    pair$communication_support_label <- ifelse(pair$n_active_lr > 0 & pair$n_local_active == 0 & pair$n_distal_candidate > 0,
-                                                "global_only_candidate",
-                                                ifelse(pair$n_distal_candidate > 0, "mixed_local_global", "local_graph_supported"))
-  }
-  if (!"local_support_fraction_active" %in% names(pair)) {
-    pair$local_support_fraction_active <- ifelse(pair$n_active_lr > 0, pair$n_local_active / pair$n_active_lr, NA_real_)
-  }
   pair <- pair[is.finite(pair$sum_lcs) & pair$n_active_lr > 0, , drop = FALSE]
-  support_rank <- match(pair$communication_support_label,
-                        c("local_graph_supported", "mixed_local_global", "global_only_candidate", "inactive"))
-  pair <- pair[order(support_rank, -pair$sum_lcs, -pair$n_active_lr, na.last = TRUE), , drop = FALSE]
-  global_only_pair <- pair[pair$communication_support_label == "global_only_candidate", , drop = FALSE]
-  global_only_pair <- global_only_pair[order(-global_only_pair$sum_lcs, -global_only_pair$n_active_lr), , drop = FALSE]
-  primary_pair <- pair[pair$communication_support_label != "global_only_candidate", , drop = FALSE]
-  if (nrow(primary_pair) == 0) primary_pair <- pair
+  pair <- pair[order(-pair$sum_lcs, -pair$n_active_lr, na.last = TRUE), , drop = FALSE]
   lr <- ct_comm$lr_table[ct_comm$lr_table$active %in% TRUE & !is.na(ct_comm$lr_table$lcs), , drop = FALSE]
   lr <- lr[order(lr$lcs, decreasing = TRUE), , drop = FALSE]
   path <- ct_comm$pathway_summary[order(ct_comm$pathway_summary$sum_lcs, decreasing = TRUE), , drop = FALSE]
@@ -609,26 +595,28 @@ summarize_communication_findings <- function(ct_comm, top_n = 10) {
     n_cell_types = ct_comm$params$n_cell_types %||% nrow(ct_comm$role_summary),
     n_lr_pairs = ct_comm$params$n_lr_pairs %||% length(unique(ct_comm$lr_table$lr_pair)),
     n_active_celltype_lr_events = sum(ct_comm$lr_table$active, na.rm = TRUE),
-    n_global_only_celltype_pairs = if ("communication_support_label" %in% names(ct_comm$pair_summary)) sum(ct_comm$pair_summary$communication_support_label == "global_only_candidate", na.rm = TRUE) else NA_integer_,
     median_edges_per_celltype_pair = stats::median(ct_comm$pair_summary$n_edges, na.rm = TRUE),
     n_low_communication_celltypes = sum(ct_comm$role_summary$low_communication, na.rm = TRUE),
     stringsAsFactors = FALSE
   )
   guide <- data.frame(
     biological_question = c(
-      "Which locally supported or mixed cell-type pairs communicate most strongly?",
-      "Which distal/global candidates lack local active edge support?",
+      "Which cell-type pairs communicate most strongly?",
       "Which L-R axes drive a selected sender-to-receiver interaction?",
       "Which cell types behave as senders, receivers, mediators, or influencers?",
-      "Are conclusions supported by enough edge opportunities?"
+      "Are conclusions supported by enough cell-type-pair opportunities?"
     ),
-    recommended_table = c("top_celltype_pairs", "distal_candidate_pairs", "top_lr_events", "role_summary", "qc + pair_summary"),
-    recommended_metric = c("sum_lcs, n_active_lr, local_support_fraction_active, and communication_support_label", "sum_lcs, n_edges, local_support_fraction_active, and permutation diagnostics", "lcs, n_active_edges, and communication_range", "role scores, role_separation_label, communication_evidence_label, and role_reliability_label", "n_edges, communication_support_label, and bootstrap/permutation diagnostics"),
+    recommended_table = c("top_celltype_pairs", "top_lr_events", "role_summary", "qc + pair_summary"),
+    recommended_metric = c(
+      "sum_lcs, n_active_lr, and mean_edge_support_fraction_active",
+      "lcs, n_active_edges, and ligand/receptor active fractions",
+      "role scores, role_separation_label, communication_evidence_label, and role_reliability_label",
+      "n_edges, n_active_edges, and bootstrap/permutation diagnostics"
+    ),
     stringsAsFactors = FALSE
   )
   out <- list(
-    top_celltype_pairs = utils::head(primary_pair, top_n),
-    distal_candidate_pairs = utils::head(global_only_pair, top_n),
+    top_celltype_pairs = utils::head(pair, top_n),
     top_lr_events = utils::head(lr, top_n),
     top_pathways = utils::head(path, top_n),
     role_summary = utils::head(roles, top_n),
@@ -658,13 +646,8 @@ write_communication_report <- function(ct_comm,
     "## Quality-control summary",
     .df_to_md(findings$qc),
     "",
-    "## Top sender-to-receiver cell-type pairs with local or mixed support",
-    .df_to_md(findings$top_celltype_pairs[, intersect(c("sender_type", "receiver_type", "communication_support_label", "local_support_fraction_active", "n_edges", "n_active_lr", "n_local_active", "n_distal_candidate", "sum_lcs", "mean_lcs_active", "top_pathway"), names(findings$top_celltype_pairs)), drop = FALSE]),
-    "",
-    "## Global-only distal candidate pairs",
-    "These pairs have active global/distal evidence but no local active edge support in the supplied graph; treat them as candidates, not direct neighborhood interactions.",
-    "",
-    .df_to_md(findings$distal_candidate_pairs[, intersect(c("sender_type", "receiver_type", "communication_support_label", "local_support_fraction_active", "n_edges", "n_active_lr", "sum_lcs", "mean_lcs_active", "top_pathway"), names(findings$distal_candidate_pairs)), drop = FALSE]),
+    "## Top sender-to-receiver cell-type pairs",
+    .df_to_md(findings$top_celltype_pairs[, intersect(c("sender_type", "receiver_type", "n_edges", "n_active_lr", "sum_lcs", "mean_lcs_active", "mean_edge_support_fraction_active", "top_pathway"), names(findings$top_celltype_pairs)), drop = FALSE]),
     "",
     "## Top cell-type-resolved L-R events",
     .df_to_md(findings$top_lr_events[, intersect(c("sender_type", "receiver_type", "lr_pair", "pathway", "n_edges", "n_active_edges", "lcs", "ligand_active_frac_sender", "receptor_active_frac_receiver"), names(findings$top_lr_events)), drop = FALSE]),
@@ -679,11 +662,10 @@ write_communication_report <- function(ct_comm,
     .df_to_md(findings$interpretation_guide),
     "",
     "## Reporting cautions",
-    "- LogicComm LCS is a rank-logic consensus score, not raw expression magnitude.",
-    "- A KNN/SNN edge is a transcriptomic neighborhood opportunity, not necessarily physical contact unless a spatial graph is used.",
+    "- LogicComm LCS is a REO logic consensus (co-expression) score, not raw expression magnitude.",
+    "- Communication is scored at the cell-type level from REO co-expression; there is no per-cell neighborhood graph, so LCS does not license spatial juxtacrine/paracrine distance claims.",
     "- Treat biological samples, not individual cells, as independent units for group comparison.",
-    "- Inspect n_edges, active edge support, bootstrap intervals, and permutation nulls before emphasizing a rare cell-type pair.",
-    "- Report global-only distal candidates separately from local or mixed graph-supported communication.",
+    "- Inspect n_edges (cell-type-pair opportunity), active co-expression support, bootstrap intervals, and permutation nulls before emphasizing a rare cell-type pair.",
     "- Separate broad or identity-associated axes from pair-specific mechanistic candidates using score_communication_specificity().",
     "- Interpret degenerate positive permutation nulls as structural-null flags, not ordinary Gaussian z-scores."
   )

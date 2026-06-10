@@ -327,10 +327,7 @@ logic_grade_evidence <- function(ct_comm,
     col %in% names(lr) & !is.na(lr[[col]]) & as.numeric(lr[[col]]) > 0
   }
 
-  local <- if ("local_active" %in% names(lr)) lr$local_active %in% TRUE else rep(FALSE, n)
-  global <- if ("global_candidate_active" %in% names(lr)) lr$global_candidate_active %in% TRUE else rep(FALSE, n)
-  distal <- if ("distal_candidate" %in% names(lr)) lr$distal_candidate %in% TRUE else rep(FALSE, n)
-  active <- if ("active" %in% names(lr)) lr$active %in% TRUE else local | global
+  active <- if ("active" %in% names(lr)) lr$active %in% TRUE else rep(FALSE, n)
 
   validation <- rep(FALSE, n)
   if (isTRUE(use_validation)) {
@@ -339,16 +336,17 @@ logic_grade_evidence <- function(ct_comm,
     }
   }
 
+  # Grade on the evidence that the cell-type co-expression model actually
+  # produces: an active communication call, optionally corroborated by attached
+  # orthogonal validation (receiver response, downstream targets, TF switch, or
+  # external evidence). There is no per-cell neighborhood graph, so no
+  # local/distal/range distinction is graded.
   grade <- rep(NA_character_, n)
-  tier <- rep(NA_integer_, n)
-  grade[local & validation] <- "A"
-  tier[local & validation] <- 5L
-  grade[local & is.na(grade)] <- "B"
-  tier[local & is.na(tier)] <- 4L
-  grade[(distal | global) & is.na(grade)] <- "C"
-  tier[(distal | global) & is.na(tier)] <- 3L
-  grade[active & is.na(grade)] <- "D"
-  tier[active & is.na(tier)] <- 2L
+  grade[active] <- "B"
+  grade[active & validation] <- "A"
+  tier <- rep(1L, n)
+  tier[grade %in% "B"] <- 2L
+  tier[grade %in% "A"] <- 3L
 
   components <- character(n)
   reason <- character(n)
@@ -357,29 +355,19 @@ logic_grade_evidence <- function(ct_comm,
 
   for (i in seq_len(n)) {
     comp <- character(0)
-    if (local[i]) comp <- c(comp, "local_neighborhood")
-    if (global[i]) comp <- c(comp, "global_candidate")
-    if (distal[i]) comp <- c(comp, "distal_candidate")
+    if (active[i]) comp <- c(comp, "cell_type_coexpression")
     if (validation[i]) comp <- c(comp, "validation")
     if (!length(comp)) comp <- "insufficient_evidence"
     components[i] <- paste(comp, collapse = ";")
 
     if (identical(grade[i], "A")) {
-      reason[i] <- "Local graph-supported LR logic with downstream or external validation evidence."
+      reason[i] <- "Active cell-type co-expression call with downstream or external validation evidence."
       caution[i] <- "Strong candidate; still requires biological context and orthogonal validation for causal claims."
       recommended[i] <- "Prioritize for mechanistic follow-up."
     } else if (identical(grade[i], "B")) {
-      reason[i] <- "Local graph-supported LR logic with sufficient core LogicComm evidence."
+      reason[i] <- "Active cell-type co-expression call from REO logic without orthogonal validation."
       caution[i] <- "Communication candidate; add receiver target, TF, protein, spatial, or perturbation evidence when possible."
       recommended[i] <- "Validate receiver response or external support."
-    } else if (identical(grade[i], "C")) {
-      reason[i] <- "Global or distal candidate potential without strong local evidence."
-      caution[i] <- "Interpret as distal/global potential rather than local communication proof."
-      recommended[i] <- "Check spatial distance, ligand class, receiver response, and sample recurrence."
-    } else if (identical(grade[i], "D")) {
-      reason[i] <- "Weak or limited communication evidence."
-      caution[i] <- "Low-priority candidate unless supported by external biology."
-      recommended[i] <- "Inspect edge counts and repeat under sensitivity analyses."
     } else {
       reason[i] <- "Insufficient evidence for an active communication call."
       caution[i] <- "Do not interpret as active communication."

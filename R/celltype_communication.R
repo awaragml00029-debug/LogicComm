@@ -193,22 +193,17 @@ summarize_celltype_communication <- function(reo_mat,
     active <- n_global_possible_by_group >= min_edges & !is.na(lcs_global) &
               lcs_global >= lcs_threshold & n_active_global >= min_active_edges & expr_ok
 
-    # Transitional back-compatible fields. LogicComm now scores communication at
-    # the cell-type level only; the former neighborhood / local / distal / range
-    # fields are retained as inert stubs so existing readers keep working, and
-    # are removed in a later cleanup step.
-    lcs_final <- lcs_value
+    # Cell-type co-expression scoring. `lcs` is the reported score (binary
+    # co-expression fraction by default, or the rank-weighted score when
+    # lcs_weighting = "rank"); `lcs_global` is always the binary co-expression
+    # fraction (ligand-active fraction of sender x receptor-active fraction of
+    # receiver) and `lcs_unweighted` is kept as its alias. `n_edges` /
+    # `edge_weight_sum` are the cell-type-pair opportunity universe
+    # (sender x receiver cell-count product); `n_active_edges` is the
+    # co-expressing support count. There is no per-cell neighborhood graph, so
+    # no local/distal/range fields are produced.
     lcs_unweighted <- lcs_global
-    lcs_neighborhood <- rep(NA_real_, n_groups)
-    n_active_neighborhood <- rep(0L, n_groups)
-    active_edge_weight_sum <- rep(0, n_groups)
     n_active_edges <- n_active_global
-    local_active <- rep(FALSE, n_groups)
-    global_candidate_active <- active
-    distal_candidate <- rep(FALSE, n_groups)
-    candidate_active <- active
-    lcs_primary_mode <- ifelse(active, "cell_type", "unscored")
-    comm_range <- ifelse(active, "cell_type", "inactive")
 
     data.frame(
       sender_type = group_defs$sender_type,
@@ -217,17 +212,12 @@ summarize_celltype_communication <- function(reo_mat,
       ligand = .lr_scalar(lr_db, "ligand", idx, paste(lig_genes, collapse = "+")),
       receptor = .lr_scalar(lr_db, "receptor", idx, paste(rec_genes, collapse = "+")),
       pathway = .lr_scalar(lr_db, "pathway", idx, "Unknown"),
-      lcs = as.numeric(lcs_final),
-      lcs_neighborhood = as.numeric(lcs_neighborhood),
+      lcs = as.numeric(lcs_value),
       lcs_global = as.numeric(lcs_global),
       lcs_unweighted = as.numeric(lcs_unweighted),
-      lcs_primary_mode = as.character(lcs_primary_mode),
-      communication_range = as.character(comm_range),
       n_edges = as.integer(n_edges_by_group),
       edge_weight_sum = as.numeric(edge_weight_sum_by_group),
       n_active_edges = as.numeric(n_active_edges),
-      n_active_neighborhood = as.integer(n_active_neighborhood),
-      active_edge_weight_sum = as.numeric(active_edge_weight_sum),
       n_global_possible = as.numeric(n_global_possible_by_group),
       n_active_global = as.numeric(n_active_global),
       sender_cell_count = as.integer(sender_n),
@@ -236,11 +226,7 @@ summarize_celltype_communication <- function(reo_mat,
       receptor_active_n_receiver = as.numeric(receptor_active_n_receiver),
       ligand_active_frac_sender = as.numeric(ligand_active_frac_sender),
       receptor_active_frac_receiver = as.numeric(receptor_active_frac_receiver),
-      local_active = as.logical(local_active),
-      global_candidate_active = as.logical(global_candidate_active),
-      distal_candidate = as.logical(distal_candidate),
-      candidate_active = as.logical(candidate_active),
-      active = as.logical(candidate_active),
+      active = as.logical(active),
       stringsAsFactors = FALSE
     )
   })
@@ -416,26 +402,10 @@ celltype_comm_to_lcs <- function(ct_comm,
     active_sub <- sub[sub$active %in% TRUE, , drop = FALSE]
     finite_sub <- sub[is.finite(sub$lcs), , drop = FALSE]
     support_frac <- if (nrow(active_sub) > 0) active_sub$n_active_edges / pmax(active_sub$n_edges, 1) else numeric(0)
-    n_local_active <- sum(sub$local_active %in% TRUE)
-    n_distal_candidate <- sum(sub$distal_candidate %in% TRUE)
-    local_support_fraction <- if (nrow(active_sub) > 0) n_local_active / nrow(active_sub) else NA_real_
-    support_label <- if (nrow(active_sub) == 0) {
-      "inactive"
-    } else if (n_local_active == 0 && n_distal_candidate > 0) {
-      "global_only_candidate"
-    } else if (n_distal_candidate == 0 && n_local_active > 0) {
-      "local_graph_supported"
-    } else {
-      "mixed_local_global"
-    }
     top_lr <- if (nrow(active_sub) > 0) active_sub$lr_pair[which.max(active_sub$lcs)] else NA_character_
     top_pathway <- if (nrow(active_sub) > 0) {
       pw_sum <- tapply(active_sub$lcs, active_sub$pathway, sum, na.rm = TRUE)
       names(pw_sum)[which.max(pw_sum)]
-    } else NA_character_
-    dominant_range <- if (nrow(active_sub) > 0) {
-      ranges <- table(active_sub$communication_range)
-      names(ranges)[which.max(ranges)]
     } else NA_character_
 
     data.frame(
@@ -446,23 +416,12 @@ celltype_comm_to_lcs <- function(ct_comm,
       n_scored_lr = nrow(finite_sub),
       n_active_lr = nrow(active_sub),
       active_lr_event_count = nrow(active_sub),
-      n_local_active = n_local_active,
-      n_global_candidate_active = sum(sub$global_candidate_active %in% TRUE),
-      n_distal_candidate = n_distal_candidate,
-      local_support_fraction_active = local_support_fraction,
-      communication_support_label = support_label,
-      n_juxtacrine = sum(active_sub$communication_range == "juxtacrine"),
-      n_paracrine = sum(active_sub$communication_range == "paracrine"),
-      n_distal = sum(active_sub$communication_range == "distal/endocrine"),
       sum_lcs = sum(active_sub$lcs, na.rm = TRUE),
       sum_lcs_all = sum(finite_sub$lcs, na.rm = TRUE),
       mean_lcs_active = if (nrow(active_sub) > 0) mean(active_sub$lcs, na.rm = TRUE) else NA_real_,
       mean_lcs_all = if (nrow(finite_sub) > 0) mean(finite_sub$lcs, na.rm = TRUE) else NA_real_,
       sum_active_edges = sum(active_sub$n_active_edges, na.rm = TRUE),
-      sum_active_edge_weight = sum(active_sub$active_edge_weight_sum, na.rm = TRUE),
-      active_edge_weight_sum = sum(active_sub$active_edge_weight_sum, na.rm = TRUE),
       mean_edge_support_fraction_active = if (length(support_frac) > 0) mean(support_frac, na.rm = TRUE) else NA_real_,
-      dominant_communication_range = dominant_range,
       top_lr_pair = top_lr,
       top_pathway = top_pathway,
       stringsAsFactors = FALSE
@@ -487,35 +446,17 @@ celltype_comm_to_lcs <- function(ct_comm,
   out <- lapply(sp, function(ii) {
     sub <- df[ii, , drop = FALSE]
     support_frac <- sub$n_active_edges / pmax(sub$n_edges, 1)
-    n_local_active <- sum(sub$local_active %in% TRUE)
-    n_distal_candidate <- sum(sub$distal_candidate %in% TRUE)
-    local_support_fraction <- n_local_active / nrow(sub)
-    support_label <- if (n_local_active == 0 && n_distal_candidate > 0) {
-      "global_only_candidate"
-    } else if (n_distal_candidate == 0 && n_local_active > 0) {
-      "local_graph_supported"
-    } else {
-      "mixed_local_global"
-    }
-    ranges <- table(sub$communication_range)
     top_lr <- sub$lr_pair[which.max(sub$lcs)]
     data.frame(
       sender_type = sub$sender_type[1],
       receiver_type = sub$receiver_type[1],
       pathway = sub$pathway[1],
       n_active_lr = nrow(sub),
-      n_local_active = n_local_active,
-      n_global_candidate_active = sum(sub$global_candidate_active %in% TRUE),
-      n_distal_candidate = n_distal_candidate,
-      local_support_fraction_active = local_support_fraction,
-      communication_support_label = support_label,
       sum_lcs = sum(sub$lcs, na.rm = TRUE),
       sum_lcs_all = sum(sub$lcs, na.rm = TRUE),
       mean_lcs_active = mean(sub$lcs, na.rm = TRUE),
       sum_active_edges = sum(sub$n_active_edges, na.rm = TRUE),
-      sum_active_edge_weight = sum(sub$active_edge_weight_sum, na.rm = TRUE),
       mean_edge_support_fraction_active = mean(support_frac, na.rm = TRUE),
-      dominant_communication_range = names(ranges)[which.max(ranges)],
       top_lr_pair = top_lr,
       stringsAsFactors = FALSE
     )
@@ -578,11 +519,11 @@ celltype_comm_to_lcs <- function(ct_comm,
 .empty_lr_table <- function() {
   data.frame(
     sender_type = character(), receiver_type = character(), lr_pair = character(), ligand = character(), receptor = character(), pathway = character(),
-    lcs = numeric(), lcs_neighborhood = numeric(), lcs_global = numeric(), lcs_unweighted = numeric(), lcs_primary_mode = character(), communication_range = character(),
-    n_edges = integer(), edge_weight_sum = numeric(), n_active_edges = numeric(), n_active_neighborhood = integer(), active_edge_weight_sum = numeric(),
+    lcs = numeric(), lcs_global = numeric(), lcs_unweighted = numeric(),
+    n_edges = integer(), edge_weight_sum = numeric(), n_active_edges = numeric(),
     n_global_possible = numeric(), n_active_global = numeric(), sender_cell_count = integer(), receiver_cell_count = integer(), ligand_active_n_sender = numeric(),
-    receptor_active_n_receiver = numeric(), ligand_active_frac_sender = numeric(), receptor_active_frac_receiver = numeric(), local_active = logical(),
-    global_candidate_active = logical(), distal_candidate = logical(), candidate_active = logical(), active = logical(), stringsAsFactors = FALSE
+    receptor_active_n_receiver = numeric(), ligand_active_frac_sender = numeric(), receptor_active_frac_receiver = numeric(),
+    active = logical(), stringsAsFactors = FALSE
   )
 }
 
@@ -595,23 +536,12 @@ celltype_comm_to_lcs <- function(ct_comm,
     n_scored_lr = integer(nrow(group_defs)),
     n_active_lr = integer(nrow(group_defs)),
     active_lr_event_count = integer(nrow(group_defs)),
-    n_local_active = integer(nrow(group_defs)),
-    n_global_candidate_active = integer(nrow(group_defs)),
-    n_distal_candidate = integer(nrow(group_defs)),
-    local_support_fraction_active = rep(NA_real_, nrow(group_defs)),
-    communication_support_label = rep("inactive", nrow(group_defs)),
-    n_juxtacrine = integer(nrow(group_defs)),
-    n_paracrine = integer(nrow(group_defs)),
-    n_distal = integer(nrow(group_defs)),
     sum_lcs = numeric(nrow(group_defs)),
     sum_lcs_all = numeric(nrow(group_defs)),
     mean_lcs_active = rep(NA_real_, nrow(group_defs)),
     mean_lcs_all = rep(NA_real_, nrow(group_defs)),
     sum_active_edges = numeric(nrow(group_defs)),
-    sum_active_edge_weight = numeric(nrow(group_defs)),
-    active_edge_weight_sum = numeric(nrow(group_defs)),
     mean_edge_support_fraction_active = rep(NA_real_, nrow(group_defs)),
-    dominant_communication_range = rep(NA_character_, nrow(group_defs)),
     top_lr_pair = rep(NA_character_, nrow(group_defs)),
     top_pathway = rep(NA_character_, nrow(group_defs)),
     stringsAsFactors = FALSE
@@ -620,10 +550,9 @@ celltype_comm_to_lcs <- function(ct_comm,
 
 .empty_pathway_summary <- function() {
   data.frame(
-    sender_type = character(), receiver_type = character(), pathway = character(), n_active_lr = integer(), n_local_active = integer(),
-    n_global_candidate_active = integer(), n_distal_candidate = integer(), local_support_fraction_active = numeric(), communication_support_label = character(),
-    sum_lcs = numeric(), sum_lcs_all = numeric(), mean_lcs_active = numeric(), sum_active_edges = numeric(), sum_active_edge_weight = numeric(),
-    mean_edge_support_fraction_active = numeric(), dominant_communication_range = character(), top_lr_pair = character(), stringsAsFactors = FALSE
+    sender_type = character(), receiver_type = character(), pathway = character(), n_active_lr = integer(),
+    sum_lcs = numeric(), sum_lcs_all = numeric(), mean_lcs_active = numeric(), sum_active_edges = numeric(),
+    mean_edge_support_fraction_active = numeric(), top_lr_pair = character(), stringsAsFactors = FALSE
   )
 }
 

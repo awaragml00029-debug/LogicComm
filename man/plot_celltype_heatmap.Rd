@@ -7,8 +7,7 @@
 plot_celltype_heatmap(
   ct_comm,
   metric = c("n_active_lr", "active_lr_event_count", "sum_lcs", "mean_lcs_active",
-    "sum_lcs_all", "n_edges", "edge_weight_sum", "sum_active_edges",
-    "sum_active_edge_weight"),
+    "sum_lcs_all", "n_edges", "edge_weight_sum", "sum_active_edges"),
   title = NULL,
   rotate_x = 45
 )
