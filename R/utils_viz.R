@@ -29,8 +29,6 @@ logiccomm_brand <- list(
 .logiccomm_palettes <- list(
   qualitative = c("#1F6F78", "#E8A33D", "#33415C", "#D1495B", "#5AA9A3",
                   "#9B6FB0", "#7F8C8D", "#C9A227", "#2E86AB", "#B05E2A"),
-  range = c("juxtacrine" = "#33415C", "paracrine" = "#1F6F78",
-            "distal/endocrine" = "#E8A33D", "unknown" = "grey80"),
   roles = c("Sender" = "#D1495B", "Receiver" = "#1F6F78",
             "Mediator" = "#E8A33D", "Influencer" = "#33415C"),
   balance = c(low = "#1F6F78", mid = "#F4F4F2", high = "#D1495B"),
