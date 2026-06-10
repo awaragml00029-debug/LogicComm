@@ -40,6 +40,15 @@ support" labels referencing a per-cell graph that no longer exists.
 
 ## Fixes
 
+* Fixed `logic_summarize_celltypes()` emitting a spurious "knn_mat, graph_name,
+  remove_self_edges are deprecated and ignored" warning on **every** call. The
+  wrapper still declared and unconditionally forwarded those (now removed)
+  neighborhood parameters, and the deprecation shim warns on argument
+  *presence*, so even a default call with no neighborhood intent warned. The dead
+  parameters (`knn_mat`, `graph_name`, `mode`, `remove_self_edges`) were dropped
+  from the wrapper; scoring options now flow through `...`, and an explicitly
+  supplied legacy argument still warns (correctly) at
+  `summarize_celltype_communication()`.
 * Fixed `score_receiver_response()` (and therefore
   `add_receiver_response_score()`), which errored with "subscript out of bounds"
   in the standard workflow. It indexed `ct_comm$cell_labels` by

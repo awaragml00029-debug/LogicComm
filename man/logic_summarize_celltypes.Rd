@@ -9,12 +9,8 @@ logic_summarize_celltypes(
   cell_labels = NULL,
   seurat_obj = NULL,
   label_col = NULL,
-  knn_mat = NULL,
   lr_db = lr_pairs_human,
-  graph_name = NULL,
-  mode = c("auto", "neighborhood", "global"),
   include_self = TRUE,
-  remove_self_edges = TRUE,
   ...
 )
 }
@@ -27,19 +23,15 @@ logic_summarize_celltypes(
 
 \item{label_col}{Optional Seurat metadata column.}
 
-\item{knn_mat}{Optional cells x cells graph.}
-
 \item{lr_db}{LogicComm ligand-receptor database.}
-
-\item{graph_name}{Optional Seurat graph name.}
-
-\item{mode}{\code{"auto"}, \code{"neighborhood"}, or \code{"global"}.}
 
 \item{include_self}{Include same-cell-type sender/receiver pairs.}
 
-\item{remove_self_edges}{Remove cell-level graph self-loops.}
-
-\item{...}{Additional arguments passed to \code{summarize_celltype_communication()}.}
+\item{...}{Additional arguments passed to
+\code{\link{summarize_celltype_communication}} (for example
+\code{lcs_threshold}, \code{min_edges}, \code{min_expr_frac},
+\code{lcs_weighting}). Legacy per-cell neighborhood arguments are accepted
+there for backward compatibility and ignored with a warning.}
 }
 \value{
 \code{LogicCommCellTypeComm} object.

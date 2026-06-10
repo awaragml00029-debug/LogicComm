@@ -209,39 +209,30 @@ logic_score_lr <- function(reo,
 #' @param cell_labels Named cell type labels.
 #' @param seurat_obj Optional Seurat object.
 #' @param label_col Optional Seurat metadata column.
-#' @param knn_mat Optional cells x cells graph.
 #' @param lr_db LogicComm ligand-receptor database.
-#' @param graph_name Optional Seurat graph name.
-#' @param mode \code{"auto"}, \code{"neighborhood"}, or \code{"global"}.
 #' @param include_self Include same-cell-type sender/receiver pairs.
-#' @param remove_self_edges Remove cell-level graph self-loops.
-#' @param ... Additional arguments passed to \code{summarize_celltype_communication()}.
+#' @param ... Additional arguments passed to
+#'   \code{\link{summarize_celltype_communication}} (for example
+#'   \code{lcs_threshold}, \code{min_edges}, \code{min_expr_frac},
+#'   \code{lcs_weighting}). Legacy per-cell neighborhood arguments are accepted
+#'   there for backward compatibility and ignored with a warning.
 #' @return \code{LogicCommCellTypeComm} object.
 #' @export
 logic_summarize_celltypes <- function(reo,
                                       cell_labels = NULL,
                                       seurat_obj = NULL,
                                       label_col = NULL,
-                                      knn_mat = NULL,
                                       lr_db = lr_pairs_human,
-                                      graph_name = NULL,
-                                      mode = c("auto", "neighborhood", "global"),
                                       include_self = TRUE,
-                                      remove_self_edges = TRUE,
                                       ...) {
-  mode <- match.arg(mode)
   logic_check_lrdb(lr_db, stop_on_error = TRUE)
   summarize_celltype_communication(
     reo_mat = reo,
     cell_labels = cell_labels,
     seurat_obj = seurat_obj,
     label_col = label_col,
-    knn_mat = knn_mat,
     lr_db = lr_db,
-    graph_name = graph_name,
-    mode = mode,
     include_self = include_self,
-    remove_self_edges = remove_self_edges,
     ...
   )
 }
