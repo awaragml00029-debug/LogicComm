@@ -9,15 +9,16 @@ Author: LogicComm Developer
 Maintainer: LogicComm Developer <dev@logiccomm.io>
 Description: Identifies cell-cell communication signals by converting single-cell
     gene expression into Relative Expression Ordering (REO) binary logic states,
-    then detecting ligand-receptor Logic Consensus Scores (LCS) across cell
-    neighborhoods. Designed for scalable multi-sample comparison, such as case
+    then detecting ligand-receptor Logic Consensus Scores (LCS) from cell-type
+    REO co-expression. Designed for scalable multi-sample comparison, such as case
     versus control cohorts, without requiring cell type pre-annotation. Supports
-    cell-type-resolved communication summaries, weighted graph scoring,
-    signaling-role centrality with confidence labels, bootstrap/null diagnostics,
-    receiver-response logic scoring, spatial and pseudotime communication
-    modules, sample-level quasibinomial differential modeling, publication-ready
-    specificity scoring, permutation-null diagnostics, role-evidence interpretation,
-    rank-aware REO evidence, threshold-stability scoring, report helpers,
+    cell-type-resolved communication summaries, signaling-role centrality with
+    confidence labels, bootstrap and permutation-null diagnostics,
+    receiver-response logic scoring, proliferation-confound and publication-ready
+    specificity diagnostics, an axis-level permutation discovery workflow,
+    sample-level quasibinomial differential modeling, role-evidence interpretation,
+    rank-aware REO evidence, threshold-stability scoring, pseudotime communication
+    dynamics, spatial graph and visualization utilities, report helpers,
     BPCells on-disk matrices, and Rcpp high-performance computation.
 License: MIT + file LICENSE
 LazyData: true
@@ -32,5 +33,4 @@ LinkingTo: Rcpp
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 NeedsCompilation: yes
-Config/roxygen2/version: 8.0.0
 RoxygenNote: 7.3.1

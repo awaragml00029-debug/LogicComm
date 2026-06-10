@@ -41,11 +41,25 @@ support" labels referencing a per-cell graph that no longer exists.
   graph-support guide rows; `write_communication_report()` drops the
   distal-candidate section and the KNN/neighborhood cautions.
 * `logic_grade_evidence()` now grades on the evidence the cell-type model
-  produces — an active co-expression call, optionally corroborated by attached
-  orthogonal validation — rather than the removed local/distal/global graph
+  produces -- an active co-expression call, optionally corroborated by attached
+  orthogonal validation -- rather than the removed local/distal/global graph
   distinction (grade A = active + validation, B = active, otherwise
   insufficient).
 * `diagnose_celltype_communication()` no longer reports `n_distal_candidates`.
+
+## Documentation
+
+* Aligned every prose description of the method with the actual cell-type
+  co-expression model. The manuscript (`inst/manuscript`) no longer presents the
+  removed per-cell KNN/SNN neighborhood scoring as a current feature (abstract,
+  introduction, methods, and figure captions were corrected, the stale test
+  count updated, and the PBMC empirical sections flagged for regeneration against
+  the v0.13 scorer); the README dropped the "KNN/SNN graph: optional but
+  recommended" claim; and the `LogicComm-intro` overview no longer describes a
+  "neighboring receiver cell".
+* `DESCRIPTION` no longer advertises "weighted graph scoring" or spatial
+  communication "modules"; it describes cell-type REO co-expression scoring, the
+  discovery workflow, and the spatial graph/visualization utilities.
 
 ## Fixes
 
@@ -90,8 +104,8 @@ support" labels referencing a per-cell graph that no longer exists.
   the derived role labels improve. Regression test added.
 * `run_multisample()` no longer takes the dead neighborhood parameters
   (`knn_list`, `graph_name`, `remove_self_edges`, `graph_symmetrize`,
-  `edge_weight_mode`). They had no effect since the v0.12 neighborhood removal —
-  `IdentifyLogicConsensus()` scores from global REO co-expression — yet were
+  `edge_weight_mode`). They had no effect since the v0.12 neighborhood removal --
+  `IdentifyLogicConsensus()` scores from global REO co-expression -- yet were
   silently accepted and `match.arg`-validated. They are now accepted via `...`
   and ignored with a deprecation warning, consistent with
   `IdentifyLogicConsensus()` and `summarize_celltype_communication()`.
