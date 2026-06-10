@@ -40,6 +40,17 @@ support" labels referencing a per-cell graph that no longer exists.
 
 ## Fixes
 
+* Fixed `calc_rank_shift()` to rank each gene within the cell's **full
+  transcriptome**, as its documentation describes (and as `calc_REO_matrix()`
+  anchors), instead of within the small L-R panel. The matrix was being subset to
+  the ~120 L-R genes *before* ranking, so a transcriptome-dominant ligand was
+  scored as mid-ranked among the panel and the transcriptome-wide rank shift the
+  method is designed to detect was lost (on a 200-gene example the normalized rank
+  of a dominant gene differed ~37-fold between the two definitions). The fix ranks
+  over all expressed genes per cell while storing only the target genes' ranks, so
+  memory stays bounded. Also corrected `mean_expr_*`/`log2fc_expr` to average each
+  gene over the samples that contain it rather than the full sample count.
+  Regression test added.
 * Fixed cell-type role assignment so that **Mediator and Influencer can actually
   be dominant roles**. `dominant_role` (and `secondary_role` / role separation)
   are now derived from the four role scores rescaled to a common [0, 1] scale

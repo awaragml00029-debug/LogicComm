@@ -97,11 +97,13 @@ calc_rank_shift <- function(sample_list,
 
   sample_ranks <- lapply(names(sample_list), function(sname) {
     mat <- .extract_matrix(sample_list[[sname]], layer = layer)
-    keep_g <- intersect(genes, rownames(mat))
-    if (length(keep_g) == 0) return(NULL)
-    mat_sub <- mat[keep_g, , drop = FALSE]
-
-    .median_norm_rank_per_gene(mat_sub, min_detection_frac)
+    if (length(intersect(genes, rownames(mat))) == 0) return(NULL)
+    # Rank each gene within the cell's FULL transcriptome, then keep the genes of
+    # interest. Subsetting to the L-R panel before ranking would rank each gene
+    # only among the panel (so a transcriptome-dominant ligand among ~120 panel
+    # genes would look mid-ranked), which contradicts the documented method and
+    # the within-cell REO philosophy used throughout LogicComm.
+    .median_norm_rank_per_gene(mat, min_detection_frac, target_genes = genes)
   })
   names(sample_ranks) <- names(sample_list)
 
@@ -194,42 +196,45 @@ calc_rank_shift <- function(sample_list,
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 #' Compute median normalized rank per gene across cells in one sample
+#'
+#' For each cell, all expressed genes are ranked within the cell's full
+#' transcriptome (rank 1 = highest expressed) and normalized by the number of
+#' expressed genes, so a smaller value means a more transcriptome-dominant gene.
+#' Only the requested \code{target_genes} are returned, but the ranking is always
+#' computed over the whole transcriptome so the score reflects each gene's
+#' position among all expressed genes, not within a panel. Memory stays bounded
+#' by \code{length(target_genes) x ncol(mat)}.
 #' @keywords internal
-.median_norm_rank_per_gene <- function(mat, min_detection_frac) {
-  n_cells <- ncol(mat)
+.median_norm_rank_per_gene <- function(mat, min_detection_frac, target_genes = NULL) {
+  keep <- if (is.null(target_genes)) rownames(mat) else intersect(target_genes, rownames(mat))
+  if (length(keep) == 0) return(stats::setNames(numeric(0), character(0)))
+  keep_idx <- match(keep, rownames(mat))
   n_genes <- nrow(mat)
+  n_cells <- ncol(mat)
 
-  # For each cell: rank expressed genes (rank 1 = highest)
-  # Then normalize by number of expressed genes
-  gene_ranks <- matrix(NA_real_, n_genes, n_cells)
-
+  # Store only the target genes' ranks; rank over the full transcriptome per cell.
+  tgt_ranks <- matrix(NA_real_, length(keep), n_cells, dimnames = list(keep, colnames(mat)))
   for (j in seq_len(n_cells)) {
-    col <- mat[, j]
+    col <- as.numeric(mat[, j])
     expressed <- col > 0
     n_exp <- sum(expressed)
     if (n_exp == 0) next
-    # rank() with ties.method="average": high expression = high rank number
-    # We invert: rank 1 = most expressed
-    r <- rank(-col[expressed], ties.method = "average")  # 1 = highest expr
-    norm_r <- r / n_exp  # normalize to [1/n, 1]
-    gene_ranks[expressed, j] <- norm_r
+    # ties.method = "average"; rank(-x) makes rank 1 = highest expression.
+    norm_r <- rep(NA_real_, n_genes)
+    norm_r[expressed] <- rank(-col[expressed], ties.method = "average") / n_exp
+    tgt_ranks[, j] <- norm_r[keep_idx]
   }
 
-  rownames(gene_ranks) <- rownames(mat)
-
-  # Per-gene: median normalized rank over cells where it is expressed
-  # Also filter by minimum detection fraction
-  detection <- rowMeans(mat > 0, na.rm = TRUE)
-  med_ranks <- apply(gene_ranks, 1, function(x) {
+  # Per-gene median normalized rank over cells where it is expressed, then drop
+  # genes detected in fewer than min_detection_frac of cells.
+  detection <- rowMeans(mat[keep, , drop = FALSE] > 0, na.rm = TRUE)
+  med_ranks <- apply(tgt_ranks, 1, function(x) {
     x <- x[!is.na(x)]
     if (length(x) == 0) return(NA_real_)
     stats::median(x)
   })
-
-  # Apply detection filter
   med_ranks[detection < min_detection_frac] <- NA_real_
-  med_ranks <- med_ranks[!is.na(med_ranks)]
-  med_ranks
+  med_ranks[!is.na(med_ranks)]
 }
 
 #' Compute mean expression per gene per group
@@ -245,13 +250,16 @@ calc_rank_shift <- function(sample_list,
       keep <- intersect(genes, rownames(m))
       rowMeans(m[keep, , drop = FALSE], na.rm = TRUE)
     })
-    # Average across samples
+    # Average across the samples that actually contain each gene (dividing by the
+    # total sample count would under-estimate genes absent from some samples).
     all_g <- Reduce(union, lapply(mats, names))
-    avg <- setNames(rep(0.0, length(all_g)), all_g)
+    sum_v <- setNames(rep(0.0, length(all_g)), all_g)
+    cnt_v <- setNames(rep(0L, length(all_g)), all_g)
     for (mv in mats) {
-      avg[names(mv)] <- avg[names(mv)] + mv / length(mats)
+      sum_v[names(mv)] <- sum_v[names(mv)] + mv
+      cnt_v[names(mv)] <- cnt_v[names(mv)] + 1L
     }
-    avg
+    sum_v / pmax(cnt_v, 1L)
   }
 
   list(

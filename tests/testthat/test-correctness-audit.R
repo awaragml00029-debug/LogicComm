@@ -135,3 +135,32 @@ test_that("run_multisample warns on and ignores legacy neighborhood arguments", 
     "deprecated and ignored"
   )
 })
+
+test_that("calc_rank_shift ranks within the full transcriptome, not the L-R panel", {
+  # MIF dominates the whole transcriptome in Case but is background-level in Ctrl,
+  # surrounded by ~300 non-panel genes. Ranking within the 2-gene L-R panel (the
+  # former behaviour) would put MIF at a mid normalized rank in Case (~0.5) and
+  # miss the transcriptome-wide shift; full-transcriptome ranking puts it near 0.
+  mk <- function(mif_level, seed) {
+    set.seed(seed)
+    G <- 300; Ce <- 25
+    m <- matrix(stats::rpois(G * Ce, 2) + 1, nrow = G,
+                dimnames = list(c("MIF", "CD74", paste0("bg", seq_len(G - 2))),
+                                paste0("c", seq_len(Ce))))
+    m["MIF", ] <- mif_level
+    m
+  }
+  samples <- list(c1 = mk(80, 1), c2 = mk(80, 2), t1 = mk(3, 3), t2 = mk(3, 4))
+  groups <- c(c1 = "Case", c2 = "Case", t1 = "Ctrl", t2 = "Ctrl")
+  lr_db <- data.frame(lr_pair = "MIF_CD74", ligand = "MIF", receptor = "CD74",
+                      pathway = "P", stringsAsFactors = FALSE)
+  lr_db$ligand_genes <- list("MIF")
+  lr_db$receptor_genes <- list("CD74")
+
+  rs <- calc_rank_shift(samples, group_info = groups, lr_db = lr_db,
+                        min_detection_frac = 0, verbose = FALSE)
+  mif <- rs[rs$gene == "MIF", , drop = FALSE]
+  expect_equal(nrow(mif), 1)
+  expect_lt(mif$median_rank_case, 0.05)   # transcriptome-dominant in Case
+  expect_gt(mif$shift_score, 0)           # more prominent (higher rank) in Case
+})

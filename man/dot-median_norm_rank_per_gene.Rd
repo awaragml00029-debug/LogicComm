@@ -4,9 +4,15 @@
 \alias{.median_norm_rank_per_gene}
 \title{Compute median normalized rank per gene across cells in one sample}
 \usage{
-.median_norm_rank_per_gene(mat, min_detection_frac)
+.median_norm_rank_per_gene(mat, min_detection_frac, target_genes = NULL)
 }
 \description{
-Compute median normalized rank per gene across cells in one sample
+For each cell, all expressed genes are ranked within the cell's full
+transcriptome (rank 1 = highest expressed) and normalized by the number of
+expressed genes, so a smaller value means a more transcriptome-dominant gene.
+Only the requested \code{target_genes} are returned, but the ranking is always
+computed over the whole transcriptome so the score reflects each gene's
+position among all expressed genes, not within a panel. Memory stays bounded
+by \code{length(target_genes) x ncol(mat)}.
 }
 \keyword{internal}
