@@ -20,13 +20,13 @@ knitr::opts_chunk$set(
 
 ## Overview
 
-> ### ⚠️ v0.12 API update — read first
+> ### ⚠️ Cell-type co-expression API — read first
 >
-> LogicComm v0.12 scores cell-cell communication at the **cell-type level from
+> LogicComm scores cell-cell communication at the **cell-type level from
 > REO co-expression**; the per-cell **KNN/SNN neighborhood** scoring was removed
 > (for dissociated scRNA-seq that graph is in expression space, not physical
 > space, so it cannot license spatial juxtacrine/paracrine claims). The
-> recommended entry point is now the one-call pipeline:
+> recommended entry point is the one-call pipeline:
 >
 > ```r
 > # REO with the rank matrix (only needed for lcs_weighting = "rank").
@@ -43,12 +43,11 @@ knitr::opts_chunk$set(
 > res$view        # confound-filtered discovery view
 > ```
 >
-> The sections below still show the legacy per-step / neighborhood API. Old
-> arguments (`knn_mat`, `mode`, `graph_name`, `graph_symmetrize`,
-> `edge_weight_mode`, `remove_self_edges`) are **accepted but deprecated and
-> ignored with a warning**, so the tutorial still runs; results are scored from
-> cell-type co-expression regardless. A full rewrite of the per-step sections to
-> the cell-type API is in progress.
+> The step-by-step sections below use this cell-type co-expression API. The legacy
+> per-cell neighborhood arguments (`knn_mat`, `mode`, `graph_name`,
+> `graph_symmetrize`, `edge_weight_mode`, `remove_self_edges`) are still
+> **accepted but deprecated and ignored with a warning** for backward
+> compatibility; communication is scored from cell-type co-expression regardless.
 
 This tutorial shows how to run **LogicComm** on the classic **PBMC3K** dataset
 with a Seurat workflow.
@@ -94,10 +93,10 @@ A publication-style biological question for this vignette is:
 
 The later sections translate raw LogicComm scores into figure-ready summaries,
 role confidence, edge-support QC, optional receiver-response evidence, spatial
-neighborhood analysis, pseudotime dynamics, and sample-level differential models.
+visualization utilities, pseudotime dynamics, and sample-level differential models.
 
 **中文说明。** 后续章节会把原始 LCS 分数转成更适合发表图表和生物学解释的结果，包括
-细胞类型通讯网络、角色分析、边支持度质控、受体下游响应证据、空间邻域扩展、拟时序动态
+细胞类型通讯网络、角色分析、边支持度质控、受体下游响应证据、空间可视化工具、拟时序动态
 以及多样本差异模型。
 
 ### Key terms / 关键术语
@@ -105,8 +104,8 @@ neighborhood analysis, pseudotime dynamics, and sample-level differential models
 | English term | 中文解释 |
 |---|---|
 | REO matrix | 相对表达排序得到的二值逻辑矩阵，表示每个细胞内基因是否相对活跃。 |
-| LCS | Logic Consensus Score，v0.12 中表示配体-受体逻辑在“发送细胞类型 × 接收细胞类型”共表达机会中被满足的比例。 |
-| cell-type co-expression | v0.12 的打分单元：每个 sender→receiver 细胞类型对，配体在 sender、受体在 receiver 同时活跃的比例（不依赖 per-cell 图）。 |
+| LCS | Logic Consensus Score，表示配体-受体逻辑在“发送细胞类型 × 接收细胞类型”共表达机会中被满足的比例。 |
+| cell-type co-expression | LogicComm 的打分单元：每个 sender→receiver 细胞类型对，配体在 sender、受体在 receiver 同时活跃的比例（不依赖 per-cell 图）。 |
 | 已弃用的 neighborhood mode | 旧版基于 Seurat KNN/SNN 的 per-cell 邻域打分；表达空间的图不能代表物理邻近，已移除（相关参数接受但忽略并警告）。 |
 | self-loop | 单个细胞自己连自己，例如 `CellA -> CellA`，默认去掉。 |
 | same-cell-type signaling | 同一细胞类型内部通讯，例如 `T cell -> T cell`，默认保留。 |
@@ -204,13 +203,14 @@ If your object uses Seurat v5, LogicComm can read a named assay layer such as
 
 ## Step 2: Standard Seurat Preprocessing
 
-LogicComm itself does not require Seurat normalization, but KNN mode needs a
-cell-cell graph. We therefore run a normal Seurat preprocessing workflow to build
-neighbors and UMAP.
+LogicComm scores communication at the cell-type level and does not require Seurat
+normalization or a cell-cell graph. We still run a standard Seurat workflow here
+only to obtain **cell-type labels** (clustering) and a UMAP for visualization;
+LogicComm itself consumes the REO matrix and the labels, not the graph.
 
-**中文说明。** LogicComm 的 REO 逻辑本身不依赖 Seurat 标准化，但如果要使用
-KNN 邻域模式，就需要 Seurat 的细胞-细胞邻居图。因此这里先运行标准 Seurat 流程，
-得到 `RNA_nn` / `RNA_snn` 图和 UMAP。
+**中文说明。** LogicComm 在细胞类型层面打分，既不依赖 Seurat 标准化，也不需要细胞-细胞
+邻居图。这里跑标准 Seurat 流程只是为了得到**细胞类型标签**（聚类）和用于可视化的 UMAP；
+LogicComm 真正用到的是 REO 矩阵和标签，而不是图。
 
 ```{r seurat_preprocess, eval=FALSE}
 pbmc <- NormalizeData(pbmc, verbose = FALSE)
@@ -229,25 +229,18 @@ pbmc <- RunUMAP(pbmc, dims = 1:20, verbose = FALSE)
 pbmc <- FindClusters(pbmc, resolution = 0.5, verbose = FALSE)
 ```
 
-Seurat usually stores the graph as something like `RNA_snn` or `RNA_nn` in
-`pbmc@graphs`. You can inspect available graph names:
-
-```{r inspect_graphs, eval=FALSE}
-names(pbmc@graphs)
-```
-
 **Biological interpretation.** PCA/UMAP/clustering should separate PBMC immune
 states according to marker-gene programs: T/NK cells are often driven by T-cell
 and cytotoxic markers, B cells by B-cell receptor markers, monocytes by myeloid
-and inflammatory genes, and platelets by megakaryocyte genes. LogicComm later
-uses the `RNA_nn` graph as a local cellular neighborhood. Therefore an L-R pair
-with high neighborhood LCS means the ligand-active and receptor-active cells are
-close in the PBMC transcriptional manifold, not merely present somewhere in the
-sample.
+and inflammatory genes, and platelets by megakaryocyte genes. These clusters
+become the **cell-type labels** LogicComm scores over: the cell-type LCS asks, for
+each sender -> receiver cell-type pair, in what fraction of the pair's opportunity
+universe (sender cells x receiver cells) the ligand is active in the sender and
+the receptor in the receiver.
 
-**中文说明。** `RNA_nn` 在这里代表转录组空间里的局部邻近关系。高 neighborhood
-LCS 的含义不是“这个样本里有 ligand 也有 receptor”这么简单，而是 ligand 活跃细胞
-和 receptor 活跃细胞经常出现在邻近关系中。
+**中文说明。** 聚类结果就是 LogicComm 打分所用的**细胞类型标签**。细胞类型 LCS 衡量的是：
+对每个 发送 -> 接收 细胞类型对，在该对的机会空间（发送细胞数 x 接收细胞数）中，有多大比例
+满足“发送细胞里配体活跃、接收细胞里受体活跃”的共表达。
 
 ---
 
@@ -395,7 +388,7 @@ only stronger within-cell activity and may reduce noisy low-level immune signals
 `IdentifyLogicConsensus()` computes, for each L-R pair, a **dataset-level** Logic
 Consensus Score: the fraction of cells in which the complete ligand logic and the
 complete receptor logic are simultaneously realized (co-expression). LogicComm
-v0.12 scores from REO co-expression and no longer uses a per-cell KNN/SNN graph.
+LogicComm scores from REO co-expression and no longer uses a per-cell KNN/SNN graph.
 
 **中文说明。** 这一步计算每个 L-R 对的 LCS：在多大比例的细胞里配体逻辑和受体逻辑
 同时成立（共表达）。v0.12 起 LogicComm 基于 REO 共表达打分，不再使用 per-cell 邻域图。
@@ -449,17 +442,13 @@ and receiver populations are the same annotated cell type.
 **中文说明。** LogicComm 默认保留同一细胞类型内部通讯，这和 CellChat 中常见的
 `celltype -> same celltype` 解释方式一致。也就是说，`Tumor -> Tumor` 可以作为
 自分泌样或同类细胞通讯潜力来解释，但不要过度声称它证明了“同一个单细胞自己分泌、
-自己接收”。默认去掉 `CellA -> CellA` 自环，是为了避免把单细胞内 L/R 共表达直接当成
-邻域通讯主证据；默认保留 `celltypeA -> celltypeA`，是为了保留同类细胞群体内部的
-通讯信息。
+自己接收”。默认保留 `celltypeA -> celltypeA`，是为了保留同类细胞群体内部的通讯信息。
 
-**Biological interpretation.** `RNA_nn` and `RNA_snn` answer slightly different
-questions. `RNA_nn` is closer to "which cells are immediate transcriptional
-neighbors?" and is therefore the preferred graph for local L-R logic. `RNA_snn`
-emphasizes shared neighborhoods and is more cluster-like. If the correlation
-between `RNA_nn` and `RNA_snn` LCS is high, the strongest signals are robust to
-the neighborhood definition. If it is low, interpret graph-dependent pairs more
-cautiously and inspect whether they are driven by cluster boundaries.
+**Biological interpretation.** Same-cell-type axes are common in PBMC immune
+signaling (for example monocyte -> monocyte or T -> T programs). Interpret them as
+population-level autocrine or homotypic potential, and before emphasizing one,
+check that the ligand and receptor are each active in a non-trivial fraction of
+that cell type (the `min_expr_frac` gate) rather than in a few outlier cells.
 
 ---
 
@@ -483,7 +472,7 @@ head(lcs_tbl, 20)
 
 **Biological interpretation.** The table is the ranked communication-program
 summary for this sample. The `lcs` value is useful for prioritization: higher
-values indicate more frequent neighborhood-level ligand/receptor co-activity.
+values indicate more frequent ligand/receptor REO co-expression across cells.
 Rows near zero are not necessarily biologically impossible; they may be absent in
 PBMC3K, too rare, filtered by the REO threshold, or require a cell type not well
 represented in the dataset. For publication-style interpretation, annotate top
@@ -639,19 +628,20 @@ moving to manually curated cell type annotations.
 
 ---
 
-## Step 9: Biology-Oriented Cell-Type Communication & Range Analysis
+## Step 9: Biology-Oriented Cell-Type Communication
 
-A critical biological question is: **how** do these cells talk?
--   **Juxtacrine**: Required physical proximity (contact-dependent).
--   **Paracrine**: Occurs between neighbors (secreted signaling).
--   **Distal/Endocrine**: Occurs between distant cell types (systemic signaling).
+The practical biological question is **which cell types talk to which, and through
+which ligand-receptor programs**. LogicComm answers this from REO co-expression at
+the cell-type level: for each sender -> receiver cell-type pair it reports the L-R
+axes that are active, their summed communication strength, the cell-type roles
+(sender / receiver / mediator / influencer), and pathway-level overviews. It does
+not assign a physical signaling range (juxtacrine / paracrine / distal) -- see the
+note in §9.1.
 
-LogicComm now automatically classifies communication events into these ranges by comparing neighborhood-based scores with global potential.
-
-**中文说明。** 这一节是发表级解释的重点：不只看某个 L-R 对有没有分数，还要看它是
-局部邻域支持的信号、同类细胞内部信号，还是可能被 KNN 图漏掉的远距离候选信号。
-LogicComm 会同时报告 local neighborhood evidence 和 global candidate potential，
-避免把远距离通讯简单丢掉。
+**中文说明。** 这一节是发表级解释的重点：从细胞类型层面的 REO 共表达出发，回答“哪些
+细胞类型在通讯、通过哪些配体-受体程序通讯”。对每个 发送 -> 接收 细胞类型对，LogicComm
+给出活跃的 L-R 轴、汇总通讯强度、细胞类型角色，以及通路层面的概览；它不判定物理信号
+距离（juxtacrine / paracrine / distal），原因见 §9.1。
 
 ```{r summarize_celltype_comm, eval=FALSE}
 # Use a biological annotation column
@@ -676,15 +666,16 @@ ct_comm <- summarize_celltype_communication(
 
 ### 9.1 A note on communication "range"
 
-v0.12 scores at the **cell-type level from co-expression**, so the former
+LogicComm scores at the **cell-type level from co-expression**, so the former
 local / distal "communication range" — a per-cell neighborhood concept — no
 longer applies: every axis is a cell-type co-expression axis. Genuine
-distance/range claims require physical spatial coordinates (see the spatial
-module). Pathway- and strength-level overviews are in §9.4–§9.5.
+distance/range claims require physical spatial coordinates (only spatial
+visualization utilities are provided, not a spatial scorer). Pathway- and
+strength-level overviews are in §9.4–§9.5.
 
-**中文说明。** v0.12 在细胞类型层面用共表达打分，旧的 local/distal“通讯距离”属于
+**中文说明。** LogicComm 在细胞类型层面用共表达打分，旧的 local/distal“通讯距离”属于
 per-cell 邻域概念，已不再适用——每条都是细胞类型共表达 axis。真正的距离声称需要物理
-空间坐标（见空间模块）。
+空间坐标（本包只提供空间可视化工具，不提供空间打分器）。
 
 ### 9.2 Publication-Ready Network Visualization
 Visualize the sender -> receiver cell-type communication network.
@@ -716,17 +707,17 @@ plot_celltype_role_heatmap(ct_comm)
 Inspect specific L-R pairs driving the communication between cell types.
 
 ```{r lr_bubble_advanced, eval=FALSE, fig.width=10, fig.height=7}
-# Advanced bubble plot with range classification and pathway faceting
+# Advanced bubble plot: bubbles sized and coloured by cell-type LCS, faceted by pathway
 plot_lr_bubble_advanced(
   ct_comm,
   top_n_per_pair = 5
 )
 ```
 
-**Interpretation.** This plot allows you to see the "Logic Hotspots" across the entire immune landscape. Faceting by pathway helps separate functional modules (e.g., Cytokines vs. ECM), while bubble color confirms if the interaction is local or distal.
+**Interpretation.** This plot allows you to see the "Logic Hotspots" across the entire immune landscape. Faceting by pathway helps separate functional modules (e.g., Cytokines vs. ECM), while bubble size and colour both encode the cell-type LCS (communication strength) of each sender -> receiver L-R axis.
 
 **中文说明。** bubble 图适合快速找出细胞类型之间最突出的 L-R 热点。分面可以区分不同
-功能模块，颜色可以提示该信号主要来自局部邻域证据还是远距离/全局候选证据。
+功能模块，气泡的大小和颜色都表示该 发送 -> 接收 L-R 轴的细胞类型 LCS（通讯强度）。
 
 ### 9.5 Pathway-Level Dominance
 Summarize pathway-level communication strength and network structure.
@@ -975,15 +966,16 @@ also important, but it should often be described as a broad immune-recognition o
 identity-associated program rather than a novel pair-specific signal.
 
 **Interpretation caution.** The sender -> receiver direction reflects the ligand
-side and receptor side of an L-R pair. If your graph is undirected or
-symmetrized, both directions may exist as graph opportunities, but the L-R
-interpretation remains directional. Very small cell types may have too few edges;
-always inspect `n_edges`, adjust `min_edges`, and examine bootstrap/permutation
-stability.
+side and receptor side of an L-R pair. Both directions of a cell-type pair are
+scored separately (the opportunity universe is the sender x receiver cell-count
+product), so the L-R interpretation stays directional. Very small cell types may
+have too few opportunities; always inspect `n_edges`, adjust `min_edges`, and
+examine bootstrap/permutation stability.
 
 **中文说明。** sender -> receiver 的方向来自 ligand 在 sender 侧、receptor 在 receiver
-侧。即使 KNN 图被无向化，L-R 的解释仍然是有方向的。小细胞群可能边数不足，所以要同时
-检查 `n_edges`、`min_edges`、bootstrap 和 permutation 结果。
+侧。一个细胞类型对的两个方向是分别打分的（机会空间是 发送细胞数 x 接收细胞数），因此
+L-R 的解释始终有方向。小细胞群可能机会数不足，所以要同时检查 `n_edges`、`min_edges`、
+bootstrap 和 permutation 结果。
 
 ---
 
@@ -1569,8 +1561,9 @@ table(group_info)
 
 ### 13.2 Preprocess each sample separately
 
-Each Seurat object should have its own KNN graph. A small helper function makes
-this easier:
+Each Seurat object needs its own **cell-type labels**, so we run standard
+preprocessing (PCA, neighbors for clustering, UMAP, and clustering) per sample.
+A small helper function makes this easier:
 
 ```{r multisample_preprocess_fun, eval=FALSE}
 preprocess_pbmc_for_logiccomm <- function(obj, dims = 1:20, resolution = 0.5) {
@@ -1588,15 +1581,11 @@ preprocess_pbmc_for_logiccomm <- function(obj, dims = 1:20, resolution = 0.5) {
 pbmc_list <- lapply(pbmc_list, preprocess_pbmc_for_logiccomm)
 ```
 
-Confirm that every sample has a nearest-neighbor graph:
+Confirm that every sample now has cluster labels (used as cell types):
 
 ```{r multisample_graph_check, eval=FALSE}
-lapply(pbmc_list, function(x) names(x@graphs))
+lapply(pbmc_list, function(x) head(Idents(x)))
 ```
-
-For standard RNA workflows, you will usually see `RNA_nn` and `RNA_snn`. For
-LogicComm KNN mode, `RNA_nn` is recommended because it represents the direct
-nearest-neighbor adjacency.
 
 ### 13.3 Recommended explicit multi-sample workflow
 
@@ -1808,8 +1797,8 @@ FeaturePlot(pbmc, features = "LogicComm_score", reduction = "umap")
 
 ## Troubleshooting
 
-**中文说明。** 这一节列出常见问题：PBMC3K 下载失败、KNN 图找不到、细胞名不匹配、内存过高、
-以及应该使用哪个 assay layer。
+**中文说明。** 这一节列出常见问题：PBMC3K 下载失败、遇到已弃用参数警告、细胞名不匹配、
+内存过高、以及应该使用哪个 assay layer。
 
 ### `SeuratData::InstallData("pbmc3k")` fails
 
@@ -1817,15 +1806,15 @@ Use the manual 10X download route in Step 12.
 
 ### Warning: a `knn_mat` / `mode` / `graph_*` argument is deprecated and ignored
 
-v0.12 scores at the cell-type level from co-expression and no longer uses a
+LogicComm scores at the cell-type level from co-expression and no longer uses a
 per-cell KNN/SNN graph. Drop these arguments — they are accepted only for
 backward compatibility and have no effect. (Cell-type labels still come from your
 usual Seurat clustering; LogicComm just doesn't consume the graph.)
 
-### Cell names do not match between REO and KNN
+### Cell names do not match between REO and cell labels
 
-Make sure `reo_pbmc` and the Seurat graph are generated from the same Seurat
-object without subsetting one but not the other.
+Make sure `reo_pbmc` and the cell-type labels come from the same Seurat object
+without subsetting one but not the other.
 
 ```{r troubleshoot_names, eval=FALSE}
 all(colnames(reo_pbmc) %in% colnames(pbmc))
