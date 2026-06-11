@@ -192,3 +192,23 @@ test_that("score_receiver_response aligns to shared cells when ct_comm filtered 
   if (nrow(b_rows)) expect_true(all(b_rows$receiver_response_score == 1))
   if (nrow(a_rows)) expect_true(all(a_rows$receiver_response_score == 0))
 })
+
+test_that("score_lr_activity accepts a LogicCommREOResult and rejects non-2D input", {
+  m <- matrix(c(1, 0, 0, 1), 2, 2, dimnames = list(c("L", "R"), c("c1", "c2")))
+  lr_db <- data.frame(lr_pair = "L_R", ligand = "L", receptor = "R", stringsAsFactors = FALSE)
+  lr_db$ligand_genes <- list("L")
+  lr_db$receptor_genes <- list("R")
+
+  # calc_REO_matrix(..., return_rank = TRUE) returns a LogicCommREOResult list;
+  # score_lr_activity() must unwrap it (other scoring entry points already do),
+  # not fail with "invalid 'times' argument".
+  reo_res <- structure(list(logic = Matrix::Matrix(m, sparse = TRUE), rank = NULL),
+                       class = "LogicCommREOResult")
+  s <- score_lr_activity(reo_res, lr_db = lr_db, verbose = FALSE)
+  expect_true(is.numeric(s$comm_score) && length(s$comm_score) == 2L)
+
+  # A single-cell/gene slice that dropped to a vector now gives a clear, actionable
+  # error instead of the cryptic rep(FALSE, ncol(...)) failure.
+  expect_error(score_lr_activity(m[, 1], lr_db = lr_db, verbose = FALSE),
+               "2D genes x cells REO matrix")
+})

@@ -52,6 +52,28 @@ score_lr_activity <- function(reo_mat,
 
   mode <- match.arg(mode, c("sender", "receiver", "both"))
 
+  # Accept a LogicCommREOResult (the output of calc_REO_matrix(..., return_rank =
+  # TRUE)) by using its binary logic matrix, mirroring the other scoring entry
+  # points. Then require a 2-D genes x cells matrix with names: a single-row or
+  # single-column slice that dropped to a vector (subset without drop = FALSE), a
+  # 1-D array, or a bare list would otherwise fail later inside
+  # .resolve_complex_logic() with a cryptic "invalid 'times' argument".
+  if (is.list(reo_mat) && !is.null(reo_mat$logic)) reo_mat <- reo_mat$logic
+  if (is.null(dim(reo_mat)) || length(dim(reo_mat)) != 2L) {
+    detail <- if (is.null(dim(reo_mat))) {
+      sprintf("a %s of length %d (a single-gene or single-cell slice drops to a vector; subset with drop = FALSE)",
+              class(reo_mat)[1], length(reo_mat))
+    } else {
+      sprintf("a %s with %d dimension(s)", class(reo_mat)[1], length(dim(reo_mat)))
+    }
+    stop("reo_mat must be a 2D genes x cells REO matrix; got ", detail,
+         ". If you built it with calc_REO_matrix(..., return_rank = TRUE), pass its $logic element.",
+         call. = FALSE)
+  }
+  if (is.null(rownames(reo_mat)) || is.null(colnames(reo_mat))) {
+    stop("reo_mat must have gene rownames and cell colnames.", call. = FALSE)
+  }
+
   n_pairs <- nrow(lr_db)
   n_cells <- ncol(reo_mat)
   cell_names <- colnames(reo_mat)

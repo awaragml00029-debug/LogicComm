@@ -1,3 +1,19 @@
+# LogicComm 0.13.1
+
+## Fixes
+
+* `score_lr_activity()` no longer fails with `Error in rep(FALSE,
+  ncol(logic_mat)) : invalid 'times' argument` when given anything other than a
+  plain 2D matrix. It was the only scoring entry point that did not unwrap a
+  `LogicCommREOResult` (the output of `calc_REO_matrix(..., return_rank = TRUE)`),
+  so passing that object -- or a single-row/column slice that had dropped to a
+  vector (subset without `drop = FALSE`), or a 1-D array -- reached an empty or
+  unmatched gene set and tried `rep(FALSE, ncol(x))` on an object with no valid
+  column count. `score_lr_activity()` now unwraps a `LogicCommREOResult` to its
+  `$logic` matrix (so that common case just works) and otherwise validates that
+  `reo_mat` is a 2D genes x cells matrix with row/column names, raising a clear,
+  actionable error instead. Regression test added.
+
 # LogicComm 0.13.0
 
 ## Breaking change: removed the transitional neighborhood / spatial-range output
