@@ -37,11 +37,15 @@ when necessary.}
 
 \item{lr_db}{LR database. Defaults to \code{ct_comm$lr_db} when available.}
 
-\item{n_perm}{Number of permutations.}
+\item{n_perm}{Number of preliminary permutations run for every axis. When
+\code{adaptive = FALSE} this is the total. When \code{adaptive = TRUE} it is
+only the first (screening) batch -- the top candidates are then taken up to
+\code{adaptive_n_perm}.}
 
 \item{n_cores}{Number of forked worker processes for the permutation loop
-(Unix/macOS). Default 1 (serial). Higher values give a near-linear speedup,
-making a publication-grade \code{n_perm} affordable; ignored on Windows.}
+(Unix/macOS). Default 1 (serial). Higher values give a near-linear speedup of
+\strong{both} the preliminary and the adaptive batches, making a
+publication-grade \code{n_perm} affordable; ignored on Windows.}
 
 \item{metric}{Metric to test. The default \code{"lcs"} (a column of
 \code{lr_table}) builds an \strong{axis-level} null: every sender ->
@@ -49,10 +53,15 @@ receiver -> L-R axis gets its own empirical p-value. A metric found in
 \code{pair_summary} (e.g. \code{"sum_lcs"}) builds a legacy cell-type-pair
 null instead.}
 
-\item{seed}{Optional random seed.}
+\item{seed}{Optional random seed (reproducible across cores via L'Ecuyer-CMRG
+streams).}
 
-\item{adaptive}{If TRUE, refine top preliminary candidates after the first
-\code{n_perm} permutations.}
+\item{adaptive}{If TRUE, after the first \code{n_perm} permutations the top
+\code{adaptive_top_n} candidates are refined up to \code{adaptive_n_perm}
+total permutations. \strong{Note:} this makes the run cost ~\code{adaptive_n_perm}
+permutations regardless of \code{n_perm} (e.g. \code{n_perm = 10} with the
+default \code{adaptive_n_perm = 1000} runs ~1000). For a quick test, keep
+\code{adaptive = FALSE} or lower \code{adaptive_n_perm}.}
 
 \item{adaptive_top_n}{Number of preliminary candidates to refine.}
 

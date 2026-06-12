@@ -82,18 +82,27 @@ bootstrap_celltype_communication <- function(ct_comm,
 #' @param knn_mat Optional KNN/SNN graph. Named graphs are subset to retained cells
 #'   when necessary.
 #' @param lr_db LR database. Defaults to \code{ct_comm$lr_db} when available.
-#' @param n_perm Number of permutations.
+#' @param n_perm Number of preliminary permutations run for every axis. When
+#'   \code{adaptive = FALSE} this is the total. When \code{adaptive = TRUE} it is
+#'   only the first (screening) batch -- the top candidates are then taken up to
+#'   \code{adaptive_n_perm}.
 #' @param n_cores Number of forked worker processes for the permutation loop
-#'   (Unix/macOS). Default 1 (serial). Higher values give a near-linear speedup,
-#'   making a publication-grade \code{n_perm} affordable; ignored on Windows.
+#'   (Unix/macOS). Default 1 (serial). Higher values give a near-linear speedup of
+#'   \strong{both} the preliminary and the adaptive batches, making a
+#'   publication-grade \code{n_perm} affordable; ignored on Windows.
 #' @param metric Metric to test. The default \code{"lcs"} (a column of
 #'   \code{lr_table}) builds an \strong{axis-level} null: every sender ->
 #'   receiver -> L-R axis gets its own empirical p-value. A metric found in
 #'   \code{pair_summary} (e.g. \code{"sum_lcs"}) builds a legacy cell-type-pair
 #'   null instead.
-#' @param seed Optional random seed.
-#' @param adaptive If TRUE, refine top preliminary candidates after the first
-#'   \code{n_perm} permutations.
+#' @param seed Optional random seed (reproducible across cores via L'Ecuyer-CMRG
+#'   streams).
+#' @param adaptive If TRUE, after the first \code{n_perm} permutations the top
+#'   \code{adaptive_top_n} candidates are refined up to \code{adaptive_n_perm}
+#'   total permutations. \strong{Note:} this makes the run cost ~\code{adaptive_n_perm}
+#'   permutations regardless of \code{n_perm} (e.g. \code{n_perm = 10} with the
+#'   default \code{adaptive_n_perm = 1000} runs ~1000). For a quick test, keep
+#'   \code{adaptive = FALSE} or lower \code{adaptive_n_perm}.
 #' @param adaptive_top_n Number of preliminary candidates to refine.
 #' @param adaptive_n_perm Target total permutations for adaptive candidates. For
 #'   example, \code{n_perm = 100} and \code{adaptive_n_perm = 1000} runs 900
@@ -242,29 +251,45 @@ permute_celltype_communication <- function(ct_comm = NULL,
     }
     vals[feature]
   }
-  # Fill an n-column null matrix, in parallel (forked workers) when n_cores > 1.
-  # The loop is embarrassingly parallel: each permutation independently reshuffles
-  # labels and re-summarises communication.
+  # Seed the reproducible parallel RNG (L'Ecuyer streams) once, so the preliminary
+  # and adaptive batches draw DIFFERENT permutations instead of repeating the same
+  # seed on each parallel call.
+  par_rng_seeded <- FALSE
+  # Fill an n-column null matrix. When n_cores > 1 the permutations run on forked
+  # workers, in chunks so progress is still reported during long runs; otherwise
+  # they run serially. Each permutation independently reshuffles labels and
+  # re-summarises communication (embarrassingly parallel).
   fill_perms <- function(n, tag) {
     use_par <- isTRUE(n_cores > 1L) && .Platform$OS.type != "windows" && n > 1L
+    out <- matrix(NA_real_, nrow = nrow(observed), ncol = n)
+    start <- proc.time()[["elapsed"]]
     if (use_par) {
-      if (!is.null(seed)) { RNGkind("L'Ecuyer-CMRG"); set.seed(seed) }
+      if (!is.null(seed) && !par_rng_seeded) {
+        RNGkind("L'Ecuyer-CMRG"); set.seed(seed); par_rng_seeded <<- TRUE
+      }
       if (isTRUE(verbose)) {
         message(sprintf("[CellTypeComm %s] %d permutations across %d cores...", tag, n, n_cores))
       }
-      res <- parallel::mclapply(seq_len(n), function(i) run_perm(), mc.cores = n_cores)
-      ok <- vapply(res, function(x) is.numeric(x) && length(x) == nrow(observed), logical(1))
-      if (!all(ok)) {
-        stop("Parallel permutation failed in ", sum(!ok), " of ", n,
-             " worker(s). Retry with n_cores = 1 to surface the underlying error.",
-             call. = FALSE)
+      chunk <- max(as.integer(n_cores), ceiling(n / 20))
+      done <- 0L
+      while (done < n) {
+        idx <- seq.int(done + 1L, min(done + chunk, n))
+        res <- parallel::mclapply(idx, function(i) run_perm(), mc.cores = n_cores)
+        ok <- vapply(res, function(x) is.numeric(x) && length(x) == nrow(observed), logical(1))
+        if (!all(ok)) {
+          stop("Parallel permutation failed in ", sum(!ok), " of ", length(idx),
+               " worker(s). Retry with n_cores = 1 to surface the underlying error.",
+               call. = FALSE)
+        }
+        out[, idx] <- matrix(unlist(res, use.names = FALSE), nrow = nrow(observed), ncol = length(idx))
+        done <- max(idx)
+        if (isTRUE(verbose)) {
+          message(sprintf("[CellTypeComm %s] %d/%d permutations | elapsed %.1f min",
+                          tag, done, n, (proc.time()[["elapsed"]] - start) / 60))
+        }
       }
-      out <- matrix(unlist(res, use.names = FALSE), nrow = nrow(observed), ncol = n)
-      if (isTRUE(verbose)) message(sprintf("[CellTypeComm %s] done (%d permutations).", tag, n))
-      out
     } else {
-      out <- matrix(NA_real_, nrow = nrow(observed), ncol = n)
-      start <- proc.time()[["elapsed"]]; step <- max(1, floor(n / 10))
+      step <- max(1, floor(n / 10))
       for (b in seq_len(n)) {
         out[, b] <- run_perm()
         if (isTRUE(verbose) && (b == 1 || b %% step == 0 || b == n)) {
@@ -272,8 +297,8 @@ permute_celltype_communication <- function(ct_comm = NULL,
                           tag, b, n, (proc.time()[["elapsed"]] - start) / 60))
         }
       }
-      out
     }
+    out
   }
   null_mat[] <- fill_perms(n_perm, "null")
   obs <- observed[[metric]]
@@ -294,18 +319,16 @@ permute_celltype_communication <- function(ct_comm = NULL,
           )
         )
       }
+      # The adaptive batch is another set of full permutations, so it honours
+      # n_cores exactly like the preliminary phase. (Previously this loop ran
+      # serially and ignored n_cores, so the bulk of the work -- e.g. 990 of 1000
+      # permutations -- crawled on a single core.) Only the top candidates' rows
+      # are kept, so they reach adaptive_n_perm resolution while the rest stay at
+      # n_perm.
+      extra_full <- fill_perms(extra_n, "null adaptive")
       extra_mat <- matrix(NA_real_, nrow = nrow(observed), ncol = extra_n,
                           dimnames = list(feature, paste0("adaptive", seq_len(extra_n))))
-      adaptive_start <- proc.time()[["elapsed"]]
-      adaptive_step <- max(1, floor(extra_n / 20))
-      for (b in seq_len(extra_n)) {
-        vals <- run_perm()
-        extra_mat[top_idx, b] <- vals[top_idx]
-        if (isTRUE(verbose) && (b == 1 || b %% adaptive_step == 0 || b == extra_n)) {
-          elapsed_min <- (proc.time()[["elapsed"]] - adaptive_start) / 60
-          message(sprintf("[CellTypeComm null adaptive] %d/%d additional permutations for top %d candidates | elapsed %.1f min", b, extra_n, length(top_idx), elapsed_min))
-        }
-      }
+      extra_mat[top_idx, ] <- extra_full[top_idx, , drop = FALSE]
       null_mat <- cbind(null_mat, extra_mat)
     }
   }

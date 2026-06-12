@@ -1,3 +1,24 @@
+# LogicComm 0.13.3
+
+## Fixes
+
+* `permute_celltype_communication(adaptive = TRUE)` now runs the adaptive
+  refinement batch **in parallel across `n_cores`**, like the preliminary batch.
+  Previously the adaptive loop was serial and ignored `n_cores`, so the bulk of
+  the work (e.g. 990 of 1000 permutations) crawled on a single core even with
+  `n_cores > 1`, and the run looked stuck. The parallel path also now reports
+  incremental progress in chunks (instead of only a start/done line), and the
+  L'Ecuyer-CMRG seed is set once so the preliminary and adaptive batches draw
+  different -- but reproducible -- permutations.
+
+## Documentation
+
+* Clarified `permute_celltype_communication()`: with `adaptive = TRUE` the run
+  costs roughly `adaptive_n_perm` permutations regardless of `n_perm` (so
+  `n_perm = 10` with the default `adaptive_n_perm = 1000` runs ~1000). For a quick
+  test, keep `adaptive = FALSE` or lower `adaptive_n_perm`. `n_cores` now
+  documents that it speeds up both batches.
+
 # LogicComm 0.13.2
 
 ## Usability
