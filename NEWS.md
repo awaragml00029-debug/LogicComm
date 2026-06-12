@@ -1,3 +1,17 @@
+# LogicComm 0.13.2
+
+## Usability
+
+* `LogicCommREOResult` (the `calc_REO_matrix(..., return_rank = TRUE)` object) now
+  behaves like the underlying genes x cells matrix for inspection and subsetting:
+  `dim()`, `nrow()`, `ncol()`, `rownames()`, `colnames()`, and `x[genes, cells]`
+  all work, and subsetting returns a `LogicCommREOResult` with both the logic and
+  rank matrices subset consistently. Previously these returned `NULL` /
+  "incorrect number of dimensions" because the object is a list, forcing users to
+  reach into `x$logic` for every matrix-like operation. The internal list
+  structure (`x$logic`, `x$rank`) is unchanged and every LogicComm function still
+  accepts the object directly.
+
 # LogicComm 0.13.1
 
 ## Fixes

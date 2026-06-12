@@ -329,3 +329,42 @@ print.LogicCommREOResult <- function(x, ...) {
               nrow(x$logic), ncol(x$logic), rank_msg))
   invisible(x)
 }
+
+#' Matrix-like accessors for LogicCommREOResult
+#'
+#' \code{calc_REO_matrix(..., return_rank = TRUE)} returns a
+#' \code{LogicCommREOResult} (a list with a \code{logic} binary matrix and a
+#' \code{rank} percentile matrix). These methods let it be inspected and subset
+#' like the underlying genes x cells matrix, so \code{dim()}, \code{nrow()},
+#' \code{ncol()}, \code{rownames()}, \code{colnames()}, and \code{x[genes, cells]}
+#' behave as expected. Subsetting returns a \code{LogicCommREOResult} with both
+#' the logic and rank matrices subset consistently. Use \code{x$logic} when a
+#' bare matrix is required.
+#'
+#' @param x A \code{LogicCommREOResult}.
+#' @param i,j Row (gene) and column (cell) subscripts.
+#' @param ... Ignored.
+#' @return \code{dim}/\code{dimnames} return the logic matrix's; \code{[} returns
+#'   a subset \code{LogicCommREOResult}.
+#' @name LogicCommREOResult-accessors
+#' @export
+dim.LogicCommREOResult <- function(x) dim(x$logic)
+
+#' @rdname LogicCommREOResult-accessors
+#' @export
+dimnames.LogicCommREOResult <- function(x) dimnames(x$logic)
+
+#' @rdname LogicCommREOResult-accessors
+#' @export
+`[.LogicCommREOResult` <- function(x, i, j, ...) {
+  mi <- missing(i); mj <- missing(j)
+  sub <- function(m) {
+    if (is.null(m)) return(NULL)
+    if (mi && mj) m[, , drop = FALSE]
+    else if (mi) m[, j, drop = FALSE]
+    else if (mj) m[i, , drop = FALSE]
+    else m[i, j, drop = FALSE]
+  }
+  structure(list(logic = sub(x$logic), rank = sub(x$rank)),
+            class = "LogicCommREOResult")
+}
